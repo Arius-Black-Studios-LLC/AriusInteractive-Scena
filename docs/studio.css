@@ -654,20 +654,21 @@ a { color: inherit; text-decoration: none; }
 }
 
 .workspace-editor:not(.has-inspector-selection) .panel-left {
-  width: 0;
-  min-width: 0;
-  max-width: 0;
-  padding: 0;
-  border: none;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
-.workspace-editor.has-inspector-selection .panel-left {
-  min-width: 280px;
-  opacity: 1;
-  pointer-events: auto;
+@media (min-width: 901px) {
+  .workspace-editor:not(.has-inspector-selection) .workspace-panels {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  }
+
+  .workspace-editor.has-inspector-selection .workspace-panels {
+    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 340px);
+  }
+
+  .workspace-editor.has-inspector-selection .panel-left {
+    display: flex;
+  }
 }
 
 .graph-toolbar-spacer { flex: 1; }
@@ -3738,11 +3739,31 @@ body.is-resizing-center {
 @media (max-width: 900px) {
   .studio-body { grid-template-columns: 1fr; }
   .studio-sidebar { display: none; }
+  .page-wide {
+    height: 100dvh;
+    padding: 0;
+  }
+  .page-dashboard {
+    padding: 0;
+    height: calc(100dvh - var(--topbar-h));
+    overflow: hidden;
+  }
+  .dashboard-main {
+    overflow: hidden;
+    padding: 0;
+    padding-bottom: 0;
+  }
+  .workspace-editor {
+    --mobile-toolbar-h: 15vh;
+    --mobile-sheet-h: 30vh;
+    height: 100%;
+  }
   .workspace-panels {
     grid-template-columns: 1fr;
     position: relative;
     min-height: 0;
     flex: 1;
+    height: calc(100% - var(--mobile-toolbar-h));
   }
   .workspace-editor:not(.has-inspector-selection) .panel-left,
   .workspace-editor.has-inspector-selection .panel-left {
@@ -3751,16 +3772,34 @@ body.is-resizing-center {
     max-width: none;
     opacity: 1;
     pointer-events: auto;
+    display: flex;
   }
   .graph-toolbar--studio {
+    flex: 0 0 var(--mobile-toolbar-h);
+    min-height: var(--mobile-toolbar-h);
+    max-height: var(--mobile-toolbar-h);
     flex-direction: column;
     align-items: stretch;
-    padding: 8px 10px;
+    padding: 6px 8px;
     gap: 0;
+    overflow-y: auto;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--scena-border);
+    z-index: 240;
   }
   .graph-toolbar-desktop { display: none; }
   .graph-toolbar-mobile {
     display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 4px;
+    width: 100%;
+  }
+  .graph-toolbar-mobile .btn-sm {
+    flex: 1 1 calc(33% - 4px);
+    min-width: 0;
+    padding: 6px 4px;
+    font-size: 0.75rem;
   }
   .panel-center {
     grid-template-rows: 1fr;
@@ -3770,8 +3809,8 @@ body.is-resizing-center {
     transition: height 0.22s ease, max-height 0.22s ease;
   }
   .workspace-editor.is-mobile-sheet-open .panel-center {
-    height: 50%;
-    max-height: 50%;
+    height: calc(100% - var(--mobile-sheet-h));
+    max-height: calc(100% - var(--mobile-sheet-h));
   }
   .center-resizer {
     display: none;
@@ -3794,12 +3833,21 @@ body.is-resizing-center {
     top: auto;
     width: 100%;
     max-width: none;
-    height: 50%;
-    z-index: 220;
+    height: var(--mobile-sheet-h);
+    max-height: var(--mobile-sheet-h);
+    z-index: 230;
     transform: translateY(100%);
     transition: transform 0.22s ease;
-    box-shadow: 0 -8px 32px rgba(20, 20, 20, 0.18);
+    box-shadow: 0 -10px 40px rgba(20, 20, 20, 0.22);
     pointer-events: none;
+    background: var(--scena-surface);
+    border-top: 2px solid var(--scena-border);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .workspace-editor .panel-left.graph-inspector {
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
   .workspace-editor.is-mobile-block-shelf-open .block-shelf,
   .workspace-editor.is-mobile-inspector-open .panel-left,
@@ -3812,7 +3860,6 @@ body.is-resizing-center {
     width: 100%;
     min-width: 0;
     border-right: none;
-    border-top: 1px solid var(--scena-border);
     opacity: 1;
     pointer-events: none;
     transform: translateY(100%);
@@ -3858,11 +3905,7 @@ body.is-resizing-center {
     height: 100%;
   }
   .workspace-editor.is-mobile-sheet-open .mobile-panel-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 210;
-    background: rgba(20, 20, 20, 0.28);
+    display: none;
   }
   .graph-port {
     width: 16px;

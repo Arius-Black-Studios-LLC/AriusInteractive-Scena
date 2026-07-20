@@ -93,6 +93,7 @@
     this.pinchState = null;
     this.ignoreMouseUntil = 0;
     this.mobileDrawer = null;
+    this.pendingNodePointer = null;
     this.dragNode = null;
     this.dragStart = null;
     this.dragEl = null;
@@ -803,6 +804,7 @@
     if (!this.learnMode) {
       this.bindMobileDrawer();
     }
+    this.syncSaveUiVisibility();
 
     document.addEventListener("mousedown", function (e) {
       if (!self.spawnMenu || self.spawnMenu.hidden) return;
@@ -929,6 +931,82 @@
 
   ScenaGraphEditor.prototype.isMobileLayout = function () {
     return window.matchMedia("(max-width: 900px)").matches;
+  };
+
+  ScenaGraphEditor.prototype.syncSaveUiVisibility = function () {
+    var hide = !!(this.learnMode || (this.series && this.series.templateSource));
+    if (this.saveBtn) this.saveBtn.hidden = hide;
+    if (this.mobileSaveBtn) this.mobileSaveBtn.hidden = hide;
+    if (this.saveStatusEl) this.saveStatusEl.hidden = hide;
+  };
+
+  ScenaGraphEditor.prototype.nodeDimensions = function (node) {
+    if (!node) return { width: 220, height: 88 };
+    if (ScenaStore.isRouterNode(node)) return { width: 240, height: 100 };
+    if (ScenaStore.isKeyItemGrant(node) || ScenaStore.shouldAutoAdvance(node)) {
+      return { width: 120, height: 88 };
+    }
+    return { width: 220, height: 110 };
+  };
+
+  ScenaGraphEditor.prototype.focusNodeInView = function (node) {
+    if (!node || !this.wrap) return;
+    var size = this.nodeDimensions(node);
+    var rect = this.wrap.getBoundingClientRect();
+    this.pan.x = rect.width / 2 - (node.x + size.width / 2) * this.zoom;
+    this.pan.y = rect.height / 2 - (node.y + size.height / 2) * this.zoom;
+    this.applyTransform();
+    this.refreshEpisodeContextBtn();
+  };
+
+  ScenaGraphEditor.prototype.startNodeDragFromPointer = function (pointer, clientX, clientY) {
+    var self = this;
+    var node = pointer.node;
+    var begin = function () {
+      self.selectNode(node.id, { skipConfirm: true });
+      self.dragNode = node;
+      self.dragEl = pointer.el;
+      self.dragStart = { mouseX: clientX, mouseY: clientY, nodeX: node.x, nodeY: node.y };
+    };
+    var nodeWidth = pointer.isFlowGate ? 240 : ((pointer.isLogic || pointer.isKeyItem) ? 120 : 220);
+    if (this.isNodePublished(node, nodeWidth)) {
+      this.confirmPublishedEdit(node, begin, function () {
+        self.dragNode = null;
+        self.dragStart = null;
+        self.dragEl = null;
+      });
+    } else {
+      begin();
+    }
+  };
+
+  ScenaGraphEditor.prototype.finishNodeTap = function (pointer) {
+    var self = this;
+    var applyTap = function () {
+      self.selectNode(pointer.node.id, { skipConfirm: true });
+      self.focusNodeInView(pointer.node);
+      if (self.isMobileLayout()) self.setMobileDrawer("inspector");
+    };
+    var nodeWidth = pointer.isFlowGate ? 240 : ((pointer.isLogic || pointer.isKeyItem) ? 120 : 220);
+    if (this.isNodePublished(pointer.node, nodeWidth)) {
+      this.confirmPublishedEdit(pointer.node, applyTap, function () {});
+    } else {
+      applyTap();
+    }
+  };
+
+  ScenaGraphEditor.prototype.armNodePointer = function (node, el, clientX, clientY, meta) {
+    this.pendingNodePointer = {
+      node: node,
+      el: el,
+      startX: clientX,
+      startY: clientY,
+      moved: false,
+      isFlowGate: meta.isFlowGate,
+      isLogic: meta.isLogic,
+      isKeyItem: meta.isKeyItem,
+    };
+    this.bindDragListeners();
   };
 
   ScenaGraphEditor.prototype.toggleBoundaryPlacement = function () {
@@ -1206,6 +1284,14 @@
 
   ScenaGraphEditor.prototype.onMouseMove = function (e) {
     var pt = eventClientXY(e);
+    if (this.pendingNodePointer && !this.dragNode) {
+      if (Math.hypot(pt.x - this.pendingNodePointer.startX, pt.y - this.pendingNodePointer.startY) >= 6) {
+        this.pendingNodePointer.moved = true;
+        var pending = this.pendingNodePointer;
+        this.pendingNodePointer = null;
+        this.startNodeDragFromPointer(pending, pt.x, pt.y);
+      }
+    }
     if (this.isPanning && this.panStart) {
       this.pan.x = pt.x - this.panStart.x;
       this.pan.y = pt.y - this.panStart.y;
@@ -1239,6 +1325,10 @@
 
   ScenaGraphEditor.prototype.onMouseUp = function (e) {
     var wasPanning = this.isPanning;
+    if (this.pendingNodePointer && !this.pendingNodePointer.moved && !this.dragNode) {
+      this.finishNodeTap(this.pendingNodePointer);
+    }
+    this.pendingNodePointer = null;
     this.isPanning = false;
     this.panStart = null;
     if (this.dragBoundary) {
@@ -2556,74 +2646,14 @@
 
       el.innerHTML = portsIn + '<div class="graph-node-body">' + body + '</div>' + portOutEdge;
 
-      function beginNodeDrag(clientX, clientY) {
-        self.selectNode(node.id, { skipConfirm: true });
-        self.dragNode = node;
-        self.dragEl = el;
-        self.dragStart = { mouseX: clientX, mouseY: clientY, nodeX: node.x, nodeY: node.y };
-        self.bindDragListeners();
-      }
-
-      function commitTapSelect() {
-        var nodeWidth = isFlowGate ? 240 : ((isLogic || isKeyItem) ? 120 : 220);
-        var applyTap = function () {
-          self.selectNode(node.id, { skipConfirm: true });
-        };
-        if (self.isNodePublished(node, nodeWidth)) {
-          self.confirmPublishedEdit(node, applyTap, function () {
-            self.dragNode = null;
-            self.dragStart = null;
-            self.dragEl = null;
-          });
-        } else {
-          applyTap();
-        }
-      }
-
-      function bindNodePointer(clientX, clientY, e) {
-        var threshold = 8;
-        var session = { startX: clientX, startY: clientY, dragging: false };
-        function onMove(ev) {
-          if (session.dragging) {
-            self.onMouseMove(ev);
-            return;
-          }
-          var pt = eventClientXY(ev);
-          if (Math.hypot(pt.x - session.startX, pt.y - session.startY) < threshold) return;
-          session.dragging = true;
-          var nodeWidth = isFlowGate ? 240 : ((isLogic || isKeyItem) ? 120 : 220);
-          if (self.isNodePublished(node, nodeWidth)) {
-            self.confirmPublishedEdit(node, function () {
-              beginNodeDrag(session.startX, session.startY);
-              self.onMouseMove(ev);
-            });
-          } else {
-            beginNodeDrag(session.startX, session.startY);
-            self.onMouseMove(ev);
-          }
-        }
-        function onUp(ev) {
-          window.removeEventListener("mousemove", onMove);
-          window.removeEventListener("mouseup", onUp);
-          window.removeEventListener("touchmove", onMove);
-          window.removeEventListener("touchend", onUp);
-          window.removeEventListener("touchcancel", onUp);
-          if (!session.dragging) commitTapSelect();
-          else self.onMouseUp(ev);
-        }
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-        window.addEventListener("touchmove", onMove, { passive: false });
-        window.addEventListener("touchend", onUp);
-        window.addEventListener("touchcancel", onUp);
-      }
+      var nodeMeta = { isFlowGate: isFlowGate, isLogic: isLogic, isKeyItem: isKeyItem };
 
       el.addEventListener("mousedown", function (e) {
         if (self.shouldIgnoreMouse()) return;
         if (e.target.closest(".graph-port")) return;
         e.stopPropagation();
         e.preventDefault();
-        bindNodePointer(e.clientX, e.clientY, e);
+        self.armNodePointer(node, el, e.clientX, e.clientY, nodeMeta);
       });
 
       el.addEventListener("touchstart", function (e) {
@@ -2632,7 +2662,7 @@
         e.stopPropagation();
         e.preventDefault();
         self.markTouchPointer();
-        bindNodePointer(e.touches[0].clientX, e.touches[0].clientY, e);
+        self.armNodePointer(node, el, e.touches[0].clientX, e.touches[0].clientY, nodeMeta);
       }, { passive: false });
 
       el.querySelectorAll(".graph-port-out").forEach(function (port) {
