@@ -93,7 +93,6 @@
     this.pinchState = null;
     this.ignoreMouseUntil = 0;
     this.mobileDrawer = null;
-    this.mobilePreviewOpen = false;
     this.dragNode = null;
     this.dragStart = null;
     this.dragEl = null;
@@ -603,27 +602,20 @@
     var self = this;
     this.container.innerHTML =
       '<div class="workspace-editor">' +
-        '<div class="graph-toolbar">' +
-          '<div class="graph-toolbar-left">' +
-            '<button type="button" class="btn btn-sm btn-primary" data-add="dialogue">+ Dialogue</button>' +
-            '<button type="button" class="btn btn-sm" data-add="choice">+ Choices</button>' +
-            '<button type="button" class="btn btn-sm" id="addBoundaryBtn" title="Place a vertical line marking where an episode ends">+ Episode boundary</button>' +
-            '<button type="button" class="btn btn-sm" id="episodeContextBtn" disabled title="Pan to a chapter region or select a beat">Chapter</button>' +
-            '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate graph</button>' +
-          '</div>' +
-          '<div class="graph-toolbar-center">' +
+        '<div class="graph-toolbar graph-toolbar--studio">' +
+          '<div class="graph-toolbar-desktop">' +
             '<button type="button" class="btn btn-sm graph-play-btn" id="graphPlayBtn" title="Play from selected beat">▶ Play</button>' +
-            '<button type="button" class="btn btn-sm" id="graphParallaxBtn" title="Toggle preview parallax">Parallax</button>' +
-          '</div>' +
-          '<div class="graph-toolbar-right">' +
-            '<div class="graph-toolbar-mobile" id="graphToolbarMobile">' +
-              '<button type="button" class="btn btn-sm" id="mobileBlocksBtn" aria-expanded="false">Blocks</button>' +
-              '<button type="button" class="btn btn-sm" id="mobilePreviewBtn" aria-expanded="false">Preview</button>' +
-              '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
-              '<button type="button" class="btn btn-sm" id="mobileResourcesBtn" aria-expanded="false">Assets</button>' +
-            '</div>' +
+            '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate</button>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
             '<button type="button" class="btn btn-sm btn-primary" id="graphSaveBtn" disabled>Save</button>' +
+          '</div>' +
+          '<div class="graph-toolbar-mobile" id="graphToolbarMobile">' +
+            '<button type="button" class="btn btn-sm" id="mobileBlocksBtn" aria-expanded="false">Blocks</button>' +
+            '<button type="button" class="btn btn-sm" id="mobilePlayBtn" aria-expanded="false">Play</button>' +
+            '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
+            '<button type="button" class="btn btn-sm" id="mobileAssetsBtn" aria-expanded="false">Assets</button>' +
+            '<button type="button" class="btn btn-sm" id="mobileValidateBtn">Validate</button>' +
+            '<button type="button" class="btn btn-sm btn-primary" id="mobileSaveBtn">Save</button>' +
           '</div>' +
         '</div>' +
         '<div class="mobile-panel-backdrop" id="mobilePanelBackdrop" hidden></div>' +
@@ -638,7 +630,6 @@
             '</div>' +
             '<div class="center-resizer" id="centerResizer" title="Drag to resize preview / graph"></div>' +
             '<div class="center-graph">' +
-              '<p class="mobile-rotate-hint" aria-hidden="true">Rotate to landscape for graph editing</p>' +
               '<button type="button" class="block-shelf-toggle" id="blockShelfToggle" aria-expanded="false" aria-controls="blockShelf" title="Show block palette">' +
                 '<span class="block-shelf-toggle-icon" aria-hidden="true">▸</span>' +
                 '<span class="block-shelf-toggle-label">Blocks</span>' +
@@ -704,17 +695,19 @@
     this.saveStatusEl = this.container.querySelector("#graphSaveStatus");
     this.saveBtn = this.container.querySelector("#graphSaveBtn");
     this.boundariesLayer = this.container.querySelector("#graphBoundaries");
-    this.boundaryBtn = this.container.querySelector("#addBoundaryBtn");
-    this.episodeContextBtn = this.container.querySelector("#episodeContextBtn");
+    this.boundaryBtn = null;
+    this.episodeContextBtn = null;
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
-    this.parallaxBtn = this.container.querySelector("#graphParallaxBtn");
+    this.parallaxBtn = null;
     this.workspaceEditor = this.container.querySelector(".workspace-editor");
     this.mobileBlocksBtn = this.container.querySelector("#mobileBlocksBtn");
-    this.mobilePreviewBtn = this.container.querySelector("#mobilePreviewBtn");
+    this.mobilePlayBtn = this.container.querySelector("#mobilePlayBtn");
     this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
     this.mobileInspectorBtn = this.container.querySelector("#mobileInspectorBtn");
-    this.mobileResourcesBtn = this.container.querySelector("#mobileResourcesBtn");
+    this.mobileAssetsBtn = this.container.querySelector("#mobileAssetsBtn");
+    this.mobileValidateBtn = this.container.querySelector("#mobileValidateBtn");
+    this.mobileSaveBtn = this.container.querySelector("#mobileSaveBtn");
     this.mobileBackdrop = this.container.querySelector("#mobilePanelBackdrop");
 
     if (this.playBtn) {
@@ -738,26 +731,27 @@
       });
     }
 
-    this.container.querySelectorAll("[data-add]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        self.addNodeFromToolbar(btn.getAttribute("data-add") || "beat");
-      });
-    });
-
-    if (this.boundaryBtn) {
-      this.boundaryBtn.addEventListener("click", function () {
-        self.boundaryPlacementMode = !self.boundaryPlacementMode;
-        self.boundaryBtn.classList.toggle("is-active", self.boundaryPlacementMode);
-        if (self.wrap) self.wrap.classList.toggle("is-boundary-mode", self.boundaryPlacementMode);
-        self.setSaveStatus(self.boundaryPlacementMode
-          ? "Click the graph to place an episode boundary line…"
-          : (self.isDirty ? "Unsaved changes" : "Saved"));
+    if (this.mobileSaveBtn) {
+      this.mobileSaveBtn.addEventListener("click", function () {
+        self.saveNow();
       });
     }
 
     if (this.validateBtn) {
       this.validateBtn.addEventListener("click", function () {
         self.showValidateGraph();
+      });
+    }
+
+    if (this.mobileValidateBtn) {
+      this.mobileValidateBtn.addEventListener("click", function () {
+        self.showValidateGraph();
+      });
+    }
+
+    if (this.boundaryBtn) {
+      this.boundaryBtn.addEventListener("click", function () {
+        self.toggleBoundaryPlacement();
       });
     }
 
@@ -937,8 +931,21 @@
     return window.matchMedia("(max-width: 900px)").matches;
   };
 
-  ScenaGraphEditor.prototype.mobilePreviewPrefKey = function () {
-    return "scena.mobilePreviewOpen";
+  ScenaGraphEditor.prototype.toggleBoundaryPlacement = function () {
+    this.boundaryPlacementMode = !this.boundaryPlacementMode;
+    if (this.boundaryBtn) {
+      this.boundaryBtn.classList.toggle("is-active", this.boundaryPlacementMode);
+    }
+    if (this.wrap) this.wrap.classList.toggle("is-boundary-mode", this.boundaryPlacementMode);
+    this.setSaveStatus(this.boundaryPlacementMode
+      ? "Click the graph to place an episode boundary line…"
+      : (this.isDirty ? "Unsaved changes" : "Saved"));
+  };
+
+  ScenaGraphEditor.prototype.syncInspectorPanel = function () {
+    if (!this.workspaceEditor || this.isMobileLayout()) return;
+    var hasSelection = !!(this.selectedId || this.selectedEdgeId || this.selectedBoundaryId);
+    this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection);
   };
 
   ScenaGraphEditor.prototype.syncMobileChrome = function () {
@@ -946,46 +953,54 @@
     if (!root) return;
     var mobile = this.isMobileLayout();
     var drawer = mobile ? this.mobileDrawer : null;
+    var sheetOpen = !!drawer;
+    root.classList.toggle("is-mobile-sheet-open", sheetOpen);
     root.classList.toggle("is-mobile-inspector-open", drawer === "inspector");
-    root.classList.toggle("is-mobile-resources-open", drawer === "resources");
+    root.classList.toggle("is-mobile-assets-open", drawer === "assets");
     root.classList.toggle("is-mobile-block-shelf-open", drawer === "blocks");
-    root.classList.toggle("is-mobile-preview-open", mobile && this.mobilePreviewOpen);
+    root.classList.toggle("is-mobile-preview-open", drawer === "preview");
+    root.classList.toggle("is-mobile-resources-open", drawer === "assets");
     if (this.mobileBackdrop) {
-      this.mobileBackdrop.hidden = !drawer;
+      this.mobileBackdrop.hidden = !sheetOpen;
     }
     var blocksBtn = this.mobileBlocksBtn;
-    var previewBtn = this.mobilePreviewBtn;
+    var playBtn = this.mobilePlayBtn;
     var inspBtn = this.mobileInspectorBtn;
-    var resBtn = this.mobileResourcesBtn;
+    var assetsBtn = this.mobileAssetsBtn;
     if (blocksBtn) {
       blocksBtn.classList.toggle("is-active", drawer === "blocks");
       blocksBtn.setAttribute("aria-expanded", drawer === "blocks" ? "true" : "false");
     }
-    if (previewBtn) {
-      previewBtn.classList.toggle("is-active", this.mobilePreviewOpen);
-      previewBtn.setAttribute("aria-expanded", this.mobilePreviewOpen ? "true" : "false");
+    if (playBtn) {
+      playBtn.classList.toggle("is-active", drawer === "preview");
+      playBtn.setAttribute("aria-expanded", drawer === "preview" ? "true" : "false");
     }
     if (inspBtn) {
       inspBtn.classList.toggle("is-active", drawer === "inspector");
       inspBtn.setAttribute("aria-expanded", drawer === "inspector" ? "true" : "false");
     }
-    if (resBtn) {
-      resBtn.classList.toggle("is-active", drawer === "resources");
-      resBtn.setAttribute("aria-expanded", drawer === "resources" ? "true" : "false");
+    if (assetsBtn) {
+      assetsBtn.classList.toggle("is-active", drawer === "assets");
+      assetsBtn.setAttribute("aria-expanded", drawer === "assets" ? "true" : "false");
     }
   };
 
-  ScenaGraphEditor.prototype.applyMobilePreviewState = function (open) {
-    this.mobilePreviewOpen = !!open;
-    try {
-      localStorage.setItem(this.mobilePreviewPrefKey(), open ? "1" : "0");
-    } catch (e) { /* ignore */ }
-    this.syncMobileChrome();
-    if (open) this.renderPreview();
+  ScenaGraphEditor.prototype.handleMobilePlay = function () {
+    if (this.mobileDrawer === "preview") {
+      if (this.playMode) this.stopPlay();
+      this.setMobileDrawer(null);
+      return;
+    }
+    this.setMobileDrawer("preview");
+    this.renderPreview();
+    if (!this.playMode) this.startPlay();
   };
 
   ScenaGraphEditor.prototype.setMobileDrawer = function (drawer) {
     var next = drawer || null;
+    if (this.isMobileLayout() && this.mobileDrawer === "preview" && next !== "preview" && this.playMode) {
+      this.stopPlay();
+    }
     if (this.isMobileLayout() && this.mobileDrawer === "blocks" && next !== "blocks") {
       this.applyBlockShelfState(false, { skipChrome: true });
     }
@@ -993,16 +1008,14 @@
     if (next === "blocks" && this.isMobileLayout()) {
       this.applyBlockShelfState(true, { skipChrome: true });
     }
+    if (next === "preview" && this.isMobileLayout()) {
+      this.renderPreview();
+    }
     this.syncMobileChrome();
   };
 
   ScenaGraphEditor.prototype.closeMobileDrawer = function () {
     this.setMobileDrawer(null);
-  };
-
-  ScenaGraphEditor.prototype.closeMobileChrome = function () {
-    this.applyMobilePreviewState(false);
-    this.closeMobileDrawer();
   };
 
   ScenaGraphEditor.prototype.handleBoundaryPointerDown = function (e, clientX) {
@@ -1020,6 +1033,7 @@
     this.paintBoundaries();
     this.renderInspector();
     this.refreshEpisodeContextBtn();
+    this.syncInspectorPanel();
     this.dragBoundary = {
       episode: ep,
       startX: ep.boundaryX,
@@ -1031,26 +1045,21 @@
   ScenaGraphEditor.prototype.bindMobileDrawer = function () {
     var self = this;
     if (!this.workspaceEditor || this.learnMode) return;
-    try {
-      self.mobilePreviewOpen = localStorage.getItem(self.mobilePreviewPrefKey()) === "1";
-    } catch (e) {
-      self.mobilePreviewOpen = false;
-    }
-    if (self.isMobileLayout()) self.mobilePreviewOpen = false;
     self.syncMobileChrome();
     if (this.mobileBlocksBtn) {
       this.mobileBlocksBtn.addEventListener("click", function () {
         self.setMobileDrawer(self.mobileDrawer === "blocks" ? null : "blocks");
       });
     }
-    if (this.mobilePreviewBtn) {
-      this.mobilePreviewBtn.addEventListener("click", function () {
-        self.applyMobilePreviewState(!self.mobilePreviewOpen);
+    if (this.mobilePlayBtn) {
+      this.mobilePlayBtn.addEventListener("click", function () {
+        self.handleMobilePlay();
       });
     }
     if (this.mobilePreviewClose) {
       this.mobilePreviewClose.addEventListener("click", function () {
-        self.applyMobilePreviewState(false);
+        if (self.playMode) self.stopPlay();
+        self.setMobileDrawer(null);
       });
     }
     if (this.mobileInspectorBtn) {
@@ -1058,9 +1067,9 @@
         self.setMobileDrawer(self.mobileDrawer === "inspector" ? null : "inspector");
       });
     }
-    if (this.mobileResourcesBtn) {
-      this.mobileResourcesBtn.addEventListener("click", function () {
-        self.setMobileDrawer(self.mobileDrawer === "resources" ? null : "resources");
+    if (this.mobileAssetsBtn) {
+      this.mobileAssetsBtn.addEventListener("click", function () {
+        self.setMobileDrawer(self.mobileDrawer === "assets" ? null : "assets");
       });
     }
     if (this.mobileBackdrop) {
@@ -1072,8 +1081,10 @@
       if (!self.isMobileLayout()) {
         self.mobileDrawer = null;
         self.syncMobileChrome();
+        self.syncInspectorPanel();
         if (self.mobileBackdrop) self.mobileBackdrop.hidden = true;
       } else {
+        self.workspaceEditor.classList.remove("has-inspector-selection");
         self.syncMobileChrome();
       }
     });
@@ -1146,11 +1157,6 @@
       if (e.key === "Escape" && self.mobileDrawer) {
         e.preventDefault();
         self.closeMobileDrawer();
-        return;
-      }
-      if (e.key === "Escape" && self.mobilePreviewOpen) {
-        e.preventDefault();
-        self.applyMobilePreviewState(false);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && self.selectedBoundaryId && !self.selectedId && !self.selectedEdgeId) {
@@ -1727,6 +1733,7 @@
       this.renderInspector();
       this.renderPreview();
       this.refreshEpisodeContextBtn();
+      this.syncInspectorPanel();
       return;
     }
     var node = this.getNode(id);
@@ -1741,7 +1748,7 @@
       self.renderInspector();
       self.renderPreview();
       self.refreshEpisodeContextBtn();
-      if (id && self.isMobileLayout()) self.setMobileDrawer("inspector");
+      self.syncInspectorPanel();
     };
     if (opts.skipConfirm || opts.fromPlay || !node || !this.isNodePublished(node)) {
       apply();
@@ -1757,6 +1764,7 @@
       this.selectedEdgeId = null;
       this.paintEdges();
       this.renderInspector();
+      this.syncInspectorPanel();
       return;
     }
     var edge = this.getEdge(edgeId);
@@ -1772,6 +1780,7 @@
       self.paintEdges();
       self.renderInspector();
       self.refreshEpisodeContextBtn();
+      self.syncInspectorPanel();
     };
     if (opts.skipConfirm || !srcNode || !this.isNodePublished(srcNode)) {
       apply();
@@ -2555,23 +2564,58 @@
         self.bindDragListeners();
       }
 
-      function startNodeDrag(clientX, clientY) {
+      function commitTapSelect() {
         var nodeWidth = isFlowGate ? 240 : ((isLogic || isKeyItem) ? 120 : 220);
+        var applyTap = function () {
+          self.selectNode(node.id, { skipConfirm: true });
+        };
         if (self.isNodePublished(node, nodeWidth)) {
-          self.confirmPublishedEdit(node, function () { beginNodeDrag(clientX, clientY); }, function () {
-            if (self.dragNode === node) {
-              node.x = self.dragStart ? self.dragStart.nodeX : node.x;
-              node.y = self.dragStart ? self.dragStart.nodeY : node.y;
-              self.dragNode = null;
-              self.dragStart = null;
-              self.dragEl = null;
-              self.paintNodes();
-              self.paintEdges();
-            }
+          self.confirmPublishedEdit(node, applyTap, function () {
+            self.dragNode = null;
+            self.dragStart = null;
+            self.dragEl = null;
           });
         } else {
-          beginNodeDrag(clientX, clientY);
+          applyTap();
         }
+      }
+
+      function bindNodePointer(clientX, clientY, e) {
+        var threshold = 8;
+        var session = { startX: clientX, startY: clientY, dragging: false };
+        function onMove(ev) {
+          if (session.dragging) {
+            self.onMouseMove(ev);
+            return;
+          }
+          var pt = eventClientXY(ev);
+          if (Math.hypot(pt.x - session.startX, pt.y - session.startY) < threshold) return;
+          session.dragging = true;
+          var nodeWidth = isFlowGate ? 240 : ((isLogic || isKeyItem) ? 120 : 220);
+          if (self.isNodePublished(node, nodeWidth)) {
+            self.confirmPublishedEdit(node, function () {
+              beginNodeDrag(session.startX, session.startY);
+              self.onMouseMove(ev);
+            });
+          } else {
+            beginNodeDrag(session.startX, session.startY);
+            self.onMouseMove(ev);
+          }
+        }
+        function onUp(ev) {
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+          window.removeEventListener("touchmove", onMove);
+          window.removeEventListener("touchend", onUp);
+          window.removeEventListener("touchcancel", onUp);
+          if (!session.dragging) commitTapSelect();
+          else self.onMouseUp(ev);
+        }
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+        window.addEventListener("touchmove", onMove, { passive: false });
+        window.addEventListener("touchend", onUp);
+        window.addEventListener("touchcancel", onUp);
       }
 
       el.addEventListener("mousedown", function (e) {
@@ -2579,7 +2623,7 @@
         if (e.target.closest(".graph-port")) return;
         e.stopPropagation();
         e.preventDefault();
-        startNodeDrag(e.clientX, e.clientY);
+        bindNodePointer(e.clientX, e.clientY, e);
       });
 
       el.addEventListener("touchstart", function (e) {
@@ -2588,7 +2632,7 @@
         e.stopPropagation();
         e.preventDefault();
         self.markTouchPointer();
-        startNodeDrag(e.touches[0].clientX, e.touches[0].clientY);
+        bindNodePointer(e.touches[0].clientX, e.touches[0].clientY, e);
       }, { passive: false });
 
       el.querySelectorAll(".graph-port-out").forEach(function (port) {
@@ -2703,6 +2747,7 @@
     this.renderPreview();
     this.renderResourcesPanel();
     this.refreshEpisodeContextBtn();
+    this.syncInspectorPanel();
   };
 
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
@@ -4139,10 +4184,18 @@
         (this.learnMode
           ? '<div class="graph-inspector-empty">Select a beat to edit dialogue or logic. Drag from a Next or Choice plug to connect — release on blank canvas to spawn a new beat.</div>'
           : '<div class="graph-inspector-empty">Select a story beat to edit dialogue, stage, choices, or logic.</div>' +
-            '<p class="field-hint">Use <strong>+ Episode boundary</strong> to mark where a chapter ends. <strong>Publish Ch. N</strong> saves your graph and goes live in one step.</p>' +
-            '<p class="field-hint">Drag from a Next or Choice plug into blank space to spawn a connected beat.</p>' +
-            '<p class="field-hint">Upload audio in the <strong>Audio</strong> tab (right panel) — Scena defaults are included automatically.</p>');
+            '<div class="inspector-actions">' +
+              '<button type="button" class="btn btn-sm" id="inspectorAddBoundary">+ Episode boundary</button>' +
+            '</div>' +
+            '<p class="field-hint">Open <strong>Blocks</strong> to drag new beats onto the graph. Drag from a Next or Choice plug into blank space to spawn a connected beat.</p>' +
+            '<p class="field-hint">Upload audio in <strong>Assets</strong> — Scena defaults are included automatically.</p>');
       this.inspector.innerHTML = html;
+      var addBoundary = this.inspector.querySelector("#inspectorAddBoundary");
+      if (addBoundary) {
+        addBoundary.addEventListener("click", function () {
+          self.toggleBoundaryPlacement();
+        });
+      }
       return;
     }
 
