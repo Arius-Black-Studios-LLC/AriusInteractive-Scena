@@ -93,6 +93,7 @@
     this.pinchState = null;
     this.ignoreMouseUntil = 0;
     this.mobileDrawer = null;
+    this.mobilePreviewOpen = false;
     this.dragNode = null;
     this.dragStart = null;
     this.dragEl = null;
@@ -226,7 +227,8 @@
     return "scena.blockShelfOpen." + (this.series && this.series.id ? this.series.id : "default");
   };
 
-  ScenaGraphEditor.prototype.applyBlockShelfState = function (open) {
+  ScenaGraphEditor.prototype.applyBlockShelfState = function (open, opts) {
+    opts = opts || {};
     var centerGraph = this.container.querySelector(".center-graph");
     if (!this.blockShelf || !this.blockShelfToggle || !centerGraph) return;
     this.blockShelfOpen = !!open;
@@ -236,9 +238,15 @@
     this.blockShelfToggle.title = this.blockShelfOpen ? "Hide block palette" : "Show block palette";
     var icon = this.blockShelfToggle.querySelector(".block-shelf-toggle-icon");
     if (icon) icon.textContent = this.blockShelfOpen ? "◂" : "▸";
-    try {
-      localStorage.setItem(this.blockShelfPrefKey(), this.blockShelfOpen ? "1" : "0");
-    } catch (e) { /* ignore */ }
+    if (!this.isMobileLayout()) {
+      try {
+        localStorage.setItem(this.blockShelfPrefKey(), this.blockShelfOpen ? "1" : "0");
+      } catch (e) { /* ignore */ }
+    }
+    if (!opts.skipChrome && this.isMobileLayout()) {
+      this.mobileDrawer = this.blockShelfOpen ? "blocks" : (this.mobileDrawer === "blocks" ? null : this.mobileDrawer);
+      this.syncMobileChrome();
+    }
   };
 
   ScenaGraphEditor.prototype.bindBlockShelfToggle = function () {
@@ -249,10 +257,18 @@
     this.blockShelfToggle.dataset.bound = "1";
     var stored = null;
     try { stored = localStorage.getItem(this.blockShelfPrefKey()); } catch (e) { /* ignore */ }
-    this.applyBlockShelfState(stored === "1");
+    if (this.isMobileLayout()) {
+      this.applyBlockShelfState(false, { skipChrome: true });
+    } else {
+      this.applyBlockShelfState(stored === "1");
+    }
     this.blockShelfToggle.addEventListener("click", function (e) {
       e.stopPropagation();
-      self.applyBlockShelfState(!self.blockShelfOpen);
+      if (self.isMobileLayout()) {
+        self.setMobileDrawer(self.mobileDrawer === "blocks" ? null : "blocks");
+      } else {
+        self.applyBlockShelfState(!self.blockShelfOpen);
+      }
     });
   };
 
@@ -270,11 +286,20 @@
     var self = this;
     if (!this.blockShelf) return;
     this.blockShelf.querySelectorAll("[data-block-spawn]").forEach(function (el) {
-      el.addEventListener("mousedown", function (e) {
-        if (e.button !== 0) return;
+      function startFromPointer(e, clientX, clientY) {
         e.preventDefault();
-        self.startBlockPaletteDrag(el.getAttribute("data-block-spawn"), e.clientX, e.clientY, el);
+        self.startBlockPaletteDrag(el.getAttribute("data-block-spawn"), clientX, clientY, el);
+      }
+      el.addEventListener("mousedown", function (e) {
+        if (self.shouldIgnoreMouse()) return;
+        if (e.button !== 0) return;
+        startFromPointer(e, e.clientX, e.clientY);
       });
+      el.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
+        self.markTouchPointer();
+        startFromPointer(e, e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
     });
   };
 
@@ -288,20 +313,26 @@
     this.blockDragGhost = ghost;
 
     var move = function (e) {
-      ghost.style.transform = "translate(" + (e.clientX + 12) + "px," + (e.clientY + 12) + "px)";
+      if (e.touches) e.preventDefault();
+      var pt = eventClientXY(e);
+      ghost.style.transform = "translate(" + (pt.x + 12) + "px," + (pt.y + 12) + "px)";
     };
     var up = function (e) {
       document.removeEventListener("mousemove", move);
       document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
+      document.removeEventListener("touchcancel", up);
       if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
       self.blockDragGhost = null;
       var wrap = self.wrap;
+      var pt = eventClientXY(e);
       if (wrap) {
         var rect = wrap.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          var pt = self.clientToCanvas(e.clientX, e.clientY);
+        if (pt.x >= rect.left && pt.x <= rect.right && pt.y >= rect.top && pt.y <= rect.bottom) {
+          var canvasPt = self.clientToCanvas(pt.x, pt.y);
           var size = self.nodeSpawnOffset(spawnType);
-          var newId = self.addNodeAt(spawnType, pt.x - size.width / 2, pt.y - size.height / 2);
+          var newId = self.addNodeAt(spawnType, canvasPt.x - size.width / 2, canvasPt.y - size.height / 2);
           if (self.connectFrom) {
             self.completeConnect(newId);
           } else {
@@ -309,6 +340,7 @@
           }
           if (!self.learnMode) self.markDirty();
           else self.notifyLearnChange();
+          if (self.isMobileLayout()) self.setMobileDrawer(null);
         } else if (self.connectFrom) {
           self.cancelConnect();
         }
@@ -318,6 +350,9 @@
     move({ clientX: clientX, clientY: clientY });
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", up);
+    document.addEventListener("touchcancel", up);
   };
 
   ScenaGraphEditor.prototype.workspaceResourceModalMarkup = function () {
@@ -582,6 +617,8 @@
           '</div>' +
           '<div class="graph-toolbar-right">' +
             '<div class="graph-toolbar-mobile" id="graphToolbarMobile">' +
+              '<button type="button" class="btn btn-sm" id="mobileBlocksBtn" aria-expanded="false">Blocks</button>' +
+              '<button type="button" class="btn btn-sm" id="mobilePreviewBtn" aria-expanded="false">Preview</button>' +
               '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
               '<button type="button" class="btn btn-sm" id="mobileResourcesBtn" aria-expanded="false">Assets</button>' +
             '</div>' +
@@ -594,12 +631,14 @@
           '<aside class="panel-left graph-inspector" id="graphInspector"></aside>' +
           '<div class="panel-center" id="panelCenter">' +
             '<div class="center-preview">' +
+              '<button type="button" class="mobile-preview-close" id="mobilePreviewClose" aria-label="Hide preview">×</button>' +
               '<div class="preview-viewport">' +
                 '<div class="preview-frame" id="gamePreview"></div>' +
               '</div>' +
             '</div>' +
             '<div class="center-resizer" id="centerResizer" title="Drag to resize preview / graph"></div>' +
             '<div class="center-graph">' +
+              '<p class="mobile-rotate-hint" aria-hidden="true">Rotate to landscape for graph editing</p>' +
               '<button type="button" class="block-shelf-toggle" id="blockShelfToggle" aria-expanded="false" aria-controls="blockShelf" title="Show block palette">' +
                 '<span class="block-shelf-toggle-icon" aria-hidden="true">▸</span>' +
                 '<span class="block-shelf-toggle-label">Blocks</span>' +
@@ -671,6 +710,9 @@
     this.playBtn = this.container.querySelector("#graphPlayBtn");
     this.parallaxBtn = this.container.querySelector("#graphParallaxBtn");
     this.workspaceEditor = this.container.querySelector(".workspace-editor");
+    this.mobileBlocksBtn = this.container.querySelector("#mobileBlocksBtn");
+    this.mobilePreviewBtn = this.container.querySelector("#mobilePreviewBtn");
+    this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
     this.mobileInspectorBtn = this.container.querySelector("#mobileInspectorBtn");
     this.mobileResourcesBtn = this.container.querySelector("#mobileResourcesBtn");
     this.mobileBackdrop = this.container.querySelector("#mobilePanelBackdrop");
@@ -895,25 +937,72 @@
     return window.matchMedia("(max-width: 900px)").matches;
   };
 
-  ScenaGraphEditor.prototype.setMobileDrawer = function (drawer) {
+  ScenaGraphEditor.prototype.mobilePreviewPrefKey = function () {
+    return "scena.mobilePreviewOpen";
+  };
+
+  ScenaGraphEditor.prototype.syncMobileChrome = function () {
     var root = this.workspaceEditor;
     if (!root) return;
-    this.mobileDrawer = drawer || null;
+    var mobile = this.isMobileLayout();
+    var drawer = mobile ? this.mobileDrawer : null;
     root.classList.toggle("is-mobile-inspector-open", drawer === "inspector");
     root.classList.toggle("is-mobile-resources-open", drawer === "resources");
+    root.classList.toggle("is-mobile-block-shelf-open", drawer === "blocks");
+    root.classList.toggle("is-mobile-preview-open", mobile && this.mobilePreviewOpen);
     if (this.mobileBackdrop) {
       this.mobileBackdrop.hidden = !drawer;
     }
+    var blocksBtn = this.mobileBlocksBtn;
+    var previewBtn = this.mobilePreviewBtn;
     var inspBtn = this.mobileInspectorBtn;
     var resBtn = this.mobileResourcesBtn;
-    if (inspBtn) inspBtn.classList.toggle("is-active", drawer === "inspector");
-    if (resBtn) resBtn.classList.toggle("is-active", drawer === "resources");
-    if (inspBtn) inspBtn.setAttribute("aria-expanded", drawer === "inspector" ? "true" : "false");
-    if (resBtn) resBtn.setAttribute("aria-expanded", drawer === "resources" ? "true" : "false");
+    if (blocksBtn) {
+      blocksBtn.classList.toggle("is-active", drawer === "blocks");
+      blocksBtn.setAttribute("aria-expanded", drawer === "blocks" ? "true" : "false");
+    }
+    if (previewBtn) {
+      previewBtn.classList.toggle("is-active", this.mobilePreviewOpen);
+      previewBtn.setAttribute("aria-expanded", this.mobilePreviewOpen ? "true" : "false");
+    }
+    if (inspBtn) {
+      inspBtn.classList.toggle("is-active", drawer === "inspector");
+      inspBtn.setAttribute("aria-expanded", drawer === "inspector" ? "true" : "false");
+    }
+    if (resBtn) {
+      resBtn.classList.toggle("is-active", drawer === "resources");
+      resBtn.setAttribute("aria-expanded", drawer === "resources" ? "true" : "false");
+    }
+  };
+
+  ScenaGraphEditor.prototype.applyMobilePreviewState = function (open) {
+    this.mobilePreviewOpen = !!open;
+    try {
+      localStorage.setItem(this.mobilePreviewPrefKey(), open ? "1" : "0");
+    } catch (e) { /* ignore */ }
+    this.syncMobileChrome();
+    if (open) this.renderPreview();
+  };
+
+  ScenaGraphEditor.prototype.setMobileDrawer = function (drawer) {
+    var next = drawer || null;
+    if (this.isMobileLayout() && this.mobileDrawer === "blocks" && next !== "blocks") {
+      this.applyBlockShelfState(false, { skipChrome: true });
+    }
+    this.mobileDrawer = next;
+    if (next === "blocks" && this.isMobileLayout()) {
+      this.applyBlockShelfState(true, { skipChrome: true });
+    }
+    this.syncMobileChrome();
   };
 
   ScenaGraphEditor.prototype.closeMobileDrawer = function () {
     this.setMobileDrawer(null);
+  };
+
+  ScenaGraphEditor.prototype.closeMobileChrome = function () {
+    this.applyMobilePreviewState(false);
+    this.closeMobileDrawer();
   };
 
   ScenaGraphEditor.prototype.handleBoundaryPointerDown = function (e, clientX) {
@@ -942,6 +1031,28 @@
   ScenaGraphEditor.prototype.bindMobileDrawer = function () {
     var self = this;
     if (!this.workspaceEditor || this.learnMode) return;
+    try {
+      self.mobilePreviewOpen = localStorage.getItem(self.mobilePreviewPrefKey()) === "1";
+    } catch (e) {
+      self.mobilePreviewOpen = false;
+    }
+    if (self.isMobileLayout()) self.mobilePreviewOpen = false;
+    self.syncMobileChrome();
+    if (this.mobileBlocksBtn) {
+      this.mobileBlocksBtn.addEventListener("click", function () {
+        self.setMobileDrawer(self.mobileDrawer === "blocks" ? null : "blocks");
+      });
+    }
+    if (this.mobilePreviewBtn) {
+      this.mobilePreviewBtn.addEventListener("click", function () {
+        self.applyMobilePreviewState(!self.mobilePreviewOpen);
+      });
+    }
+    if (this.mobilePreviewClose) {
+      this.mobilePreviewClose.addEventListener("click", function () {
+        self.applyMobilePreviewState(false);
+      });
+    }
     if (this.mobileInspectorBtn) {
       this.mobileInspectorBtn.addEventListener("click", function () {
         self.setMobileDrawer(self.mobileDrawer === "inspector" ? null : "inspector");
@@ -958,7 +1069,13 @@
       });
     }
     window.addEventListener("resize", function () {
-      if (!self.isMobileLayout()) self.closeMobileDrawer();
+      if (!self.isMobileLayout()) {
+        self.mobileDrawer = null;
+        self.syncMobileChrome();
+        if (self.mobileBackdrop) self.mobileBackdrop.hidden = true;
+      } else {
+        self.syncMobileChrome();
+      }
     });
   };
 
@@ -1029,6 +1146,11 @@
       if (e.key === "Escape" && self.mobileDrawer) {
         e.preventDefault();
         self.closeMobileDrawer();
+        return;
+      }
+      if (e.key === "Escape" && self.mobilePreviewOpen) {
+        e.preventDefault();
+        self.applyMobilePreviewState(false);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && self.selectedBoundaryId && !self.selectedId && !self.selectedEdgeId) {
