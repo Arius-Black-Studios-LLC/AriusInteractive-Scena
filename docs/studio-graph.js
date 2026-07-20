@@ -803,6 +803,7 @@
 
     if (!this.learnMode) {
       this.bindMobileDrawer();
+      this.syncMobileChrome();
     }
     this.syncSaveUiVisibility();
 
@@ -886,6 +887,10 @@
 
   ScenaGraphEditor.prototype.applyCenterSplit = function () {
     if (!this.panelCenter) return;
+    if (this.isMobileLayout()) {
+      this.panelCenter.style.setProperty("--preview-ratio", "0");
+      return;
+    }
     this.panelCenter.style.setProperty("--preview-ratio", String(this.previewRatio));
   };
 

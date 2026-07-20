@@ -166,6 +166,7 @@
     var main = $("#studioMain");
     if (!main) return;
     graphEditor = null;
+    updateTopbarForRoute(route);
 
     try {
       renderRoute(route, main);
@@ -173,6 +174,46 @@
       console.error(err);
       toast((err && err.message) || "Could not load this page.");
     }
+  }
+
+  function updateTopbarForRoute(route) {
+    var center = $("#studioTopbarCenter");
+    var wrap = $("#studioSearchWrap");
+    var input = $("#studioSeriesSearch");
+    var showSearch = route.view === "dashboard";
+    if (center) center.classList.toggle("is-visible", showSearch);
+    if (wrap) wrap.hidden = !showSearch;
+    if (input && !showSearch) input.value = "";
+  }
+
+  function applyDashboardSearch(query) {
+    var q = (query || "").trim().toLowerCase();
+    var visible = 0;
+    document.querySelectorAll(".series-card:not(.series-card--template)").forEach(function (card) {
+      var title = (card.querySelector("h3") && card.querySelector("h3").textContent || "").toLowerCase();
+      var desc = (card.querySelector("p") && card.querySelector("p").textContent || "").toLowerCase();
+      var match = !q || title.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
+      card.hidden = !match;
+      if (match) visible += 1;
+    });
+    document.querySelectorAll(".series-card--template").forEach(function (card) {
+      var title = (card.querySelector("h3") && card.querySelector("h3").textContent || "").toLowerCase();
+      var desc = (card.querySelector("p") && card.querySelector("p").textContent || "").toLowerCase();
+      var match = !q || title.indexOf(q) !== -1 || desc.indexOf(q) !== -1;
+      card.hidden = !match;
+      if (match) visible += 1;
+    });
+    var empty = $("#dashboardSearchEmpty");
+    if (empty) empty.hidden = visible > 0 || !q;
+  }
+
+  function bindDashboardSearch() {
+    var input = $("#studioSeriesSearch");
+    if (!input || input.dataset.bound === "1") return;
+    input.dataset.bound = "1";
+    input.addEventListener("input", function () {
+      applyDashboardSearch(input.value);
+    });
   }
 
   function renderRoute(route, main) {
@@ -356,6 +397,7 @@
     }
 
     html +=
+          '<p class="field-hint dashboard-search-empty" id="dashboardSearchEmpty" hidden>No series match your search.</p>' +
           '</div>' +
           '<aside class="studio-badges-panel" aria-label="Your laurels">' +
             '<div class="studio-badges-head">' +
@@ -379,6 +421,8 @@
   }
 
   function bindDashboard() {
+    bindDashboardSearch();
+    applyDashboardSearch($("#studioSeriesSearch") ? $("#studioSeriesSearch").value : "");
     var creating = false;
     function goNew() {
       if (creating) return;
