@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Creator studio — Scena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio.css?v=68" />
+  <link rel="stylesheet" href="play.css?v=15" />
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+</head>
+<body>
+  <div class="loading-screen" id="loading">Checking session…</div>
+
+  <div class="studio-shell" id="app" hidden>
+    <header class="studio-topbar">
+      <div class="studio-topbar-left">
+        <a class="studio-logo" href="scena-design-preview.html">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="logo-text">Scena</span>
+        </a>
+        <span style="color:var(--scena-text-faint);font-size:0.8125rem">Creator studio</span>
+      </div>
+      <div class="studio-topbar-right">
+        <span class="user-email" id="studioUserEmail"></span>
+        <a class="btn btn-ghost btn-sm" href="learn.html">Conservatory</a>
+        <a class="btn btn-ghost btn-sm" href="scena-design-preview.html">View site</a>
+        <button type="button" class="btn btn-sm" id="signOutBtn">Log out</button>
+      </div>
+    </header>
+
+    <div class="studio-body">
+      <aside class="studio-sidebar" id="studioSidebar" aria-label="Studio navigation"></aside>
+      <main class="studio-main" id="studioMain"></main>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="episodeModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-labelledby="episodeModalTitle">
+      <h2 id="episodeModalTitle">New episode</h2>
+      <div id="episodeModalBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="episodeModalCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="episodeModalSave">Save episode</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="studioToast" role="status" aria-live="polite"></div>
+
+  <script src="scena-config.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scena-auth.js?v=10"></script>
+  <script src="scena-cloud.js?v=19"></script>
+  <script src="scena-badges.js?v=6"></script>
+  <script src="scena-default-audio.js?v=1"></script>
+  <script src="scena-key-item-icons.js?v=2"></script>
+  <script src="scena-key-item.js?v=3"></script>
+  <script src="studio-store.js?v=64"></script>
+  <script src="scena-demo-series.js?v=14"></script>
+  <script src="scena-progress.js?v=5"></script>
+  <script src="scena-profile.js?v=1"></script>
+  <script src="scena-account.js?v=1"></script>
+  <script src="scena-audio.js?v=1"></script>
+  <script src="scena-reader-menu.js?v=2"></script>
+  <script src="studio-graph.js?v=79"></script>
+  <script src="studio-app.js?v=40"></script>
+  <script>
+    (function () {
+      var loading = document.getElementById("loading");
+      var app = document.getElementById("app");
+      var booted = false;
+
+      function showError(message) {
+        loading.hidden = false;
+        loading.textContent = message;
+        app.hidden = true;
+      }
+
+      function openStudio(session) {
+        if (booted) return;
+        booted = true;
+        if (!window.ScenaStudio) {
+          showError("Studio failed to load. Hard-refresh with Ctrl+Shift+R.");
+          return;
+        }
+        loading.hidden = true;
+        app.hidden = false;
+        try {
+          ScenaStudio.start(session);
+        } catch (err) {
+          showError("Could not open studio: " + (err.message || "Unknown error"));
+        }
+      }
+
+      function bootStudio(session) {
+        if (!window.ScenaStore || !ScenaStore.ready) {
+          openStudio(session);
+          return;
+        }
+        loading.textContent = "Loading your projects…";
+        ScenaStore.ready(session && session.user ? session.user.id : null).then(function () {
+          openStudio(session);
+        }).catch(function () {
+          openStudio(session);
+        });
+      }
+
+      function sendToLogin() {
+        try { sessionStorage.setItem("scena_post_login", "studio.html"); } catch (e) {}
+        window.location.href = "scena-design-preview.html";
+      }
+
+      if (!window.ScenaAuth || !ScenaAuth.isConfigured()) {
+        showError("Configure scena-config.js, then log in from the Scena landing page.");
+        return;
+      }
+
+      if (ScenaAuth.isFileProtocol()) {
+        loading.innerHTML = "Open via <strong>http://127.0.0.1:5500/studio.html</strong> (run serve.ps1 first).";
+        return;
+      }
+
+      var stored = ScenaAuth.getStoredSession ? ScenaAuth.getStoredSession() : null;
+      if (stored && stored.user) {
+        bootStudio(stored);
+      }
+
+      ScenaAuth.init().then(function (session) {
+        if (session && session.user) {
+          bootStudio(session);
+          return;
+        }
+        if (!booted) sendToLogin();
+      }).catch(function () {
+        if (!booted) sendToLogin();
+      });
+
+      setTimeout(function () {
+        if (booted) return;
+        var fallback = ScenaAuth.getStoredSession ? ScenaAuth.getStoredSession() : null;
+        if (fallback && fallback.user) {
+          bootStudio(fallback);
+          return;
+        }
+        showError("Could not verify login. Go back to the landing page, log out, log in again, then open Creator studio.");
+      }, 4000);
+
+      document.getElementById("signOutBtn").addEventListener("click", function () {
+        ScenaAuth.signOut().then(function () {
+          window.location.href = "scena-design-preview.html";
+        });
+      });
+    })();
+  </script>
+  <script src="scena-logo.js?v=1"></script>
+</body>
+</html>

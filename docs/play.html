@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reading — Scena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio.css?v=65" />
+  <link rel="stylesheet" href="play.css?v=16" />
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+</head>
+<body class="player-body">
+  <div class="loading-screen" id="loading">Opening story…</div>
+
+  <div class="player-shell" id="playerApp" hidden>
+    <div class="player-topbar" id="playerTopbar">
+      <a class="player-back" id="playerBack" href="scena-design-preview.html">← Back</a>
+      <span class="player-topbar-meta" id="playerMeta"></span>
+      <a class="player-account-link" id="playerAccountLink" href="account.html" hidden>Account</a>
+    </div>
+    <div id="playerRoot"></div>
+  </div>
+
+  <script src="scena-config.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scena-auth.js?v=10"></script>
+  <script src="scena-cloud.js?v=22"></script>
+  <script src="scena-default-audio.js?v=1"></script>
+  <script src="scena-key-item-icons.js?v=1"></script>
+  <script src="scena-key-item.js?v=3"></script>
+  <script src="studio-store.js?v=64"></script>
+  <script src="scena-demo-series.js?v=14"></script>
+  <script src="scena-catalog.js?v=1"></script>
+  <script src="scena-progress.js?v=8"></script>
+  <script src="scena-comments.js?v=5"></script>
+  <script src="scena-hearts.js?v=2"></script>
+  <script src="scena-profile.js?v=1"></script>
+  <script src="scena-audio.js?v=1"></script>
+  <script src="scena-reader-menu.js?v=2"></script>
+  <script src="scena-player.js?v=24"></script>
+  <script>
+    (function () {
+      var loading = document.getElementById("loading");
+      var app = document.getElementById("playerApp");
+      var root = document.getElementById("playerRoot");
+      var meta = document.getElementById("playerMeta");
+      var back = document.getElementById("playerBack");
+      var params = new URLSearchParams(window.location.search);
+      var seriesId = params.get("series");
+      var episodeId = params.get("episode");
+      var fromStudio = params.get("from") === "studio";
+      var restartChapter = params.get("restart") === "1";
+      var player = null;
+
+      function showError(message) {
+        loading.hidden = false;
+        loading.textContent = message;
+        app.hidden = true;
+      }
+
+      function seriesMenuHref(id) {
+        if (window.ScenaProgress && ScenaProgress.seriesMenuUrl) {
+          return ScenaProgress.seriesMenuUrl(id);
+        }
+        return "series.html?series=" + encodeURIComponent(id);
+      }
+
+      function boot(userId, session) {
+        var accountLink = document.getElementById("playerAccountLink");
+        if (accountLink) accountLink.hidden = !userId;
+
+        if (!seriesId) {
+          showError("Missing story link.");
+          return;
+        }
+        if (!episodeId) {
+          window.location.replace(seriesMenuHref(seriesId));
+          return;
+        }
+        if (!window.ScenaStore || !window.ScenaPlayer || !window.ScenaProgress) {
+          showError("Player failed to load. Hard-refresh with Ctrl+Shift+R.");
+          return;
+        }
+
+        var scopeId = ScenaProgress.scopeFromUser(userId);
+        var ready = ScenaStore.ready ? ScenaStore.ready(userId) : Promise.resolve();
+        ready.then(function () {
+          var resolve = window.ScenaCatalog && ScenaCatalog.resolveSeries
+            ? ScenaCatalog.resolveSeries(seriesId, userId)
+            : Promise.resolve(
+              (userId ? ScenaStore.getSeries(userId, seriesId) : null) ||
+              (window.ScenaDemo ? ScenaDemo.getSeries(seriesId) : null)
+            );
+          return resolve.then(function (series) {
+          if (!series) {
+            showError("Story not found. Open it from Discover or your studio.");
+            return null;
+          }
+          ScenaStore.normalizeSeries(series);
+          ScenaStore.ensureDefaultAudio(series);
+          var episode = (series.episodes || []).find(function (ep) { return ep.id === episodeId; });
+          if (!episode) {
+            showError("Episode not found.");
+            return null;
+          }
+
+          return ScenaProgress.ready(scopeId, series.id).then(function () {
+            if (!fromStudio && !ScenaProgress.isEpisodeUnlocked(scopeId, series, episode)) {
+              window.location.replace(seriesMenuHref(seriesId) + "&locked=" + encodeURIComponent(episodeId));
+              return null;
+            }
+            return Promise.all([
+              window.ScenaComments ? ScenaComments.load(series.id, episode.id) : Promise.resolve(),
+              window.ScenaHearts ? ScenaHearts.load(series.id, episode.id) : Promise.resolve(),
+            ]).then(function () {
+              return { series: series, episode: episode };
+            });
+          });
+          });
+        }).then(function (payload) {
+          if (!payload) return;
+          var series = payload.series;
+          var episode = payload.episode;
+
+          if (fromStudio) {
+            back.href = "studio.html#/series/" + encodeURIComponent(series.id) + "/episodes";
+            back.textContent = "← Back to studio";
+          } else {
+            back.href = seriesMenuHref(series.id);
+            back.textContent = "← Chapters";
+          }
+
+          meta.textContent = (series.title || "Story") +
+            (episode.title ? " · " + episode.title : (" · Chapter " + episode.number));
+
+          var profilePromise = userId && window.ScenaProfile
+            ? ScenaProfile.get(userId, session)
+            : Promise.resolve(null);
+
+          return profilePromise.then(function (userProfile) {
+            player = new ScenaPlayer(root, series, {
+              episode: episode,
+              fromStudio: fromStudio,
+              userProfile: userProfile,
+              progressScopeId: scopeId,
+              restartChapter: restartChapter,
+              onError: showError,
+            });
+            if (!player.startEpisode(episode, { restart: restartChapter })) {
+              showError("This episode has no playable beats yet.");
+              return;
+            }
+            loading.hidden = true;
+            app.hidden = false;
+          });
+        }).catch(function () {
+          showError("Could not load story.");
+        });
+      }
+
+      if (window.ScenaAuth && ScenaAuth.isConfigured()) {
+        ScenaAuth.init().then(function (session) {
+          boot(session && session.user ? session.user.id : null, session);
+        }).catch(function () { boot(null, null); });
+      } else {
+        boot(null, null);
+      }
+
+      window.addEventListener("beforeunload", function () {
+        if (player) player.destroy();
+      });
+    })();
+  </script>
+</body>
+</html>

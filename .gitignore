@@ -1,0 +1,23 @@
+# Local Supabase keys — never commit (use scena-config.example.js as template)
+docs/scena-config.js
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.vscode/
+.idea/
+.cursor/
+
+# Logs and temp
+*.log
+npm-debug.log*
+tmp/
+temp/
+
+# Optional local env overrides
+.env
+.env.*
+!.env.example

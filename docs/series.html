@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Chapters — Scena</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="studio.css?v=31" />
+
+  <link rel="stylesheet" href="series.css?v=4" />
+
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+
+</head>
+
+<body class="series-body">
+
+  <div class="loading-screen" id="loading">Loading chapters…</div>
+
+
+
+  <div class="series-shell" id="seriesApp" hidden>
+
+    <header class="series-header">
+
+      <a class="series-back" id="seriesBack" href="scena-design-preview.html">← Discover</a>
+
+      <div class="series-header-actions" id="seriesHeaderActions" hidden>
+        <a class="series-account-link" href="account.html">Account</a>
+      </div>
+
+      <div class="series-hero" id="seriesHero"></div>
+
+    </header>
+
+
+
+    <main class="series-main">
+
+      <div class="series-summary" id="seriesSummary"></div>
+
+      <p class="series-alert" id="seriesAlert" hidden></p>
+
+      <section class="series-saves" aria-label="Save files" id="saveSection">
+
+        <button type="button" class="series-saves-toggle" id="saveToggle" aria-expanded="true" aria-controls="savePanel">
+
+          <span class="series-saves-toggle-label">Save files</span>
+
+          <span class="series-saves-toggle-meta" id="saveToggleMeta"></span>
+
+          <span class="series-saves-chevron" aria-hidden="true">▾</span>
+
+        </button>
+
+        <div class="series-saves-panel" id="savePanel">
+
+          <div class="series-saves-toolbar">
+
+            <p class="series-saves-hint">Separate runs — different choices, stats, and progress.</p>
+
+            <button type="button" class="btn btn-sm btn-primary" id="newSaveBtn">+ New</button>
+
+          </div>
+
+          <div class="series-save-list" id="saveList"></div>
+
+        </div>
+
+      </section>
+
+      <section class="series-chapters" aria-label="Chapters">
+
+        <h2>Chapters</h2>
+
+        <div class="series-chapter-list" id="chapterList"></div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+
+
+  <script src="scena-config.js?v=9"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script src="scena-auth.js?v=10"></script>
+
+  <script src="scena-cloud.js?v=20"></script>
+
+  <script src="studio-store.js?v=64"></script>
+
+  <script src="scena-demo-series.js?v=14"></script>
+
+  <script src="scena-catalog.js?v=1"></script>
+
+  <script src="scena-progress.js?v=8"></script>
+
+  <script>
+
+    (function () {
+
+      var loading = document.getElementById("loading");
+
+      var app = document.getElementById("seriesApp");
+
+      var hero = document.getElementById("seriesHero");
+
+      var summary = document.getElementById("seriesSummary");
+
+      var chapterList = document.getElementById("chapterList");
+
+      var alertEl = document.getElementById("seriesAlert");
+
+      var params = new URLSearchParams(window.location.search);
+
+      var seriesId = params.get("series");
+
+      var lockedEp = params.get("locked");
+
+
+
+      function escapeHtml(s) {
+
+        return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      }
+
+
+
+      function escapeAttr(s) {
+
+        return escapeHtml(s).replace(/"/g, "&quot;");
+
+      }
+
+
+
+      function showError(message) {
+
+        loading.hidden = false;
+
+        loading.textContent = message;
+
+        app.hidden = true;
+
+      }
+
+
+
+      function formatMetric(series, metrics) {
+
+        return (series.metrics || []).filter(function (m) {
+
+          return m.key && !m.hiddenFromPlayer;
+        }).map(function (m) {
+
+          var val = metrics && metrics[m.key] != null ? metrics[m.key] : m.defaultValue;
+
+          var display = typeof val === "number" && val % 1 !== 0 ? val.toFixed(1) : String(val);
+
+          return (
+
+            '<span class="series-stat">' +
+
+              escapeHtml(m.displayName || m.key) + ": <strong>" + escapeHtml(display) + "</strong>" +
+
+            "</span>"
+
+          );
+
+        }).join("");
+
+      }
+
+
+
+      function formatChoices(series, episode, choiceIds) {
+
+        if (!choiceIds || !choiceIds.length || !window.ScenaStore) return "";
+
+        var labels = ScenaStore.resolveChoiceLabels(series, episode, choiceIds);
+
+        if (!labels.length) return "";
+
+        return (
+
+          '<div class="series-chapter-choices">' +
+
+            '<span class="series-chapter-choices-label">Your choices</span>' +
+
+            "<ul>" +
+
+            labels.map(function (item) {
+
+              return "<li>" + escapeHtml(item.label) + "</li>";
+
+            }).join("") +
+
+            "</ul>" +
+
+          "</div>"
+
+        );
+
+      }
+
+
+
+      function renderChapters(series, progress, scopeId) {
+
+        var episodes = ScenaStore.orderedEpisodes(series).filter(function (ep) {
+          return ep.isLive;
+        });
+
+        chapterList.innerHTML = episodes.map(function (ep) {
+
+          var unlocked = ScenaProgress.isEpisodeUnlocked(scopeId, series, ep);
+
+          var rec = progress.episodes[ep.id] || {};
+
+          var status = rec.completed ? "completed" : (rec.checkpoint ? "in-progress" : "new");
+
+          var statusLabel = rec.completed && !rec.checkpoint
+
+            ? "Completed"
+
+            : (rec.checkpoint ? "In progress" : (unlocked ? "Ready" : (window.ScenaStore && ScenaStore.isEpisodeScheduled && ScenaStore.isEpisodeScheduled(ep) ? "Coming soon" : "Locked")));
+
+          var playUrl = unlocked
+
+            ? ScenaProgress.playUrl(series.id, ep.id)
+
+            : "#";
+
+          var statsSource = rec.completed && rec.metrics
+
+            ? rec.metrics
+
+            : ScenaProgress.carryForwardPreview(scopeId, series, ep);
+
+          var statsHtml = formatMetric(series, statsSource);
+
+          var choicesHtml = (rec.completed || (rec.choicesMade && rec.choicesMade.length))
+
+            ? formatChoices(series, ep, rec.choicesMade || [])
+
+            : "";
+
+          var lockReason = unlocked ? "" : ScenaProgress.lockReason(scopeId, series, ep);
+
+
+
+          return (
+
+            '<article class="series-chapter' +
+
+              (unlocked ? "" : " series-chapter--locked") +
+
+              (rec.completed ? " series-chapter--done" : "") +
+
+              '" data-episode-id="' + escapeHtml(ep.id) + '">' +
+
+              '<div class="series-chapter-head">' +
+
+                '<span class="series-chapter-num">Chapter ' + (ep.number || "?") + "</span>" +
+
+                '<span class="series-chapter-status series-chapter-status--' + status + '">' +
+
+                  escapeHtml(statusLabel) +
+
+                "</span>" +
+
+              "</div>" +
+
+              '<h3 class="series-chapter-title">' + escapeHtml(ep.title || ("Chapter " + ep.number)) + "</h3>" +
+
+              (statsHtml ? ('<div class="series-chapter-stats">' + statsHtml + "</div>") : "") +
+
+              choicesHtml +
+
+              (lockReason ? ('<p class="series-chapter-lock">' + escapeHtml(lockReason) + "</p>") : "") +
+
+              '<div class="series-chapter-actions">' +
+
+                (unlocked
+
+                  ? ('<a class="btn btn-primary" href="' + escapeHtml(playUrl) + '">' +
+
+                      (rec.checkpoint ? "Continue" : "Play") +
+
+                    "</a>" +
+
+                    (rec.completed || rec.checkpoint
+
+                      ? ('<a class="btn btn-ghost" href="' + escapeHtml(ScenaProgress.playUrl(series.id, ep.id, true)) + '">Restart</a>')
+
+                      : ""))
+
+                  : ('<button type="button" class="btn btn-primary is-disabled" disabled aria-disabled="true">Locked</button>')) +
+
+              "</div>" +
+
+            "</article>"
+
+          );
+
+        }).join("");
+
+      }
+
+
+
+      var saveList = document.getElementById("saveList");
+
+      var saveToggle = document.getElementById("saveToggle");
+
+      var saveToggleMeta = document.getElementById("saveToggleMeta");
+
+      var saveSection = document.getElementById("saveSection");
+
+      var savePanel = document.getElementById("savePanel");
+
+      var currentSeries = null;
+
+      var currentScopeId = null;
+
+
+
+      function formatSaveDate(iso) {
+
+        if (!iso) return "";
+
+        try {
+
+          return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+        } catch (e) {
+
+          return "";
+
+        }
+
+      }
+
+
+
+      function resumeButtonLabel(save) {
+
+        if (save.hasCheckpoint) return "Continue";
+
+        if (save.chaptersFinished > 0) return "Play next";
+
+        return "Start";
+
+      }
+
+
+
+      function renderSaveFiles(series, scopeId) {
+
+        if (!saveList || !window.ScenaProgress.listSaves) return;
+
+        var saves = ScenaProgress.listSaves(scopeId, series.id, series);
+
+        var active = saves.find(function (s) { return s.isActive; }) || saves[0];
+
+
+
+        if (saveToggleMeta && active) {
+
+          saveToggleMeta.textContent = active.label + " · " + active.summary;
+
+        }
+
+
+
+        if (saveSection) {
+
+          saveSection.classList.toggle("series-saves--many", saves.length > 3);
+
+          if (saves.length > 3 && saveToggle && savePanel && !saveSection.dataset.collapseInit) {
+
+            saveSection.dataset.collapseInit = "1";
+
+            saveToggle.setAttribute("aria-expanded", "false");
+
+            savePanel.hidden = true;
+
+            saveSection.classList.add("series-saves--collapsed");
+
+          }
+
+        }
+
+
+
+        if (!saves.length) {
+
+          saveList.innerHTML = '<p class="series-save-empty">No save files yet.</p>';
+
+          return;
+
+        }
+
+
+
+        saveList.innerHTML = saves.map(function (save) {
+
+          var resumeUrl = ScenaProgress.resumeUrlForSave(scopeId, series.id, series, save.id);
+
+          var canDelete = saves.length > 1;
+
+          return (
+
+            '<article class="series-save' + (save.isActive ? " series-save--active" : "") + '" data-save-id="' + escapeHtml(save.id) + '">' +
+
+              '<div class="series-save-main">' +
+
+                '<div class="series-save-label-row">' +
+
+                  '<span class="series-save-label">' + escapeHtml(save.label) + "</span>" +
+
+                  (save.isActive ? '<span class="series-save-badge">Active</span>' : "") +
+
+                "</div>" +
+
+                '<p class="series-save-summary">' + escapeHtml(save.summary) + "</p>" +
+
+              "</div>" +
+
+              '<div class="series-save-actions">' +
+
+                '<a class="btn btn-sm btn-primary" href="' + escapeAttr(resumeUrl) + '"' +
+
+                  (save.isActive ? "" : ' data-play-save="' + escapeHtml(save.id) + '"') + ">" +
+
+                  escapeHtml(resumeButtonLabel(save)) +
+
+                "</a>" +
+
+                (save.isActive
+
+                  ? ""
+
+                  : ('<button type="button" class="btn btn-sm" data-use-save="' + escapeHtml(save.id) + '">Use</button>')) +
+
+                (canDelete
+
+                  ? ('<button type="button" class="btn btn-sm btn-ghost series-save-delete" data-delete-save="' +
+
+                      escapeHtml(save.id) + '" title="Delete playthrough">Delete</button>')
+
+                  : "") +
+
+              "</div>" +
+
+            "</article>"
+
+          );
+
+        }).join("");
+
+      }
+
+
+
+      function refreshPage(series, scopeId) {
+
+        currentSeries = series;
+
+        currentScopeId = scopeId;
+
+        var progress = ScenaProgress.get(scopeId, series.id);
+
+        var unlocked = ScenaProgress.countUnlockedEndings(scopeId, series.id);
+
+        var total = ScenaProgress.countTotalEndings(series);
+
+        var activeSave = ScenaProgress.listSaves(scopeId, series.id, series).find(function (s) {
+
+          return s.isActive;
+
+        });
+
+        var resumeUrl = ScenaProgress.resumeUrl(scopeId, series.id, series);
+
+        var resumeLabel = activeSave && activeSave.hasCheckpoint
+
+          ? "Continue story"
+
+          : (activeSave && activeSave.chaptersFinished > 0 ? "Play next chapter" : "Start story");
+
+
+
+        summary.innerHTML =
+
+          '<div class="series-progress-card">' +
+
+            '<div class="series-progress-stat">' +
+
+              '<span class="series-progress-label">Endings unlocked</span>' +
+
+              '<span class="series-progress-value">' + unlocked + " / " + total + "</span>" +
+
+            "</div>" +
+
+            '<div class="series-progress-stat">' +
+
+              '<span class="series-progress-label">Chapters finished</span>' +
+
+              '<span class="series-progress-value">' +
+
+                Object.keys(progress.episodes).filter(function (id) {
+
+                  return progress.episodes[id] && progress.episodes[id].completed;
+
+                }).length +
+
+                " / " +
+
+                (series.episodes || []).length +
+
+              "</span>" +
+
+            "</div>" +
+
+          "</div>" +
+
+          '<div class="series-continue-row">' +
+
+            '<a class="btn btn-primary btn-continue-story" href="' + escapeAttr(resumeUrl) + '">' +
+
+              escapeHtml(resumeLabel) +
+
+            "</a>" +
+
+            (activeSave
+
+              ? ('<span class="series-continue-meta">' + escapeHtml(activeSave.label) + " · " + escapeHtml(activeSave.summary) + "</span>")
+
+              : "") +
+
+          "</div>";
+
+
+
+        renderSaveFiles(series, scopeId);
+
+        renderChapters(series, progress, scopeId);
+
+      }
+
+
+
+      function bindSaveFiles(series, scopeId) {
+
+        var newBtn = document.getElementById("newSaveBtn");
+
+        if (newBtn) {
+
+          newBtn.addEventListener("click", function () {
+
+            var result = ScenaProgress.createSave(scopeId, series.id);
+
+            if (!result.ok) {
+
+              window.alert(result.error || "Could not create save file.");
+
+              return;
+
+            }
+
+            refreshPage(series, scopeId);
+
+          });
+
+        }
+
+
+
+        if (saveToggle && savePanel) {
+
+          saveToggle.addEventListener("click", function () {
+
+            var expanded = saveToggle.getAttribute("aria-expanded") !== "true";
+
+            saveToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+
+            savePanel.hidden = !expanded;
+
+            saveSection.classList.toggle("series-saves--collapsed", !expanded);
+
+          });
+
+        }
+
+
+
+        if (!saveList) return;
+
+        saveList.addEventListener("click", function (e) {
+
+          var playLink = e.target.closest("[data-play-save]");
+
+          if (playLink) {
+
+            e.preventDefault();
+
+            var saveId = playLink.getAttribute("data-play-save");
+
+            ScenaProgress.setActiveSave(scopeId, series.id, saveId);
+
+            window.location.href = playLink.getAttribute("href");
+
+            return;
+
+          }
+
+
+
+          var useBtn = e.target.closest("[data-use-save]");
+
+          if (useBtn) {
+
+            ScenaProgress.setActiveSave(scopeId, series.id, useBtn.getAttribute("data-use-save"));
+
+            refreshPage(series, scopeId);
+
+            return;
+
+          }
+
+
+
+          var delBtn = e.target.closest("[data-delete-save]");
+
+          if (delBtn) {
+
+            var saveId = delBtn.getAttribute("data-delete-save");
+
+            var saves = ScenaProgress.listSaves(scopeId, series.id, series);
+
+            var target = saves.find(function (item) { return item.id === saveId; });
+
+            var label = target ? target.label : "this save";
+
+            if (!window.confirm("Delete \"" + label + "\"? This playthrough cannot be recovered.")) return;
+
+            var result = ScenaProgress.deleteSave(scopeId, series.id, saveId);
+
+            if (!result.ok) {
+
+              window.alert(result.error || "Could not delete save file.");
+
+              return;
+
+            }
+
+            refreshPage(series, scopeId);
+
+          }
+
+        });
+
+      }
+
+
+
+      function boot(userId) {
+
+        if (!seriesId) {
+
+          showError("Missing story link.");
+
+          return;
+
+        }
+
+        if (!window.ScenaStore || !window.ScenaProgress) {
+
+          showError("Could not load chapter menu. Hard-refresh with Ctrl+Shift+R.");
+
+          return;
+
+        }
+
+
+
+        var scopeId = ScenaProgress.scopeFromUser(userId);
+
+        var ready = ScenaStore.ready ? ScenaStore.ready(userId) : Promise.resolve();
+
+        ready.then(function () {
+
+          var resolve = window.ScenaCatalog && ScenaCatalog.resolveSeries
+
+            ? ScenaCatalog.resolveSeries(seriesId, userId)
+
+            : Promise.resolve(
+
+              (userId ? ScenaStore.getSeries(userId, seriesId) : null) ||
+
+              (window.ScenaDemo ? ScenaDemo.getSeries(seriesId) : null)
+
+            );
+
+          return resolve.then(function (series) {
+
+          if (!series) {
+
+            showError("Story not found.");
+
+            return;
+
+          }
+
+          ScenaStore.normalizeSeries(series);
+
+
+
+          return ScenaProgress.ready(scopeId, series.id).then(function () {
+
+          document.title = (series.title || "Story") + " — Chapters";
+
+
+
+          hero.innerHTML =
+
+            (series.bannerDataUrl || series.thumbnailDataUrl
+
+              ? ('<div class="series-banner" style="background-image:url(' + escapeHtml(series.bannerDataUrl || series.thumbnailDataUrl) + ')"></div>')
+
+              : "") +
+
+            '<div class="series-hero-text">' +
+
+              '<h1>' + escapeHtml(series.title || "Story") + "</h1>" +
+
+              (series.shortDescription
+
+                ? ('<p class="series-tagline">' + escapeHtml(series.shortDescription) + "</p>")
+
+                : "") +
+
+            "</div>";
+
+
+
+          if (lockedEp) {
+
+            var lockedEpisode = (series.episodes || []).find(function (ep) { return ep.id === lockedEp; });
+
+            if (lockedEpisode) {
+
+              alertEl.hidden = false;
+
+              alertEl.textContent = ScenaProgress.lockReason(scopeId, series, lockedEpisode);
+
+            }
+
+          }
+
+
+
+          refreshPage(series, scopeId);
+
+          bindSaveFiles(series, scopeId);
+
+          loading.hidden = true;
+
+          app.hidden = false;
+
+          });
+
+          });
+
+        }).catch(function () {
+
+          showError("Could not load story.");
+
+        });
+
+      }
+
+
+
+      if (window.ScenaAuth && ScenaAuth.isConfigured()) {
+
+        ScenaAuth.init().then(function (session) {
+
+          var actions = document.getElementById("seriesHeaderActions");
+          if (actions) actions.hidden = !(session && session.user);
+          boot(session && session.user ? session.user.id : null);
+
+        }).catch(function () { boot(null); });
+
+      } else {
+
+        boot(null);
+
+      }
+
+    })();
+
+  </script>
+
+</body>
+
+</html>
+

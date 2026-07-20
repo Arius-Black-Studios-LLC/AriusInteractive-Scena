@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Conservatory — Scena</title>
+  <meta name="description" content="Interactive stagecraft lessons for the Scena creator studio — blocking, subtext, casting, and scenic design." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio.css?v=68" />
+  <link rel="stylesheet" href="play.css?v=15" />
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+  <link rel="stylesheet" href="learn.css?v=14" />
+  <style>
+    :root {
+      --scena-bg: #F7F6F3;
+      --scena-surface: #FFFFFF;
+      --scena-surface-2: #F0EFEC;
+      --scena-text: #141414;
+      --scena-text-muted: #6B6B6B;
+      --scena-text-faint: #9A9893;
+      --scena-border: #E5E3DE;
+      --scena-border-strong: #C9C6BE;
+      --scena-accent: #ff8c00;
+      --scena-accent-hover: #FF6600;
+      --scena-accent-soft: #fff4e6;
+      --abs-black: #000000;
+      --abs-white: #ffffff;
+      --abs-yellow: #ffd700;
+      --abs-orange: #ff8c00;
+      --abs-orange-deep: #ff6600;
+      --font-display: "Fraunces", Georgia, serif;
+      --font-ui: "DM Sans", system-ui, sans-serif;
+      --radius: 8px;
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-ui); background: var(--scena-bg); color: var(--scena-text); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 8px 14px; border-radius: 6px; font-size: 0.875rem; font-weight: 500;
+      border: 1px solid var(--scena-border); background: var(--scena-surface);
+      cursor: pointer; text-decoration: none; color: inherit; font-family: inherit;
+    }
+    .btn-primary { background: var(--scena-accent); border-color: var(--scena-accent); color: #fff; }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost { border-color: transparent; background: transparent; color: var(--scena-text-muted); }
+    .btn-sm { padding: 6px 10px; font-size: 0.8125rem; }
+    .field-hint { font-size: 0.8125rem; color: var(--scena-text-faint); line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="learn-shell">
+    <header class="learn-header">
+      <a class="logo" href="scena-design-preview.html">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-text">Scena</span>
+      </a>
+      <nav class="learn-header-nav" aria-label="Learn navigation">
+        <a href="learn.html" class="is-active">Conservatory</a>
+        <a href="scena-design-preview.html">Discover</a>
+        <a href="account.html">Account</a>
+        <a href="studio.html">Creator studio</a>
+      </nav>
+    </header>
+    <main class="learn-main" id="learnMain">
+      <p style="padding:24px;color:var(--scena-text-muted)">Loading lessons…</p>
+    </main>
+  </div>
+
+  <div class="toast learn-toast" id="learnToast" role="status" aria-live="polite"></div>
+
+  <script src="scena-config.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scena-auth.js?v=10"></script>
+  <script src="scena-default-audio.js?v=1"></script>
+  <script src="scena-key-item-icons.js?v=2"></script>
+  <script src="scena-key-item.js?v=3"></script>
+  <script src="studio-store.js?v=63"></script>
+  <script src="scena-audio.js?v=1"></script>
+  <script src="scena-reader-menu.js?v=2"></script>
+  <script src="studio-graph.js?v=78"></script>
+  <script src="learn-mascots.js?v=5"></script>
+  <script src="scena-badges.js?v=14"></script>
+  <script src="learn-lessons.js?v=42"></script>
+  <script src="learn-sandbox.js?v=15"></script>
+  <script src="learn-app.js?v=3"></script>
+  <script>
+    (function () {
+      function start(userId) {
+        ScenaLearnApp.start(userId || null);
+      }
+      if (window.ScenaAuth && ScenaAuth.isConfigured()) {
+        ScenaAuth.init().then(function (session) {
+          start(session && session.user ? session.user.id : null);
+        }).catch(function () { start(null); });
+      } else {
+        start(null);
+      }
+    })();
+  </script>
+  <script src="scena-logo.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Account — Scena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="studio.css?v=66" />
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+  <style>
+    .studio-body--solo { display: block; }
+    .studio-body--solo .studio-main {
+      min-height: calc(100vh - var(--topbar-h));
+      max-width: 720px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="loading-screen" id="loading">Checking session…</div>
+
+  <div class="studio-shell" id="app" hidden>
+    <header class="studio-topbar">
+      <div class="studio-topbar-left">
+        <a class="studio-logo" href="scena-design-preview.html">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="logo-text">Scena</span>
+        </a>
+        <span style="color:var(--scena-text-faint);font-size:0.8125rem">Account</span>
+      </div>
+      <div class="studio-topbar-right">
+        <span class="user-email" id="accountUserEmail"></span>
+        <a class="btn btn-ghost btn-sm" href="studio.html">Creator studio</a>
+        <a class="btn btn-ghost btn-sm" href="scena-design-preview.html">Discover</a>
+        <button type="button" class="btn btn-sm" id="signOutBtn">Log out</button>
+      </div>
+    </header>
+
+    <div class="studio-body studio-body--solo">
+      <main class="studio-main" id="accountMain">
+        <div class="page"><p class="field-hint">Loading profile…</p></div>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="accountToast" role="status" aria-live="polite"></div>
+
+  <script src="scena-config.js?v=9"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scena-auth.js?v=11"></script>
+  <script src="scena-profile.js?v=1"></script>
+  <script src="scena-account.js?v=1"></script>
+  <script>
+    (function () {
+      var loading = document.getElementById("loading");
+      var app = document.getElementById("app");
+      var main = document.getElementById("accountMain");
+      var userEmailEl = document.getElementById("accountUserEmail");
+      var toastTimer = null;
+      var booted = false;
+
+      function toast(msg) {
+        var el = document.getElementById("accountToast");
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.add("is-show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { el.classList.remove("is-show"); }, 2600);
+      }
+
+      function showError(message) {
+        loading.hidden = false;
+        loading.textContent = message;
+        app.hidden = true;
+      }
+
+      function openAccount(session) {
+        if (booted) return;
+        booted = true;
+        if (!window.ScenaAccount || !window.ScenaProfile) {
+          showError("Account page failed to load. Hard-refresh with Ctrl+Shift+R.");
+          return;
+        }
+        loading.hidden = true;
+        app.hidden = false;
+
+        var userId = session.user.id;
+        var userEmail = session.user.email || "";
+
+        ScenaProfile.get(userId, session).then(function (profile) {
+          main.innerHTML = ScenaAccount.renderPage(profile, { userEmail: userEmail });
+          ScenaAccount.bindPage(profile, {
+            userId: userId,
+            userEmail: userEmail,
+            toast: toast,
+            onSaved: function (next) {
+              ScenaAccount.paintTopbar(userEmailEl, next, { userEmail: userEmail, title: "Your account" });
+            },
+          });
+          ScenaAccount.paintTopbar(userEmailEl, profile, { userEmail: userEmail, title: "Your account" });
+        }).catch(function () {
+          main.innerHTML = '<div class="page"><p class="field-hint">Could not load your profile.</p></div>';
+        });
+      }
+
+      function sendToLogin() {
+        try { sessionStorage.setItem("scena_post_login", "account.html"); } catch (e) {}
+        window.location.href = "scena-design-preview.html";
+      }
+
+      if (!window.ScenaAuth || !ScenaAuth.isConfigured()) {
+        showError("Configure scena-config.js, then log in from the Scena landing page.");
+        return;
+      }
+
+      if (ScenaAuth.isFileProtocol()) {
+        loading.innerHTML = "Open via <strong>http://127.0.0.1:5500/account.html</strong> (run serve.ps1 first).";
+        return;
+      }
+
+      var stored = ScenaAuth.getStoredSession ? ScenaAuth.getStoredSession() : null;
+      if (stored && stored.user) {
+        openAccount(stored);
+      }
+
+      ScenaAuth.init().then(function (session) {
+        if (session && session.user) {
+          openAccount(session);
+          return;
+        }
+        if (!booted) sendToLogin();
+      }).catch(function () {
+        if (!booted) sendToLogin();
+      });
+
+      setTimeout(function () {
+        if (booted) return;
+        var fallback = ScenaAuth.getStoredSession ? ScenaAuth.getStoredSession() : null;
+        if (fallback && fallback.user) {
+          openAccount(fallback);
+          return;
+        }
+        showError("Could not verify login. Go back to the landing page, log out, log in again, then open Account.");
+      }, 4000);
+
+      document.getElementById("signOutBtn").addEventListener("click", function () {
+        ScenaAuth.signOut().then(function () {
+          window.location.href = "scena-design-preview.html";
+        });
+      });
+    })();
+  </script>
+  <script src="scena-logo.js?v=1"></script>
+</body>
+</html>
