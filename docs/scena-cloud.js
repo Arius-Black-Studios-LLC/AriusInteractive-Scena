@@ -4,12 +4,16 @@
  */
 (function () {
   var BUCKET = "series-assets";
-  var BUCKET_SETUP_HINT =
-    "Storage bucket missing. In Supabase: Dashboard → Storage → New bucket → name it \"series-assets\" → turn Public ON. " +
-    "Then run docs/supabase-cloud-setup.sql in the SQL editor (for upload permissions).";
+  var BUCKET_MISSING_HINT =
+    "Storage bucket \"series-assets\" not found in this Supabase project. " +
+    "Dashboard → Storage → New bucket → name \"series-assets\" → Public ON, " +
+    "or run docs/supabase-cloud-setup.sql in the SQL editor.";
+  var BUCKET_POLICY_HINT =
+    "Storage upload blocked. The series-assets bucket exists, but upload permissions are missing. " +
+    "Run docs/supabase-cloud-setup.sql in Supabase SQL Editor (section 3 — storage policies).";
+  var BUCKET_SETUP_HINT = BUCKET_POLICY_HINT;
 
   var bucketReadyPromise = null;
-  var bucketKnownMissing = false;
 
   function getClient() {
     return window.ScenaAuth && ScenaAuth.getClient ? ScenaAuth.getClient() : null;
@@ -72,40 +76,37 @@
     return userId + "/" + seriesId + "/" + category + "/" + assetId + "." + ext;
   }
 
-  function bucketExists(sb) {
-    return sb.storage.listBuckets().then(function (result) {
-      if (result.error) throw result.error;
-      return (result.data || []).some(function (b) {
-        return b.name === BUCKET || b.id === BUCKET;
-      });
+  function isStoragePolicyError(err) {
+    var msg = errorMessage(err).toLowerCase();
+    return msg.indexOf("row-level security") >= 0 ||
+      msg.indexOf("permission denied") >= 0 ||
+      msg.indexOf("not allowed") >= 0 ||
+      msg.indexOf("violates row-level") >= 0 ||
+      (msg.indexOf("policy") >= 0 && msg.indexOf("storage") >= 0);
+  }
+
+  function storageSetupError(err) {
+    if (isBucketMissingError(err)) return new Error(BUCKET_MISSING_HINT);
+    if (isStoragePolicyError(err)) return new Error(BUCKET_POLICY_HINT);
+    return err instanceof Error ? err : new Error(errorMessage(err) || "Storage error.");
+  }
+
+  function probeBucket(sb) {
+    return sb.storage.from(BUCKET).list("", { limit: 1 }).then(function (result) {
+      if (result.error) throw storageSetupError(result.error);
+      return true;
     });
   }
 
   function ensureBucket() {
-    if (bucketKnownMissing) {
-      return Promise.reject(new Error(BUCKET_SETUP_HINT));
-    }
     if (bucketReadyPromise) return bucketReadyPromise;
 
     var sb = getClient();
     if (!sb) return Promise.reject(new Error("Cloud storage is not available."));
 
-    bucketReadyPromise = bucketExists(sb).then(function (exists) {
-      if (exists) return true;
-      return sb.storage.createBucket(BUCKET, { public: true }).then(function (created) {
-        if (created.error && !isAlreadyExistsError(created.error)) throw created.error;
-        return true;
-      });
-    }).then(function () {
-      bucketKnownMissing = false;
-      return true;
-    }).catch(function (err) {
+    bucketReadyPromise = probeBucket(sb).catch(function (err) {
       bucketReadyPromise = null;
-      if (isBucketMissingError(err) || errorMessage(err).toLowerCase().indexOf("row-level security") >= 0) {
-        bucketKnownMissing = true;
-        throw new Error(BUCKET_SETUP_HINT);
-      }
-      throw err;
+      throw storageSetupError(err);
     });
 
     return bucketReadyPromise;
@@ -120,7 +121,7 @@
         contentType: blob.type || "application/octet-stream",
       });
     }).then(function (result) {
-      if (result.error) throw result.error;
+      if (result.error) throw storageSetupError(result.error);
       return publicUrl(storagePath);
     });
   }
@@ -311,7 +312,7 @@
         return false;
       }).then(function () {
         return externalizeSeriesImages(userId, payload).catch(function (err) {
-          if (isBucketMissingError(err)) {
+          if (isBucketMissingError(err) || isStoragePolicyError(err)) {
             imagesPending = true;
             return payload;
           }
@@ -319,11 +320,15 @@
         });
       }).then(function (prepared) {
         return upsertSeries(sb, userId, prepared, series).then(function () {
+          var warning = null;
+          if (imagesPending) {
+            warning = BUCKET_POLICY_HINT;
+          }
           return {
             ok: true,
             cloud: true,
             imagesPending: imagesPending,
-            warning: imagesPending ? BUCKET_SETUP_HINT : null,
+            warning: warning,
             series: series,
           };
         });
