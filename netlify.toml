@@ -1,0 +1,3 @@
+[build]
+  publish = "docs"
+  command = "node scripts/write-scena-config.js"
