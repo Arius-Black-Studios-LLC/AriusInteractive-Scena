@@ -1888,7 +1888,10 @@
         loginError.classList.remove("is-show");
       }
 
+      var currentSession = null;
+
       function updateAuthUI(session) {
+        currentSession = session;
         var signedIn = Boolean(session && session.user);
         headerLoggedOut.hidden = signedIn;
         headerLoggedIn.hidden = !signedIn;
@@ -1968,8 +1971,22 @@
       }
 
       document.querySelectorAll("[data-open-login]").forEach(function (el) {
-        el.addEventListener("click", function () {
-          openLogin(el.getAttribute("data-open-login"));
+        el.addEventListener("click", function (e) {
+          var mode = el.getAttribute("data-open-login");
+          if (currentSession && currentSession.user) {
+            if (mode === "creator") {
+              e.preventDefault();
+              window.location.href = "studio.html";
+              return;
+            }
+            if (mode === "reader") {
+              e.preventDefault();
+              window.location.href = "account.html";
+              return;
+            }
+          }
+          if (e.target.closest("a")) e.preventDefault();
+          openLogin(mode);
           mobileNav.classList.remove("is-open");
           menuToggle.setAttribute("aria-expanded", "false");
         });
