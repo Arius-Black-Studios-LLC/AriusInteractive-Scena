@@ -14,6 +14,23 @@
     return escapeHtml(s).replace(/"/g, "&quot;");
   }
 
+  function eventClientXY(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    if (e.changedTouches && e.changedTouches.length) {
+      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function pinchDistance(touches) {
+    if (!touches || touches.length < 2) return 0;
+    var dx = touches[1].clientX - touches[0].clientX;
+    var dy = touches[1].clientY - touches[0].clientY;
+    return Math.hypot(dx, dy);
+  }
+
   function isoToLocalDatetimeInput(iso) {
     if (!iso) return "";
     var d = new Date(iso);
@@ -73,6 +90,9 @@
     this.zoom = 1;
     this.isPanning = false;
     this.panStart = null;
+    this.pinchState = null;
+    this.ignoreMouseUntil = 0;
+    this.mobileDrawer = null;
     this.dragNode = null;
     this.dragStart = null;
     this.dragEl = null;
@@ -102,6 +122,8 @@
     }
     this.boundMove = this.onMouseMove.bind(this);
     this.boundUp = this.onMouseUp.bind(this);
+    this.boundTouchMove = this.onTouchMove.bind(this);
+    this.boundTouchEnd = this.onTouchEnd.bind(this);
     this.boundConnectMove = this.onConnectMove.bind(this);
     this.boundConnectUp = this.onConnectUp.bind(this);
     this.renderShell();
@@ -559,10 +581,15 @@
             '<button type="button" class="btn btn-sm" id="graphParallaxBtn" title="Toggle preview parallax">Parallax</button>' +
           '</div>' +
           '<div class="graph-toolbar-right">' +
+            '<div class="graph-toolbar-mobile" id="graphToolbarMobile">' +
+              '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
+              '<button type="button" class="btn btn-sm" id="mobileResourcesBtn" aria-expanded="false">Assets</button>' +
+            '</div>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
             '<button type="button" class="btn btn-sm btn-primary" id="graphSaveBtn" disabled>Save</button>' +
           '</div>' +
         '</div>' +
+        '<div class="mobile-panel-backdrop" id="mobilePanelBackdrop" hidden></div>' +
         '<div class="workspace-panels">' +
           '<aside class="panel-left graph-inspector" id="graphInspector"></aside>' +
           '<div class="panel-center" id="panelCenter">' +
@@ -643,6 +670,10 @@
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
     this.parallaxBtn = this.container.querySelector("#graphParallaxBtn");
+    this.workspaceEditor = this.container.querySelector(".workspace-editor");
+    this.mobileInspectorBtn = this.container.querySelector("#mobileInspectorBtn");
+    this.mobileResourcesBtn = this.container.querySelector("#mobileResourcesBtn");
+    this.mobileBackdrop = this.container.querySelector("#mobilePanelBackdrop");
 
     if (this.playBtn) {
       this.playBtn.addEventListener("click", function () {
@@ -696,28 +727,18 @@
 
     if (this.boundariesLayer) {
       this.boundariesLayer.addEventListener("mousedown", function (e) {
+        if (self.shouldIgnoreMouse()) return;
+        self.handleBoundaryPointerDown(e, e.clientX);
+      });
+      this.boundariesLayer.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
         var line = e.target.closest(".episode-boundary");
         if (!line) return;
         e.stopPropagation();
         e.preventDefault();
-        var ep = (self.series.episodes || []).find(function (item) {
-          return item.id === line.dataset.episodeId;
-        });
-        if (!ep) return;
-        self.selectedBoundaryId = ep.id;
-        self.selectedEdgeId = null;
-        self.selectNode(null);
-        self.paintBoundaries();
-        self.renderInspector();
-        self.refreshEpisodeContextBtn();
-        self.dragBoundary = {
-          episode: ep,
-          startX: ep.boundaryX,
-          startMouseX: e.clientX,
-        };
-        window.addEventListener("mousemove", self.boundMove);
-        window.addEventListener("mouseup", self.boundUp);
-      });
+        self.markTouchPointer();
+        self.handleBoundaryPointerDown(e, e.touches[0].clientX);
+      }, { passive: false });
     }
 
     this.container.querySelectorAll("[data-resource-tab]").forEach(function (btn) {
@@ -742,6 +763,10 @@
     this.renderBlockShelf();
     this.renderSpawnMenu();
     this.bindBlockShelfToggle();
+
+    if (!this.learnMode) {
+      this.bindMobileDrawer();
+    }
 
     document.addEventListener("mousedown", function (e) {
       if (!self.spawnMenu || self.spawnMenu.hidden) return;
@@ -826,10 +851,136 @@
     this.panelCenter.style.setProperty("--preview-ratio", String(this.previewRatio));
   };
 
+  ScenaGraphEditor.prototype.markTouchPointer = function () {
+    this.ignoreMouseUntil = Date.now() + 700;
+  };
+
+  ScenaGraphEditor.prototype.shouldIgnoreMouse = function () {
+    return Date.now() < this.ignoreMouseUntil;
+  };
+
+  ScenaGraphEditor.prototype.bindDragListeners = function () {
+    window.addEventListener("mousemove", this.boundMove);
+    window.addEventListener("mouseup", this.boundUp);
+    window.addEventListener("touchmove", this.boundTouchMove, { passive: false });
+    window.addEventListener("touchend", this.boundTouchEnd);
+    window.addEventListener("touchcancel", this.boundTouchEnd);
+  };
+
+  ScenaGraphEditor.prototype.unbindDragListeners = function () {
+    window.removeEventListener("mousemove", this.boundMove);
+    window.removeEventListener("mouseup", this.boundUp);
+    window.removeEventListener("touchmove", this.boundTouchMove);
+    window.removeEventListener("touchend", this.boundTouchEnd);
+    window.removeEventListener("touchcancel", this.boundTouchEnd);
+  };
+
+  ScenaGraphEditor.prototype.bindConnectListeners = function () {
+    window.addEventListener("mousemove", this.boundConnectMove);
+    window.addEventListener("mouseup", this.boundConnectUp);
+    window.addEventListener("touchmove", this.boundConnectMove, { passive: false });
+    window.addEventListener("touchend", this.boundConnectUp);
+    window.addEventListener("touchcancel", this.boundConnectUp);
+  };
+
+  ScenaGraphEditor.prototype.unbindConnectListeners = function () {
+    window.removeEventListener("mousemove", this.boundConnectMove);
+    window.removeEventListener("mouseup", this.boundConnectUp);
+    window.removeEventListener("touchmove", this.boundConnectMove);
+    window.removeEventListener("touchend", this.boundConnectUp);
+    window.removeEventListener("touchcancel", this.boundConnectUp);
+  };
+
+  ScenaGraphEditor.prototype.isMobileLayout = function () {
+    return window.matchMedia("(max-width: 900px)").matches;
+  };
+
+  ScenaGraphEditor.prototype.setMobileDrawer = function (drawer) {
+    var root = this.workspaceEditor;
+    if (!root) return;
+    this.mobileDrawer = drawer || null;
+    root.classList.toggle("is-mobile-inspector-open", drawer === "inspector");
+    root.classList.toggle("is-mobile-resources-open", drawer === "resources");
+    if (this.mobileBackdrop) {
+      this.mobileBackdrop.hidden = !drawer;
+    }
+    var inspBtn = this.mobileInspectorBtn;
+    var resBtn = this.mobileResourcesBtn;
+    if (inspBtn) inspBtn.classList.toggle("is-active", drawer === "inspector");
+    if (resBtn) resBtn.classList.toggle("is-active", drawer === "resources");
+    if (inspBtn) inspBtn.setAttribute("aria-expanded", drawer === "inspector" ? "true" : "false");
+    if (resBtn) resBtn.setAttribute("aria-expanded", drawer === "resources" ? "true" : "false");
+  };
+
+  ScenaGraphEditor.prototype.closeMobileDrawer = function () {
+    this.setMobileDrawer(null);
+  };
+
+  ScenaGraphEditor.prototype.handleBoundaryPointerDown = function (e, clientX) {
+    var line = e.target.closest(".episode-boundary");
+    if (!line) return;
+    e.stopPropagation();
+    e.preventDefault();
+    var ep = (this.series.episodes || []).find(function (item) {
+      return item.id === line.dataset.episodeId;
+    });
+    if (!ep) return;
+    this.selectedBoundaryId = ep.id;
+    this.selectedEdgeId = null;
+    this.selectNode(null);
+    this.paintBoundaries();
+    this.renderInspector();
+    this.refreshEpisodeContextBtn();
+    this.dragBoundary = {
+      episode: ep,
+      startX: ep.boundaryX,
+      startMouseX: clientX,
+    };
+    this.bindDragListeners();
+  };
+
+  ScenaGraphEditor.prototype.bindMobileDrawer = function () {
+    var self = this;
+    if (!this.workspaceEditor || this.learnMode) return;
+    if (this.mobileInspectorBtn) {
+      this.mobileInspectorBtn.addEventListener("click", function () {
+        self.setMobileDrawer(self.mobileDrawer === "inspector" ? null : "inspector");
+      });
+    }
+    if (this.mobileResourcesBtn) {
+      this.mobileResourcesBtn.addEventListener("click", function () {
+        self.setMobileDrawer(self.mobileDrawer === "resources" ? null : "resources");
+      });
+    }
+    if (this.mobileBackdrop) {
+      this.mobileBackdrop.addEventListener("click", function () {
+        self.closeMobileDrawer();
+      });
+    }
+    window.addEventListener("resize", function () {
+      if (!self.isMobileLayout()) self.closeMobileDrawer();
+    });
+  };
+
   ScenaGraphEditor.prototype.bindCanvasEvents = function () {
     var self = this;
+
+    function canvasTargetBlocked(target) {
+      return target.closest(".graph-node") || target.closest(".graph-port") || target.closest(".episode-boundary");
+    }
+
+    function startPan(clientX, clientY) {
+      self.pinchState = null;
+      self.isPanning = true;
+      self.panStart = { x: clientX - self.pan.x, y: clientY - self.pan.y };
+      self.wrap.classList.add("is-panning");
+      self.selectNode(null);
+      self.bindDragListeners();
+    }
+
     this.wrap.addEventListener("mousedown", function (e) {
-      if (e.target.closest(".graph-node") || e.target.closest(".graph-port") || e.target.closest(".episode-boundary")) return;
+      if (self.shouldIgnoreMouse()) return;
+      if (canvasTargetBlocked(e.target)) return;
       if (self.boundaryPlacementMode && e.button === 0) {
         e.preventDefault();
         var pt = self.clientToCanvas(e.clientX, e.clientY);
@@ -837,14 +988,30 @@
         return;
       }
       if (e.button === 0 || e.button === 1) {
-        self.isPanning = true;
-        self.panStart = { x: e.clientX - self.pan.x, y: e.clientY - self.pan.y };
-        self.wrap.classList.add("is-panning");
-        self.selectNode(null);
-        window.addEventListener("mousemove", self.boundMove);
-        window.addEventListener("mouseup", self.boundUp);
+        startPan(e.clientX, e.clientY);
       }
     });
+
+    this.wrap.addEventListener("touchstart", function (e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        self.isPanning = false;
+        self.panStart = null;
+        self.pinchState = {
+          distance: pinchDistance(e.touches),
+          zoom: self.zoom,
+        };
+        self.wrap.classList.add("is-panning");
+        self.bindDragListeners();
+        return;
+      }
+      if (e.touches.length !== 1 || canvasTargetBlocked(e.target)) return;
+      e.preventDefault();
+      self.markTouchPointer();
+      var pt = eventClientXY(e);
+      startPan(pt.x, pt.y);
+    }, { passive: false });
+
     this.wrap.addEventListener("wheel", function (e) {
       e.preventDefault();
       self.zoom = Math.min(2, Math.max(0.35, self.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
@@ -857,6 +1024,11 @@
       if (e.key === "Escape" && self.connectDragActive) {
         e.preventDefault();
         self.cancelConnect();
+        return;
+      }
+      if (e.key === "Escape" && self.mobileDrawer) {
+        e.preventDefault();
+        self.closeMobileDrawer();
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && self.selectedBoundaryId && !self.selectedId && !self.selectedEdgeId) {
@@ -876,15 +1048,44 @@
     });
   };
 
+  ScenaGraphEditor.prototype.onTouchMove = function (e) {
+    if (e.touches && e.touches.length === 2 && this.pinchState) {
+      e.preventDefault();
+      var dist = pinchDistance(e.touches);
+      if (this.pinchState.distance > 0) {
+        var scale = dist / this.pinchState.distance;
+        this.zoom = Math.min(2, Math.max(0.35, this.pinchState.zoom * scale));
+        this.applyTransform();
+        this.refreshEpisodeContextBtn();
+      }
+      return;
+    }
+    if (this.isPanning || this.dragNode || this.dragBoundary || this.connectDragActive) {
+      e.preventDefault();
+    }
+    this.onMouseMove(e);
+  };
+
+  ScenaGraphEditor.prototype.onTouchEnd = function (e) {
+    if (e.touches && e.touches.length >= 2) return;
+    if (e.touches && e.touches.length === 1 && this.pinchState) {
+      this.pinchState = null;
+      return;
+    }
+    this.pinchState = null;
+    this.onMouseUp(e);
+  };
+
   ScenaGraphEditor.prototype.onMouseMove = function (e) {
+    var pt = eventClientXY(e);
     if (this.isPanning && this.panStart) {
-      this.pan.x = e.clientX - this.panStart.x;
-      this.pan.y = e.clientY - this.panStart.y;
+      this.pan.x = pt.x - this.panStart.x;
+      this.pan.y = pt.y - this.panStart.y;
       this.applyTransform();
     }
     if (this.dragNode && this.dragStart) {
-      var dx = (e.clientX - this.dragStart.mouseX) / this.zoom;
-      var dy = (e.clientY - this.dragStart.mouseY) / this.zoom;
+      var dx = (pt.x - this.dragStart.mouseX) / this.zoom;
+      var dy = (pt.y - this.dragStart.mouseY) / this.zoom;
       this.dragNode.x = Math.max(0, this.dragStart.nodeX + dx);
       this.dragNode.y = Math.max(0, this.dragStart.nodeY + dy);
       if (this.dragEl) {
@@ -894,8 +1095,8 @@
       this.paintEdges();
     }
     if (this.dragBoundary) {
-      var dx = (e.clientX - this.dragBoundary.startMouseX) / this.zoom;
-      var newX = Math.round(this.dragBoundary.startX + dx);
+      var bdx = (pt.x - this.dragBoundary.startMouseX) / this.zoom;
+      var newX = Math.round(this.dragBoundary.startX + bdx);
       var ep = this.dragBoundary.episode;
       var sorted = ScenaStore.sortedEpisodesByBoundary(this.series);
       var idx = sorted.findIndex(function (item) { return item.id === ep.id; });
@@ -932,21 +1133,22 @@
     this.dragStart = null;
     this.dragEl = null;
     if (this.wrap) this.wrap.classList.remove("is-panning");
-    window.removeEventListener("mousemove", this.boundMove);
-    window.removeEventListener("mouseup", this.boundUp);
+    this.pinchState = null;
+    this.unbindDragListeners();
     if (wasPanning) this.refreshEpisodeContextBtn();
   };
 
   ScenaGraphEditor.prototype.onConnectMove = function (e) {
     if (!this.connectDragActive || !this.connectFrom || !this.tempLine || !this.connectFromPort) return;
-    var pt = this.clientToCanvas(e.clientX, e.clientY);
+    if (e.touches) e.preventDefault();
+    var xy = eventClientXY(e);
+    var pt = this.clientToCanvas(xy.x, xy.y);
     this.drawTempLine(this.connectFromPort, pt);
   };
 
   ScenaGraphEditor.prototype.endConnectDrag = function (keepConnectState) {
     if (this.connectDragActive) {
-      window.removeEventListener("mousemove", this.boundConnectMove);
-      window.removeEventListener("mouseup", this.boundConnectUp);
+      this.unbindConnectListeners();
       this.connectDragActive = false;
     }
     this.tempLine = null;
@@ -968,7 +1170,8 @@
     this.connectFrom = sourceId;
     this.connectChoiceId = choiceId;
 
-    var target = document.elementFromPoint(e.clientX, e.clientY);
+    var pointer = eventClientXY(e);
+    var target = document.elementFromPoint(pointer.x, pointer.y);
     var portIn = target && target.closest ? target.closest(".graph-port-in") : null;
     if (portIn) {
       var nodeEl = portIn.closest(".graph-node");
@@ -1416,6 +1619,7 @@
       self.renderInspector();
       self.renderPreview();
       self.refreshEpisodeContextBtn();
+      if (id && self.isMobileLayout()) self.setMobileDrawer("inspector");
     };
     if (opts.skipConfirm || opts.fromPlay || !node || !this.isNodePublished(node)) {
       apply();
@@ -1962,8 +2166,7 @@
     this.tempLine = true;
     this.connectDragActive = true;
     this.setSaveStatus("Drag to connect or release in blank space…");
-    window.addEventListener("mousemove", this.boundConnectMove);
-    window.addEventListener("mouseup", this.boundConnectUp);
+    this.bindConnectListeners();
   };
 
   ScenaGraphEditor.prototype.ensureGraphArrays = function () {
@@ -2222,21 +2425,18 @@
 
       el.innerHTML = portsIn + '<div class="graph-node-body">' + body + '</div>' + portOutEdge;
 
-      el.addEventListener("mousedown", function (e) {
-        if (e.target.closest(".graph-port")) return;
-        e.stopPropagation();
-        e.preventDefault();
+      function beginNodeDrag(clientX, clientY) {
+        self.selectNode(node.id, { skipConfirm: true });
+        self.dragNode = node;
+        self.dragEl = el;
+        self.dragStart = { mouseX: clientX, mouseY: clientY, nodeX: node.x, nodeY: node.y };
+        self.bindDragListeners();
+      }
+
+      function startNodeDrag(clientX, clientY) {
         var nodeWidth = isFlowGate ? 240 : ((isLogic || isKeyItem) ? 120 : 220);
-        var beginDrag = function () {
-          self.selectNode(node.id, { skipConfirm: true });
-          self.dragNode = node;
-          self.dragEl = el;
-          self.dragStart = { mouseX: e.clientX, mouseY: e.clientY, nodeX: node.x, nodeY: node.y };
-          window.addEventListener("mousemove", self.boundMove);
-          window.addEventListener("mouseup", self.boundUp);
-        };
         if (self.isNodePublished(node, nodeWidth)) {
-          self.confirmPublishedEdit(node, beginDrag, function () {
+          self.confirmPublishedEdit(node, function () { beginNodeDrag(clientX, clientY); }, function () {
             if (self.dragNode === node) {
               node.x = self.dragStart ? self.dragStart.nodeX : node.x;
               node.y = self.dragStart ? self.dragStart.nodeY : node.y;
@@ -2248,16 +2448,44 @@
             }
           });
         } else {
-          beginDrag();
+          beginNodeDrag(clientX, clientY);
         }
+      }
+
+      el.addEventListener("mousedown", function (e) {
+        if (self.shouldIgnoreMouse()) return;
+        if (e.target.closest(".graph-port")) return;
+        e.stopPropagation();
+        e.preventDefault();
+        startNodeDrag(e.clientX, e.clientY);
       });
 
+      el.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
+        if (e.target.closest(".graph-port")) return;
+        e.stopPropagation();
+        e.preventDefault();
+        self.markTouchPointer();
+        startNodeDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+
       el.querySelectorAll(".graph-port-out").forEach(function (port) {
-        port.addEventListener("mousedown", function (e) {
+        function onPortDown(e) {
           e.stopPropagation();
           e.preventDefault();
           self.startConnect(node.id, port.getAttribute("data-choice-id"), port, el);
+        }
+        port.addEventListener("mousedown", function (e) {
+          if (self.shouldIgnoreMouse()) return;
+          onPortDown(e);
         });
+        port.addEventListener("touchstart", function (e) {
+          if (e.touches.length !== 1) return;
+          e.stopPropagation();
+          e.preventDefault();
+          self.markTouchPointer();
+          onPortDown(e);
+        }, { passive: false });
       });
 
       self.canvas.appendChild(el);
@@ -2312,11 +2540,19 @@
       line.setAttribute("d", d);
 
       hit.addEventListener("mousedown", function (e) {
+        if (self.shouldIgnoreMouse()) return;
         if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         self.selectEdge(edge.id);
       });
+      hit.addEventListener("touchstart", function (e) {
+        if (e.touches.length !== 1) return;
+        e.stopPropagation();
+        e.preventDefault();
+        self.markTouchPointer();
+        self.selectEdge(edge.id);
+      }, { passive: false });
 
       group.appendChild(hit);
       group.appendChild(line);
