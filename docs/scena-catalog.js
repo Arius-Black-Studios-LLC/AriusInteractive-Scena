@@ -63,16 +63,16 @@
         readersThisWeekLabel: formatReaderCount(display),
       });
     });
-    var realWeekly = cloudStats
+    var hasCloudStats = cloudStats != null;
+    var realWeekly = hasCloudStats
       ? (parseInt(cloudStats.chaptersReadThisWeek, 10) ||
          parseInt(cloudStats.readersThisWeek, 10) || 0)
       : 0;
-    var displayWeekly = realWeekly;
-    if (!displayWeekly) {
-      displayWeekly = enriched.reduce(function (sum, entry) {
-        return sum + (entry.chaptersReadThisWeek || entry.readersThisWeek || 0);
-      }, 0);
-    }
+    var displayWeekly = hasCloudStats
+      ? realWeekly
+      : enriched.reduce(function (sum, entry) {
+          return sum + (entry.chaptersReadThisWeek || entry.readersThisWeek || 0);
+        }, 0);
     return {
       entries: enriched,
       chaptersReadThisWeek: displayWeekly,
