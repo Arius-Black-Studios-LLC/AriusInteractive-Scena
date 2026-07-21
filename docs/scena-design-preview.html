@@ -1147,25 +1147,67 @@
 
     .login-error.is-show { display: block; }
 
-    .header-user-email {
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: var(--scena-text-muted);
-      max-width: 160px;
+    #headerLoggedIn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+
+    #headerLoggedIn[hidden] {
+      display: none !important;
+    }
+
+    #headerLoggedIn .btn {
+      flex-shrink: 0;
+    }
+
+    #mobileLoggedIn[hidden] {
+      display: none !important;
+    }
+
+    .mobile-nav #mobileLoggedIn .header-user-avatar {
+      margin-bottom: 4px;
+    }
+
+    .header-user-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .header-user-email-link {
-      color: inherit;
       text-decoration: none;
+      transition: box-shadow 0.2s, transform 0.2s;
     }
 
-    .header-user-email-link:hover {
-      color: var(--scena-accent);
-      text-decoration: underline;
+    .header-user-avatar:hover {
+      box-shadow: 0 0 0 2px var(--scena-accent-soft);
+      transform: translateY(-1px);
     }
+
+    .header-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .header-avatar.comment-avatar--initials {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-label-short { display: none; }
 
     .config-banner {
       display: none;
@@ -1316,9 +1358,18 @@
       .nav-main, .search-wrap,
       .header-actions .btn-ghost { display: none; }
       .menu-toggle { display: block; margin-left: auto; }
-      .header-actions .btn-primary { padding: 9px 14px; font-size: 0.875rem; }
+      .header-actions { gap: 6px; }
+      #headerLoggedIn { gap: 6px; }
+      #headerLoggedIn .btn { padding: 8px 10px; font-size: 0.8125rem; }
+      .header-user-avatar,
+      .header-avatar { width: 28px; height: 28px; }
       .footer-grid { grid-template-columns: 1fr; }
       .hero-stats { gap: 20px; }
+    }
+
+    @media (max-width: 420px) {
+      #headerLoggedIn .btn-label-full { display: none; }
+      #headerLoggedIn .btn-label-short { display: inline; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1361,9 +1412,9 @@
           <button type="button" class="btn btn-primary" data-open-login="creator">Creator studio</button>
         </div>
         <div id="headerLoggedIn" hidden>
-          <span class="header-user-email" id="headerUserEmail"></span>
+          <a href="account.html" class="header-user-avatar" id="headerUserAvatar" title="Your account" aria-label="Your account"></a>
           <a href="account.html" class="btn btn-primary" id="headerAccountBtn">Account</a>
-          <a href="studio.html" class="btn btn-secondary" id="headerStudioBtn">Creator studio</a>
+          <a href="studio.html" class="btn btn-secondary" id="headerStudioBtn"><span class="btn-label-full">Creator studio</span><span class="btn-label-short">Studio</span></a>
           <button type="button" class="btn btn-ghost" id="headerSignOutBtn">Log out</button>
         </div>
       </div>
@@ -1391,7 +1442,7 @@
       <button type="button" data-open-login="creator">Creator studio</button>
     </div>
     <div id="mobileLoggedIn" hidden>
-      <span class="header-user-email" id="mobileUserEmail"></span>
+      <a href="account.html" class="header-user-avatar" id="mobileUserAvatar" title="Your account" aria-label="Your account"></a>
       <a href="account.html">Account</a>
       <a href="studio.html">Creator studio</a>
       <button type="button" id="mobileSignOutBtn">Log out</button>
@@ -1612,6 +1663,7 @@
   <script src="scena-version.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="scena-auth.js?v=3"></script>
+  <script src="scena-profile.js?v=2"></script>
   <script src="scena-cloud.js?v=22"></script>
   <script src="studio-store.js?v=64"></script>
   <script src="scena-demo-series.js?v=14"></script>
@@ -1849,11 +1901,11 @@
       const configBannerText = document.getElementById("configBannerText");
       const headerLoggedOut = document.getElementById("headerLoggedOut");
       const headerLoggedIn = document.getElementById("headerLoggedIn");
-      const headerUserEmail = document.getElementById("headerUserEmail");
+      const headerUserAvatar = document.getElementById("headerUserAvatar");
       const headerSignOutBtn = document.getElementById("headerSignOutBtn");
       const mobileLoggedOut = document.getElementById("mobileLoggedOut");
       const mobileLoggedIn = document.getElementById("mobileLoggedIn");
-      const mobileUserEmail = document.getElementById("mobileUserEmail");
+      const mobileUserAvatar = document.getElementById("mobileUserAvatar");
       const mobileSignOutBtn = document.getElementById("mobileSignOutBtn");
       const tabs = document.querySelectorAll(".modal-tab");
       const menuToggle = document.getElementById("menuToggle");
@@ -1890,6 +1942,18 @@
 
       var currentSession = null;
 
+      function paintHeaderAvatars(profile, session) {
+        if (!window.ScenaProfile) return;
+        var label = (profile && profile.displayName) || (session.user && session.user.email) || "Your account";
+        var html = ScenaProfile.renderAvatar(profile, "header-avatar");
+        [headerUserAvatar, mobileUserAvatar].forEach(function (el) {
+          if (!el) return;
+          el.innerHTML = html;
+          el.title = label;
+          el.setAttribute("aria-label", "Your account");
+        });
+      }
+
       function updateAuthUI(session) {
         currentSession = session;
         var signedIn = Boolean(session && session.user);
@@ -1897,10 +1961,14 @@
         headerLoggedIn.hidden = !signedIn;
         mobileLoggedOut.hidden = signedIn;
         mobileLoggedIn.hidden = !signedIn;
-        if (signedIn) {
-          var email = session.user.email || "Signed in";
-          headerUserEmail.innerHTML = '<a href="account.html" class="header-user-email-link">' + email + '</a>';
-          mobileUserEmail.innerHTML = '<a href="account.html" class="header-user-email-link">' + email + '</a>';
+        if (signedIn && window.ScenaProfile) {
+          var quick = ScenaProfile.sessionProfile(session) || { id: session.user.id, displayName: "Reader", avatarUrl: "" };
+          paintHeaderAvatars(quick, session);
+          ScenaProfile.get(session.user.id, session).then(function (profile) {
+            if (currentSession && currentSession.user && currentSession.user.id === session.user.id) {
+              paintHeaderAvatars(profile, session);
+            }
+          });
         }
       }
 

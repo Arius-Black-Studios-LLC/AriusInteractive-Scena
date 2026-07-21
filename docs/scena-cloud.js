@@ -5,11 +5,11 @@
 (function () {
   var BUCKET = "series-assets";
   var BUCKET_MISSING_HINT =
-    "Storage bucket \"series-assets\" not found in this Supabase project. " +
-    "Dashboard → Storage → New bucket → name \"series-assets\" → Public ON, " +
-    "or run docs/supabase-cloud-setup.sql in the SQL editor.";
+    "Storage bucket \"series-assets\" was not found in the Supabase project this site is using. " +
+    "Confirm Netlify/env SCENA_CONFIG points at the same project where you created the bucket, " +
+    "or run docs/supabase-cloud-setup.sql in that project's SQL editor.";
   var BUCKET_POLICY_HINT =
-    "Storage upload blocked. The series-assets bucket exists, but upload permissions are missing. " +
+    "Storage upload blocked. The bucket may exist, but upload policies are missing or wrong. " +
     "Run docs/supabase-cloud-setup.sql in Supabase SQL Editor (section 3 — storage policies).";
   var BUCKET_SETUP_HINT = BUCKET_POLICY_HINT;
 
@@ -21,6 +21,11 @@
 
   function config() {
     return window.SCENA_CONFIG || {};
+  }
+
+  function projectLabel() {
+    var url = (config().supabaseUrl || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return url ? " (Supabase: " + url + ")" : "";
   }
 
   function publicUrl(storagePath) {
@@ -38,12 +43,7 @@
     var msg = errorMessage(err).toLowerCase();
     return msg.indexOf("bucket not found") >= 0 ||
       msg.indexOf("bucket does not exist") >= 0 ||
-      (msg.indexOf("bucket") >= 0 && msg.indexOf("not found") >= 0);
-  }
-
-  function isAlreadyExistsError(err) {
-    var msg = errorMessage(err).toLowerCase();
-    return msg.indexOf("already exists") >= 0 || msg.indexOf("duplicate") >= 0;
+      msg.indexOf("invalid bucket") >= 0;
   }
 
   function isInlineImage(url) {
@@ -82,44 +82,54 @@
       msg.indexOf("permission denied") >= 0 ||
       msg.indexOf("not allowed") >= 0 ||
       msg.indexOf("violates row-level") >= 0 ||
-      (msg.indexOf("policy") >= 0 && msg.indexOf("storage") >= 0);
+      msg.indexOf("unauthorized") >= 0 ||
+      msg.indexOf("jwt") >= 0 ||
+      msg.indexOf("policy") >= 0;
   }
 
   function storageSetupError(err) {
-    if (isBucketMissingError(err)) return new Error(BUCKET_MISSING_HINT);
-    if (isStoragePolicyError(err)) return new Error(BUCKET_POLICY_HINT);
-    return err instanceof Error ? err : new Error(errorMessage(err) || "Storage error.");
+    if (isBucketMissingError(err)) {
+      return new Error(BUCKET_MISSING_HINT + projectLabel());
+    }
+    if (isStoragePolicyError(err)) {
+      return new Error(BUCKET_POLICY_HINT + projectLabel());
+    }
+    var raw = errorMessage(err);
+    if (!raw) return new Error("Storage error." + projectLabel());
+    return new Error(raw + projectLabel());
+  }
+
+  function resetBucketCache() {
+    bucketReadyPromise = null;
   }
 
   function probeBucket(sb) {
     return sb.storage.from(BUCKET).list("", { limit: 1 }).then(function (result) {
-      if (result.error) throw storageSetupError(result.error);
+      if (result.error) throw result.error;
       return true;
     });
   }
 
-  function ensureBucket() {
-    if (bucketReadyPromise) return bucketReadyPromise;
-
+  function checkBucketAccess() {
+    resetBucketCache();
     var sb = getClient();
-    if (!sb) return Promise.reject(new Error("Cloud storage is not available."));
-
-    bucketReadyPromise = probeBucket(sb).catch(function (err) {
+    if (!sb) return Promise.reject(new Error("Cloud storage is not configured."));
+    if (bucketReadyPromise) return bucketReadyPromise;
+    bucketReadyPromise = probeBucket(sb).then(function () {
+      return true;
+    }).catch(function (err) {
       bucketReadyPromise = null;
       throw storageSetupError(err);
     });
-
     return bucketReadyPromise;
   }
 
   function uploadBlob(storagePath, blob) {
     var sb = getClient();
     if (!sb) return Promise.reject(new Error("Cloud storage is not available."));
-    return ensureBucket().then(function () {
-      return sb.storage.from(BUCKET).upload(storagePath, blob, {
-        upsert: true,
-        contentType: blob.type || "application/octet-stream",
-      });
+    return sb.storage.from(BUCKET).upload(storagePath, blob, {
+      upsert: true,
+      contentType: blob.type || "application/octet-stream",
     }).then(function (result) {
       if (result.error) throw storageSetupError(result.error);
       return publicUrl(storagePath);
@@ -223,7 +233,7 @@
     isBucketMissingError: isBucketMissingError,
 
     checkStorage: function () {
-      return ensureBucket().then(function () {
+      return checkBucketAccess().then(function () {
         return { ok: true };
       }).catch(function (err) {
         return { ok: false, error: errorMessage(err) || BUCKET_SETUP_HINT };
@@ -238,7 +248,9 @@
 
     uploadImage: function (userId, seriesId, category, assetId, dataUrl) {
       return uploadDataUrl(userId, seriesId, category, assetId, dataUrl).catch(function (err) {
-        if (isBucketMissingError(err) && isInlineImage(dataUrl)) return dataUrl;
+        if ((isBucketMissingError(err) || isStoragePolicyError(err)) && isInlineImage(dataUrl)) {
+          return dataUrl;
+        }
         throw err;
       });
     },
@@ -305,30 +317,21 @@
 
       var payload = cloneSeries(series);
       payload.updatedAt = new Date().toISOString();
-      var imagesPending = false;
+      var storageWarning = null;
 
-      return ensureBucket().catch(function () {
-        imagesPending = true;
-        return false;
-      }).then(function () {
-        return externalizeSeriesImages(userId, payload).catch(function (err) {
-          if (isBucketMissingError(err) || isStoragePolicyError(err)) {
-            imagesPending = true;
-            return payload;
-          }
-          throw err;
-        });
+      return externalizeSeriesImages(userId, payload).catch(function (err) {
+        if (isBucketMissingError(err) || isStoragePolicyError(err)) {
+          storageWarning = errorMessage(storageSetupError(err));
+          return payload;
+        }
+        throw err;
       }).then(function (prepared) {
         return upsertSeries(sb, userId, prepared, series).then(function () {
-          var warning = null;
-          if (imagesPending) {
-            warning = BUCKET_POLICY_HINT;
-          }
           return {
             ok: true,
             cloud: true,
-            imagesPending: imagesPending,
-            warning: warning,
+            imagesPending: !!storageWarning,
+            warning: storageWarning,
             series: series,
           };
         });
@@ -407,3 +410,4 @@
     },
   };
 })();
+

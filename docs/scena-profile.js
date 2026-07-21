@@ -26,17 +26,23 @@
     }
   }
 
+  function oauthAvatarFromUser(user) {
+    var meta = (user && user.user_metadata) || {};
+    return meta.avatar_url || meta.picture || meta.photo || "";
+  }
+
   function defaultFromSession(session) {
     var user = session && session.user;
     if (!user) return null;
     var email = user.email || "";
+    var meta = user.user_metadata || {};
     return {
       id: user.id,
       email: email,
-      displayName: email.split("@")[0] || "Reader",
+      displayName: String(meta.full_name || meta.name || email.split("@")[0] || "Reader").trim() || "Reader",
       username: "",
       pronouns: "",
-      avatarUrl: "",
+      avatarUrl: oauthAvatarFromUser(user),
     };
   }
 
@@ -103,6 +109,7 @@
     initials: initials,
     avatarColor: avatarColor,
     authorSnapshot: authorSnapshot,
+    sessionProfile: defaultFromSession,
 
     /** Public author block for comments UI */
     renderAvatar: function (profile, className) {
