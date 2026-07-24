@@ -45,7 +45,9 @@ export async function ensureLegacyConfig(): Promise<void> {
       }
     }
 
-    const existing = window.ARLECO_CONFIG || window.SCENA_CONFIG || {};
+    const existing = (window.ARLECO_CONFIG || window.SCENA_CONFIG || {}) as NonNullable<
+      Window["ARLECO_CONFIG"]
+    >;
     const cfg = {
       supabaseUrl: import.meta.env.VITE_SUPABASE_URL || existing.supabaseUrl || "",
       supabaseAnonKey:

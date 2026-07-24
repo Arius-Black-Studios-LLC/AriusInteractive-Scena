@@ -1,8 +1,4 @@
-import type {
-  GraphEditorHandle,
-  GraphEditorOptions,
-  GraphEditorPort,
-} from "../ports/GraphEditorPort";
+import type { GraphEditorHandle, GraphEditorPort } from "../ports/GraphEditorPort";
 
 type LegacyGraphEditor = GraphEditorHandle & {
   openEpisodeFromGraph: (episodeId: string) => void;

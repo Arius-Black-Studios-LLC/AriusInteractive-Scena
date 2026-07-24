@@ -1,4 +1,3 @@
-import type { LegacySession } from "../globals.d.ts";
 import type { StudioPort } from "../ports/StudioPort";
 
 export const studioAdapter: StudioPort = {

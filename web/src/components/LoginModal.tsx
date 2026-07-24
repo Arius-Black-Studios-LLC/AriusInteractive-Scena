@@ -3,8 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import "./LoginModal.css";
 
 const CONFIG_HINT =
-  "Supabase is not configured. Keys load automatically from docs/scena-config.js in dev — restart npm run dev after editing that file. For production, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in web/.env or Netlify env vars.";
-
+  "Supabase is not configured for this deploy. Local dev: copy docs/scena-config.example.js to docs/scena-config.js and restart npm run dev. Netlify (including preview builds): set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Site settings → Environment variables, then add your preview URL (e.g. https://your-branch--site.netlify.app/) to Supabase → Authentication → Redirect URLs.";
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -59,8 +58,10 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
           ×
         </button>
         <h2 id="loginTitle">Log in to Arleco</h2>
-        {sent ? (
-          <p className="modal-success">
+        {!loading && !configured ? (
+          <p className="field-error">{CONFIG_HINT}</p>
+        ) : null}
+        {sent ? (          <p className="modal-success">
             Check your email — we sent a magic link to <strong>{email}</strong>.
           </p>
         ) : (

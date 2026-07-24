@@ -1,9 +1,5 @@
 import { getLessonMeta, listLessonMeta, type LessonCatalogEntry } from "../../domain/learn/lessonCatalog";
-import type {
-  LegacyLearnLesson,
-  LessonMeta,
-  LessonValidationResult,
-} from "../../domain/learn/types";
+import type { LegacyLearnLesson, LessonMeta } from "../../domain/learn/types";
 import type { LearnPort, LearnSandboxHandle } from "../ports/LearnPort";
 
 function mergeLesson(legacy: LegacyLearnLesson, meta?: LessonCatalogEntry): LegacyLearnLesson {

@@ -17,6 +17,7 @@ export type CatalogEntry = {
   readersThisWeekLabel?: string;
   chaptersReadThisWeekLabel?: string;
   thumbStyle?: string;
+  isDemo?: boolean;
 };
 
 declare global {

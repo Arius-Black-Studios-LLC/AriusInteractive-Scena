@@ -9,9 +9,15 @@ type Props = {
 };
 
 export function LearnLessonRunner({ lesson }: Props) {
-  const { userId, showToast, refreshProgress } = useLearnContext();
+  const { ready: learnReady, userId, showToast, refreshProgress } = useLearnContext();
   const navigate = useNavigate();
   const sandboxRef = useRef<HTMLDivElement>(null);
+  const userIdRef = useRef(userId);
+  const showToastRef = useRef(showToast);
+  const refreshProgressRef = useRef(refreshProgress);
+  userIdRef.current = userId;
+  showToastRef.current = showToast;
+  refreshProgressRef.current = refreshProgress;
   const [completed, setCompleted] = useState(() =>
     badgeAdapter.isLessonComplete(lesson.id, userId),
   );
@@ -24,6 +30,7 @@ export function LearnLessonRunner({ lesson }: Props) {
   }, [lesson.id, userId]);
 
   useEffect(() => {
+    if (!learnReady) return;
     const container = sandboxRef.current;
     if (!container) return;
 
@@ -32,19 +39,22 @@ export function LearnLessonRunner({ lesson }: Props) {
 
     const handle = learnAdapter.createSandbox(container, lessonDef, (result) => {
       if (result.ok) {
-        const newly = badgeAdapter.recordLessonComplete(lesson.id, userId);
-        badgeAdapter.showUnlockCelebration(newly, showToast);
-        refreshProgress();
-        setCompleted(true);
-        setMessage(result.message || "Well done.");
-        setShowActions(true);
+        // Defer React updates so legacy paintAll() finishes before any re-render.
+        window.requestAnimationFrame(() => {
+          const newly = badgeAdapter.recordLessonComplete(lesson.id, userIdRef.current);
+          badgeAdapter.showUnlockCelebration(newly, showToastRef.current);
+          refreshProgressRef.current();
+          setCompleted(true);
+          setMessage(result.message || "Well done.");
+          setShowActions(true);
+        });
       } else if (result.hint) {
         setHint(result.hint);
       }
     });
 
     return () => handle.destroy();
-  }, [lesson.id, userId, showToast, refreshProgress]);
+  }, [lesson.id, learnReady]);
 
   function goNext() {
     const lessons = learnAdapter.listLessons();
@@ -95,7 +105,9 @@ export function LearnLessonRunner({ lesson }: Props) {
             </div>
           ) : null}
         </aside>
-        <div className="learn-sandbox-wrap" ref={sandboxRef} id="learnSandbox" />
+        <div className="learn-sandbox-wrap" ref={sandboxRef} id="learnSandbox">
+          {!learnReady ? <div className="learn-sandbox-loading">Loading graph…</div> : null}
+        </div>
       </div>
     </div>
   );

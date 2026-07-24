@@ -5,3 +5,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Auth on Netlify (including deploy previews): set in Site settings → Environment variables:
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_AUTH_REDIRECT_URL (optional; defaults to site origin)
+# Also add each preview URL to Supabase → Authentication → Redirect URLs.
+# docs/scena-config.js is local-only (gitignored); CI builds rely on those env vars.

@@ -483,8 +483,8 @@
               '<div class="graph-canvas-wrap" id="graphCanvasWrap" tabindex="0">' +
                 '<div class="graph-canvas" id="graphCanvas">' +
                   boundariesLayer +
-                  '<svg class="graph-edges" id="graphEdges"></svg>' +
-                  '<svg class="graph-edges graph-edges-temp" id="graphEdgesTemp"></svg>' +
+                  '<svg class="graph-edges" id="graphEdges" width="100%" height="100%" viewBox="0 0 5000 4000" preserveAspectRatio="none"></svg>' +
+                  '<svg class="graph-edges graph-edges-temp" id="graphEdgesTemp" width="100%" height="100%" viewBox="0 0 5000 4000" preserveAspectRatio="none"></svg>' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -642,8 +642,8 @@
               '<div class="graph-canvas-wrap" id="graphCanvasWrap" tabindex="0">' +
                 '<div class="graph-canvas" id="graphCanvas">' +
                   '<div class="graph-boundaries" id="graphBoundaries"></div>' +
-                  '<svg class="graph-edges" id="graphEdges"></svg>' +
-                  '<svg class="graph-edges graph-edges-temp" id="graphEdgesTemp"></svg>' +
+                  '<svg class="graph-edges" id="graphEdges" width="100%" height="100%" viewBox="0 0 5000 4000" preserveAspectRatio="none"></svg>' +
+                  '<svg class="graph-edges graph-edges-temp" id="graphEdgesTemp" width="100%" height="100%" viewBox="0 0 5000 4000" preserveAspectRatio="none"></svg>' +
                 '</div>' +
               '</div>' +
             '</div>' +
@@ -2431,11 +2431,12 @@
       return e.source === sourceId && e.target === targetId &&
         (e.choiceId || null) === (choiceId || null);
     });
+    var added = false;
     if (!exists) {
       this.series.edges.push({ id: uid("e"), source: sourceId, target: targetId, choiceId: choiceId });
       if (ScenaStore.syncEpisodeEntries) ScenaStore.syncEpisodeEntries(this.series);
-      if (this.learnMode) this.notifyLearnChange();
-      else this.markDirty();
+      added = true;
+      if (!this.learnMode) this.markDirty();
     }
     this.connectFrom = null;
     this.connectChoiceId = null;
@@ -2446,6 +2447,7 @@
     }
     this.endConnectDrag(false);
     this.paintAll();
+    if (this.learnMode && added) this.notifyLearnChange();
     this.refreshSaveStatus();
   };
 
@@ -2712,9 +2714,21 @@
     });
   };
 
+  ScenaGraphEditor.prototype.ensureEdgesLayer = function () {
+    if (!this.canvas) return;
+    if (!this.edgesSvg || !this.canvas.contains(this.edgesSvg)) {
+      this.edgesSvg = this.canvas.querySelector("#graphEdges");
+    }
+    if (!this.edgesTemp || !this.canvas.contains(this.edgesTemp)) {
+      this.edgesTemp = this.canvas.querySelector("#graphEdgesTemp");
+    }
+  };
+
   ScenaGraphEditor.prototype.paintEdges = function () {
     var self = this;
     this.ensureGraphArrays();
+    this.ensureEdgesLayer();
+    if (!this.edgesSvg) return;
     this.edgesSvg.innerHTML = "";
     var nodeEls = {};
     this.canvas.querySelectorAll(".graph-node").forEach(function (el) {

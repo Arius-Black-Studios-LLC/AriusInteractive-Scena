@@ -9,3 +9,11 @@
 .learn-shell {
   min-height: 100vh;
 }
+
+.learn-sandbox-loading {
+  display: grid;
+  place-content: center;
+  min-height: 280px;
+  color: var(--scena-text-muted, #6b6b6b);
+  font-size: 0.875rem;
+}
