@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How to make a visual novel (2026 guide) — Arleco Blog</title>
+  <meta name="description" content="A complete beginner guide to making a visual novel: story, art, branching choices, tools, and publishing episodic chapters in the browser." />
+  <link rel="canonical" href="https://arleco.app/blog/how-to-make-a-visual-novel.html" />
+  <meta property="og:site_name" content="Arleco" />
+  <meta property="og:title" content="How to make a visual novel (complete guide)" />
+  <meta property="og:type" content="article" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/legacy/studio.css?v=74" />
+  <link rel="stylesheet" href="/legacy/scena-logo.css?v=3" />
+  <link rel="stylesheet" href="/legacy/scena-page.css?v=2" />
+  <link rel="stylesheet" href="/legacy/arleco-theme.css?v=1" />
+  <link rel="stylesheet" href="/legacy/blog.css?v=3" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Article","headline":"How to make a visual novel (complete guide)","author":{"@type":"Organization","name":"Arleco"},"publisher":{"@type":"Organization","name":"Arleco"},"datePublished":"2026-07-24"}
+  </script>
+</head>
+<body class="scena-page-body">
+  <div class="scena-page-shell">
+    <header class="studio-topbar">
+      <div class="studio-topbar-left">
+        <a class="studio-logo" href="/">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="logo-text">Arleco</span>
+        </a>
+      </div>
+      <div class="studio-topbar-right">
+        <a class="btn btn-ghost btn-sm" href="/blog">Blog</a>
+        <a class="btn btn-ghost btn-sm" href="/studio">Creator studio</a>
+      </div>
+    </header>
+    <main class="scena-page-main scena-article-main">
+      <nav class="scena-breadcrumb" aria-label="Breadcrumb">
+        <a href="/blog">Blog</a> · Development
+      </nav>
+      <h1>How to make a visual novel (complete guide)</h1>
+      <p class="scena-article-meta"><time datetime="2026-07-24">Jul 24, 2026</time> · Development · ~12 min read</p>
+
+      <div class="scena-article-body">
+        <p>A visual novel is a story told through text, character art, and player choices. You do not need a game studio or a programming degree to start — you need a clear scope, a tool that fits your skills, and a plan to ship chapter one before you polish chapter ten.</p>
+
+        <h2>Step 1: Define a small first project</h2>
+        <p>Your first VN should be finishable. Pick one genre, three to five characters, and a story that works in <strong>two or three short chapters</strong>. A mystery on a single spaceship, a romance at one summer job, a horror night in one building — constraints make branching manageable.</p>
+        <p>Write a one-page synopsis: protagonist, goal, obstacle, and two possible endings. If you cannot explain the hook in two sentences, simplify before you open any tool.</p>
+
+        <h2>Step 2: Outline the spine, then the branches</h2>
+        <p>Start with a linear route — opening, midpoint, climax, resolution. Mark two or three places where a choice could change <em>trust, information, or commitment</em>, not random flavor text. Branches should feel like the same story seen from different angles.</p>
+        <p>Our guide on <a href="/blog/how-to-write-branching-story.html">writing branching stories</a> goes deeper on keeping forks coherent across episodes.</p>
+
+        <h2>Step 3: Choose your production stack</h2>
+        <p>You need:</p>
+        <ul>
+          <li><strong>Writing</strong> — script or graph (dialogue + stage directions)</li>
+          <li><strong>Art</strong> — backgrounds, character sprites or CGs, UI</li>
+          <li><strong>Audio</strong> — optional music and SFX</li>
+          <li><strong>Engine or platform</strong> — where the story runs and saves progress</li>
+        </ul>
+        <p>Compare options in our <a href="/blog/best-visual-novel-engines-compared.html">visual novel engines roundup</a>. If you want zero install for you and your readers, a browser platform like Arleco handles hosting, saves, and episodic releases in one place.</p>
+
+        <h2>Step 4: Produce art at the right fidelity</h2>
+        <p>Match art effort to scope. A dialogue-heavy VN can ship with:</p>
+        <ul>
+          <li>One background per major location</li>
+          <li>One expression set per main character (neutral, happy, angry, sad)</li>
+          <li>A simple UI frame and readable font</li>
+        </ul>
+        <p>Add CG illustrations only for key emotional beats. Consistency beats polish on a never-finished mega-project.</p>
+
+        <h2>Step 5: Build the first chapter</h2>
+        <p>Implement chapter one end-to-end before expanding. That means:</p>
+        <ol>
+          <li>All dialogue and choices for the chapter wired and playable</li>
+          <li>Save / continue working</li>
+          <li>At least one ending or cliffhanger that leads to chapter two</li>
+        </ol>
+        <p>In Arleco’s studio, use episode boundaries on the graph so chapter two stays organized. Play from preview exactly as a reader would — tap through every choice.</p>
+
+        <h2>Step 6: Validate and playtest</h2>
+        <p>Broken routes kill trust fast. Check for orphan nodes, unreachable endings, and stat gates that can never fire. Ask one friend to play without you in the room; watch where they hesitate or misread tone.</p>
+        <p>Use a <a href="/blog/visual-novel-development-checklist.html">development checklist</a> before every publish so nothing obvious slips through.</p>
+
+        <h2>Step 7: Publish episodically</h2>
+        <p>Releasing one chapter at a time builds audience habit and keeps you shipping. Schedule drops weekly or biweekly, leave hooks at chapter ends, and keep a short devlog or blog post per release.</p>
+        <p>See <a href="/blog/publish-interactive-fiction-online.html">how to publish interactive fiction online</a> for validation, discover pages, and growing readership without building a native app.</p>
+
+        <h2>Common mistakes to avoid</h2>
+        <ul>
+          <li>Writing ten endings before chapter one is playable</li>
+          <li>Choices that do not change anything meaningful</li>
+          <li>Scope creep — new characters every chapter with no arc</li>
+          <li>Waiting for perfect art before any public release</li>
+        </ul>
+
+        <h2>What to do this week</h2>
+        <p>Pick your synopsis, outline chapter one’s spine plus one branch, and block out dialogue for the first scene. Open the Conservatory if you are new to graph-based tools, or jump into the creator studio when you are ready to wire beats.</p>
+
+        <div class="scena-article-cta">
+          <p>Start building chapter one</p>
+          <a class="btn btn-primary btn-sm" href="/studio">Open creator studio</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/legacy/scena-logo.js?v=3"></script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visual novel development checklist — Arleco Blog</title>
+  <meta name="description" content="A practical pre-publish checklist for visual novel creators: story, branching, art, audio, saves, playtesting, and launch — use before every chapter ship." />
+  <link rel="canonical" href="https://arleco.app/blog/visual-novel-development-checklist.html" />
+  <meta property="og:site_name" content="Arleco" />
+  <meta property="og:title" content="Visual novel development checklist" />
+  <meta property="og:type" content="article" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/legacy/studio.css?v=74" />
+  <link rel="stylesheet" href="/legacy/scena-logo.css?v=3" />
+  <link rel="stylesheet" href="/legacy/scena-page.css?v=2" />
+  <link rel="stylesheet" href="/legacy/arleco-theme.css?v=1" />
+  <link rel="stylesheet" href="/legacy/blog.css?v=3" />
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Article","headline":"Visual novel development checklist","author":{"@type":"Organization","name":"Arleco"},"publisher":{"@type":"Organization","name":"Arleco"},"datePublished":"2026-07-24"}
+  </script>
+</head>
+<body class="scena-page-body">
+  <div class="scena-page-shell">
+    <header class="studio-topbar">
+      <div class="studio-topbar-left">
+        <a class="studio-logo" href="/">
+          <span class="logo-mark" aria-hidden="true"></span>
+          <span class="logo-text">Arleco</span>
+        </a>
+      </div>
+      <div class="studio-topbar-right">
+        <a class="btn btn-ghost btn-sm" href="/blog">Blog</a>
+        <a class="btn btn-ghost btn-sm" href="/studio">Creator studio</a>
+      </div>
+    </header>
+    <main class="scena-page-main scena-article-main">
+      <nav class="scena-breadcrumb" aria-label="Breadcrumb">
+        <a href="/blog">Blog</a> · Development
+      </nav>
+      <h1>The visual novel development checklist</h1>
+      <p class="scena-article-meta"><time datetime="2026-07-24">Jul 24, 2026</time> · Development · ~8 min read</p>
+
+      <div class="scena-article-body">
+        <p>Use this list before you publish each chapter — whether you ship on Ren'Py, Unity, or Arleco. Copy it into your notes and check items off; missing one obvious broken route hurts reviews more than missing a background variant.</p>
+
+        <h2>Story &amp; structure</h2>
+        <ul>
+          <li>Chapter has a clear opening hook in the first few beats</li>
+          <li>At least one meaningful choice (or deliberate kinetic stretch with purpose)</li>
+          <li>Cliffhanger or resolution that justifies the next episode</li>
+          <li>Character voice stays distinct in dialogue (read aloud test)</li>
+          <li>No placeholder “Lorem” or TBD lines left in publish path</li>
+        </ul>
+
+        <h2>Branching &amp; logic</h2>
+        <ul>
+          <li>Every choice leads somewhere — no dead-end nodes</li>
+          <li>All endings in this chapter are reachable from at least one path</li>
+          <li>Metric / stat changes documented if gates exist later</li>
+          <li>Key items granted once; no duplicate grants on replay within same save</li>
+          <li>Prior-chapter choices respected if this episode branches on them</li>
+        </ul>
+        <p>See <a href="/blog/how-to-write-branching-story.html">how to write branching stories</a> for design patterns that keep forks coherent.</p>
+
+        <h2>Art &amp; presentation</h2>
+        <ul>
+          <li>Backgrounds assigned for every scene (or intentional blank called out)</li>
+          <li>Character sprites show correct expression for tone</li>
+          <li>Text readable on mobile — font size and contrast checked</li>
+          <li>CGs (if any) match aspect ratio and file size limits</li>
+          <li>Content flags accurate (mature language, horror, etc.)</li>
+        </ul>
+
+        <h2>Audio (if used)</h2>
+        <ul>
+          <li>Music loops cleanly or fades appropriately</li>
+          <li>SFX not clipping or startling on default volume</li>
+          <li>Rights cleared for any non-original tracks</li>
+        </ul>
+
+        <h2>Technical &amp; saves</h2>
+        <ul>
+          <li>Playthrough from chapter start on a fresh save file</li>
+          <li>Continue from checkpoint after refresh / re-open</li>
+          <li>Restart chapter clears progress for this episode only (if offered)</li>
+          <li>Validation passes in your tool (orphans, missing entry, broken links)</li>
+          <li>Preview on phone width, not just desktop</li>
+        </ul>
+
+        <h2>Publish &amp; discover</h2>
+        <ul>
+          <li>Episode title, short description, and thumbnail set</li>
+          <li>Publish date or schedule confirmed (timezone aware)</li>
+          <li>Series page lists chapter in correct order</li>
+          <li>Previous chapter marked complete path for sequential unlock (if used)</li>
+          <li>Short announcement ready (blog, Discord, social) — see <a href="/blog/publish-interactive-fiction-online.html">publishing online</a></li>
+        </ul>
+
+        <h2>After launch (first 48 hours)</h2>
+        <ul>
+          <li>Play once on live URL, not just studio preview</li>
+          <li>Watch for reader confusion in comments or Discord</li>
+          <li>Log typos for a quick patch; avoid rewriting plot mid-week unless critical</li>
+          <li>Note metrics: completion rate, drop-off beat, return readers next chapter</li>
+        </ul>
+
+        <h2>Scope sanity</h2>
+        <p>If this checklist takes longer than fixing the chapter, the chapter may be too big. Split oversized episodes — weekly serial fiction wins on consistency, not word count.</p>
+        <p>New to the full pipeline? Start with <a href="/blog/how-to-make-a-visual-novel.html">how to make a visual novel</a> and pick your stack in our <a href="/blog/best-visual-novel-engines-compared.html">engine comparison</a>.</p>
+
+        <div class="scena-article-cta">
+          <p>Run validation in the studio</p>
+          <a class="btn btn-primary btn-sm" href="/studio">Open creator studio</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/legacy/scena-logo.js?v=3"></script>
+</body>
+</html>

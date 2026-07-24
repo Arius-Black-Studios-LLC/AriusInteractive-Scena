@@ -1,0 +1,41 @@
+.player-shell {
+  min-height: 100vh;
+  background: #0f0f0f;
+  color: #fff;
+}
+
+.player-loading {
+  min-height: 60vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 24px;
+}
+
+.player-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.player-back,
+.player-account-link {
+  color: rgba(255, 255, 255, 0.82);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.player-topbar-meta {
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.player-account-link {
+  margin-left: auto;
+}

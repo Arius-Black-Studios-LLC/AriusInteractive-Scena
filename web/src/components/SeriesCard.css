@@ -1,0 +1,84 @@
+.series-card-wrap {
+  min-width: 0;
+}
+
+.series-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.series-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(124, 17, 40, 0.25);
+  box-shadow: 0 14px 36px rgba(26, 10, 14, 0.1);
+}
+
+.series-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(135deg, #f9ecef, #e8d4da);
+}
+
+.series-card-thumb--a { background: linear-gradient(135deg, #fde8ef, #f5c2d4); }
+.series-card-thumb--b { background: linear-gradient(135deg, #fff3e0, #ffd59a); }
+.series-card-thumb--c { background: linear-gradient(135deg, #e8eaf6, #9fa8da); }
+.series-card-thumb--d { background: linear-gradient(135deg, #e0f2f1, #80cbc4); }
+.series-card-thumb--e { background: linear-gradient(135deg, #fce4ec, #f48fb1); }
+.series-card-thumb--f { background: linear-gradient(135deg, #ede7f6, #b39ddb); }
+
+.series-card-ep {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+}
+
+.series-card-body {
+  padding: 16px 18px 18px;
+}
+
+.series-card-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.series-card-desc {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.series-card-readers {
+  font-size: 0.75rem;
+  color: var(--faint);
+  margin-bottom: 10px;
+}
+
+.series-card-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.flag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}

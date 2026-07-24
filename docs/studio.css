@@ -2062,8 +2062,11 @@ body.is-resizing-center {
 .graph-edges {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 }
 
 .graph-edges path {
@@ -2087,6 +2090,11 @@ body.is-resizing-center {
   stroke: var(--scena-border-strong);
   stroke-width: 2;
   pointer-events: none;
+}
+
+.workspace-editor--learn .graph-edge-line {
+  stroke: var(--scena-accent);
+  stroke-width: 2.5;
 }
 
 .graph-edge.is-edge-selected .graph-edge-line {

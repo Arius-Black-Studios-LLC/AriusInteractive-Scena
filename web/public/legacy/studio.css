@@ -144,6 +144,7 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
 }
 
+<<<<<<< HEAD
 /* Account page — full-width main without sidebar column */
 .studio-body--solo {
   display: block;
@@ -160,6 +161,8 @@ a { color: inherit; text-decoration: none; }
   font-size: 0.8125rem;
 }
 
+=======
+>>>>>>> 017d4ddebc116c0825e81f819e13daeeef23e2e7
 .studio-sidebar {
   background: var(--scena-surface-2);
   border-right: 1px solid var(--scena-border);
@@ -2062,8 +2065,16 @@ body.is-resizing-center {
 .graph-edges {
   position: absolute;
   inset: 0;
+<<<<<<< HEAD
   pointer-events: none;
   overflow: visible;
+=======
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+>>>>>>> 017d4ddebc116c0825e81f819e13daeeef23e2e7
 }
 
 .graph-edges path {
@@ -2089,6 +2100,14 @@ body.is-resizing-center {
   pointer-events: none;
 }
 
+<<<<<<< HEAD
+=======
+.workspace-editor--learn .graph-edge-line {
+  stroke: var(--scena-accent);
+  stroke-width: 2.5;
+}
+
+>>>>>>> 017d4ddebc116c0825e81f819e13daeeef23e2e7
 .graph-edge.is-edge-selected .graph-edge-line {
   stroke: #e8c547;
   stroke-width: 3.5;

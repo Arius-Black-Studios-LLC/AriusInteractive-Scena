@@ -1,0 +1,9 @@
+# SPA shell — all app routes fall through to index.html (must be last)
+/blog/*              /blog/:splat              200
+/legacy/*            /legacy/:splat            200
+/studio.css           /legacy/studio.css        200
+/scena-logo.css       /legacy/scena-logo.css    200
+/scena-page.css       /legacy/scena-page.css    200
+/arleco-theme.css     /legacy/arleco-theme.css  200
+/blog.css             /legacy/blog.css          200
+/*                    /index.html               200

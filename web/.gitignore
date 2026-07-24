@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+*.local
+
+# Generated from docs/ by Vite (see vite.config.ts copyLegacyFromDocs)
+public/legacy/
+public/blog/
