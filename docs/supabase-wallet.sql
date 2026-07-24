@@ -1,12 +1,19 @@
 -- Arleco Ducats — reader wallet, creator earnings, cash-out
--- Run in Supabase SQL Editor after supabase-setup.sql and supabase-cloud-setup.sql
+-- Run in Supabase SQL Editor after supabase-setup.sql
 --
--- Economics (must match scena-wallet.js / MONETIZATION.md):
---   CREATOR_SHARE = 70% of spent Ducats → creator_earned_ducats
+-- HOW TO RUN (important):
+--   1. Open this entire file in the SQL editor
+--   2. Select ALL (Ctrl+A) — do NOT run a highlighted selection only
+--   3. Click Run once
+--   Or run part A then part B below (both required).
+--
+-- Economics (must match scena-wallet.js / MONETIZATION.md):--   CREATOR_SHARE = 70% of spent Ducats → creator_earned_ducats
 --   REFERENCE_RETAIL = $0.04 per Ducat ($20 / 500 face value)
 --   CASHOUT = 70% of reference → $0.028 per earned Ducat ($14 / 500)
 --   MIN_CASHOUT = 500 earned Ducats ($14)
 -- Beta: Ducat purchases require Stripe — see supabase-stripe-wallet.sql (no free purchase_ducat_pack).
+
+-- ========== PART A: tables + RLS (run through here if splitting) ==========
 
 alter table public.profiles
   add column if not exists ducat_balance int not null default 0 check (ducat_balance >= 0);
@@ -20,7 +27,7 @@ create table if not exists public.chapter_unlocks (
   series_id text not null,
   episode_id text not null,
   creator_id uuid references auth.users (id) on delete set null,
-  ducats_spent int not null default 0 check (ducat_spent >= 0),
+  ducats_spent int not null default 0 check (ducats_spent >= 0),
   creator_ducats int not null default 0 check (creator_ducats >= 0),
   platform_ducats int not null default 0 check (platform_ducats >= 0),
   unlocked_at timestamptz not null default now(),
@@ -36,7 +43,7 @@ create table if not exists public.creator_earnings (
   reader_id uuid not null references auth.users (id) on delete cascade,
   series_id text not null,
   episode_id text not null,
-  ducats_spent int not null check (ducat_spent > 0),
+  ducats_spent int not null check (ducats_spent > 0),
   creator_ducats int not null check (creator_ducats >= 0),
   platform_ducats int not null check (platform_ducats >= 0),
   created_at timestamptz not null default now()
@@ -75,8 +82,9 @@ create policy "Creators read own cashout requests"
   on public.cashout_requests for select
   using (auth.uid() = creator_id);
 
--- Constants
-create or replace function public._ducat_creator_share()
+-- ========== PART B: functions + grants (run after part A succeeds) ==========
+
+-- Constantscreate or replace function public._ducat_creator_share()
 returns numeric language sql immutable as $$ select 0.70; $$;
 
 create or replace function public._ducat_reference_retail_cents()
