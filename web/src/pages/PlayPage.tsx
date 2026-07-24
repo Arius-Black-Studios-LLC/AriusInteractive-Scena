@@ -11,6 +11,7 @@ export function PlayPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<{ destroy: () => void } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ageGate, setAgeGate] = useState<{ title: string } | null>(null);
   const [meta, setMeta] = useState("");
   const { ready, error: loadError } = useLegacyBundle("player", [
     "studio.css",
@@ -59,6 +60,19 @@ export function PlayPage() {
       (store.normalizeSeries as (s: unknown) => void)(series);
       (store.ensureDefaultAudio as (s: unknown) => void)(series);
 
+      const profile =
+        userId && window.ScenaProfile
+          ? await window.ScenaProfile.get(userId, session)
+          : null;
+
+      if (
+        window.ScenaProfile?.seriesNeedsAgeGate?.(series as { contentFlags?: string[] }) &&
+        !window.ScenaProfile.isAdultVerified?.(profile ?? undefined)
+      ) {
+        setAgeGate({ title: (series as { title?: string }).title || "This story" });
+        return;
+      }
+
       const episodes = ((series as { episodes?: { id: string }[] }).episodes) || [];
       const episode = episodes.find((ep) => ep.id === episodeId);
       if (!episode) {
@@ -85,10 +99,7 @@ export function PlayPage() {
       await window.ScenaComments?.load(seriesId, episodeId);
       await window.ScenaHearts?.load(seriesId, episodeId);
 
-      const userProfile =
-        userId && window.ScenaProfile
-          ? await window.ScenaProfile.get(userId, session)
-          : null;
+      const userProfile = profile;
 
       if (cancelled || !rootRef.current) return;
 
@@ -131,6 +142,24 @@ export function PlayPage() {
     restartChapter,
     navigate,
   ]);
+
+  if (ageGate) {
+    return (
+      <div className="player-loading player-age-gate">
+        <h1>Age-restricted story</h1>
+        <p>
+          <strong>{ageGate.title}</strong> includes sexual content and is labeled 18+.
+        </p>
+        <p>
+          Confirm your age on your{" "}
+          <Link to="/account">Account</Link> page, then return to this chapter.
+        </p>
+        <Link to={seriesId ? `/series?series=${encodeURIComponent(seriesId)}` : "/"}>
+          Back to chapters
+        </Link>
+      </div>
+    );
+  }
 
   if (loadError || error) {
     return (

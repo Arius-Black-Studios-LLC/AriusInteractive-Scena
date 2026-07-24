@@ -119,6 +119,8 @@ export const LEGACY_BUNDLES = {
     "scena-wallet.js",
     "scena-feedback.js",
     "scena-marketplace.js",
+    "scena-asset-library.js",
+    "scena-jams.js",
     "scena-audio.js",
     "scena-reader-menu.js",
     "studio-graph.js",

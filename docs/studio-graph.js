@@ -656,6 +656,7 @@
                 '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
                 '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
                 '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
+                '<button type="button" class="resources-tab" data-resource-tab="library">My library</button>' +
                 '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
               '</div>' +
               '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
@@ -793,7 +794,7 @@
         var createBtn = self.container.querySelector("#resourceCreateBtn");
         if (createBtn) {
           createBtn.textContent = self.resourceTab === "store" ? "+ Sell pack" : "+ Create";
-          createBtn.hidden = self.learnMode && self.resourceTab === "store";
+          createBtn.hidden = self.learnMode && (self.resourceTab === "store" || self.resourceTab === "library");
         }
         self.renderResourcesPanel();
       });
@@ -851,7 +852,11 @@
           self.submitMarketplaceSellModal();
           return;
         }
-        self.submitCreateResourceModal();
+        if (self._workspaceModalMode === "library_sell") {
+          self.submitLibrarySellModal();
+          return;
+        }
+        if (self._workspaceModalMode === "create") self.submitCreateResourceModal();
       }
     });
     this.workspaceModal.addEventListener("keydown", function (e) {
@@ -3101,6 +3106,11 @@
       return;
     }
 
+    if (tab === "library" && window.ScenaAssetLibrary) {
+      this.renderAssetLibraryPanel();
+      return;
+    }
+
     var split = this.container.querySelector(".resources-split");
     if (split) split.classList.remove("resources-split--store");
 
@@ -3279,7 +3289,8 @@
         '<div class="field"><label>Color</label><input type="color" id="resCharColor" value="' + escapeAttr(profile.color || "#888888") + '"></div>' +
         '<div class="field"><label>Sprites</label><div class="sprite-grid">' + (sprites || '<span class="field-hint">No sprites</span>') + '</div>' +
         '<label class="btn btn-sm">+ Add sprite<input type="file" accept="image/*" hidden id="resSpriteUpload"></label></div>' +
-        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteChar">Delete character</button>';
+        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteChar">Delete character</button>' +
+        '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else if (tab === "stages") {
       var bg = ScenaStore.getBackground(this.series, id);
       if (!bg) { this.resourcesDetail.innerHTML = ""; return; }
@@ -3293,7 +3304,8 @@
           this.layerSlot("Foreground", "fg", layers.fg) +
         '</div>' +
         '<p class="field-hint">1080p (1920×1080) PNG/JPG supported. Background & middle layers save as JPEG; foreground keeps transparency.</p>' +
-        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteStage">Delete stage</button>';
+        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteStage">Delete stage</button>' +
+        '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else if (tab === "audio") {
       var asset = ScenaStore.getAudioAsset(this.series, id);
       if (!asset) { this.resourcesDetail.innerHTML = ""; return; }
@@ -3309,7 +3321,8 @@
           '<button type="button" class="btn btn-sm" id="resAudioPreview">▶ Preview</button>' +
           '<label class="btn btn-sm">Replace file<input type="file" accept="audio/*" hidden id="resAudioUpload"></label>' +
         '</div>' +
-        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteAudio">Delete clip</button>';
+        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteAudio">Delete clip</button>' +
+        (asset.isDefault ? "" : '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>');
       if (asset.isDefault) {
         html = html.replace('id="resDeleteAudio">Delete clip</button>', 'id="resDeleteAudio" hidden>Delete clip</button>');
       }
@@ -3328,7 +3341,8 @@
         (keyAsset.dataUrl ? "" : "◆") + '</div>' +
         this.renderKeyItemIconPicker(keyAsset.dataUrl, "resKeyItemIconPicker") +
         '<label class="btn btn-sm">Upload custom<input type="file" accept="image/*" hidden id="resKeyItemIconUpload"></label></div>' +
-        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteKeyItem">Delete key item</button>';
+        '<button type="button" class="btn btn-sm btn-danger" id="resDeleteKeyItem">Delete key item</button>' +
+        '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else {
       var idx = parseInt(String(id).replace("metric_", ""), 10);
       var metric = (this.series.metrics || [])[idx];
@@ -3628,6 +3642,52 @@
         persist();
       });
     }
+
+    this.bindSaveToLibraryButton(tab, id);
+  };
+
+  ScenaGraphEditor.prototype.bindSaveToLibraryButton = function (tab, id) {
+    var self = this;
+    var btn = this.resourcesDetail.querySelector("#resSaveToLibrary");
+    if (!btn || !window.ScenaAssetLibrary || !this.feedbackUserId) return;
+    if (this.learnMode) {
+      btn.hidden = true;
+      return;
+    }
+    btn.addEventListener("click", function () {
+      var spec = {};
+      var meta = {
+        sourceSeriesId: self.series.id,
+        sourceSeriesTitle: self.series.title || "",
+      };
+      if (tab === "characters") {
+        var ch = ScenaStore.getCharacter(self.series, id);
+        spec.characterId = id;
+        meta.title = (ch && ch.name) || "Character";
+      } else if (tab === "stages") {
+        var st = ScenaStore.getBackground(self.series, id);
+        spec.stageId = id;
+        meta.title = (st && st.name) || "Stage";
+      } else if (tab === "audio") {
+        var au = ScenaStore.getAudioAsset(self.series, id);
+        spec.assetId = id;
+        meta.title = (au && au.label) || "Audio clip";
+      } else if (tab === "keyitems") {
+        var ki = ScenaStore.getKeyItemAsset(self.series, id);
+        spec.assetId = id;
+        meta.title = (ki && ki.label) || "Key item";
+      } else {
+        return;
+      }
+      btn.disabled = true;
+      ScenaAssetLibrary.saveFromSeries(self.feedbackUserId, self.series, spec, meta).then(function () {
+        btn.disabled = false;
+        self.setSaveStatus("Saved to your asset library.");
+      }).catch(function (err) {
+        btn.disabled = false;
+        self.onSaveError((err && err.message) || "Could not save to library.");
+      });
+    });
   };
 
   ScenaGraphEditor.prototype.openCreateResourceModal = function () {
@@ -5471,6 +5531,13 @@
         }
         btn.disabled = true;
         ScenaMarketplace.purchase(userId, listingId).then(function (result) {
+          return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (window.ScenaAssetLibrary && listing) {
+              ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
+            }
+            return result;
+          });
+        }).then(function (result) {
           var imported = ScenaMarketplace.importBundleToSeries(self.series, result.bundle);
           if (!imported.ok) throw new Error("Could not import asset pack.");
           self.markDirty();
@@ -5501,6 +5568,135 @@
         self.onSaveError((err && err.message) || "Could not buy Ducats.");
       });
     }
+  };
+
+  ScenaGraphEditor.prototype.renderAssetLibraryPanel = function () {
+    var self = this;
+    var shell = this.container.querySelector("#workspaceResources");
+    if (!shell || !window.ScenaAssetLibrary) return;
+
+    self.libraryCategory = self.libraryCategory || "";
+    self.libraryQuery = self.libraryQuery || "";
+    self.librarySelectedId = self.librarySelectedId || "";
+
+    var split = shell.querySelector(".resources-split");
+    if (split) split.classList.add("resources-split--store");
+
+    var userId = self.feedbackUserId || null;
+    ScenaAssetLibrary.list(userId, {
+      category: self.libraryCategory,
+      query: self.libraryQuery,
+    }).then(function (entries) {
+      var detailHtml = "";
+      if (self.librarySelectedId) {
+        return ScenaAssetLibrary.get(userId, self.librarySelectedId).then(function (entry) {
+          detailHtml = ScenaAssetLibrary.renderEntryDetail(entry, {
+            importLabel: "Add to this project",
+            showSell: entry && entry.source === "made",
+          });
+          return { entries: entries, detailHtml: detailHtml };
+        });
+      }
+      return { entries: entries, detailHtml: detailHtml };
+    }).then(function (payload) {
+      var html = ScenaAssetLibrary.renderPanel(payload.entries, {
+        category: self.libraryCategory,
+        query: self.libraryQuery,
+        selectedId: self.librarySelectedId,
+        detailHtml: payload.detailHtml,
+        pageTab: "assets",
+      });
+      self.resourcesList.innerHTML = "";
+      self.resourcesDetail.innerHTML = html;
+      self.bindAssetLibraryPanel();
+    });
+  };
+
+  ScenaGraphEditor.prototype.bindAssetLibraryPanel = function () {
+    var self = this;
+    var root = this.resourcesDetail;
+    if (!root) return;
+
+    root.querySelectorAll("[data-library-category]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        self.libraryCategory = btn.getAttribute("data-library-category") || "";
+        self.librarySelectedId = "";
+        self.renderAssetLibraryPanel();
+      });
+    });
+
+    var search = root.querySelector(".library-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        self.libraryQuery = search.value.trim();
+        self.librarySelectedId = "";
+        self.renderAssetLibraryPanel();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          self.libraryQuery = search.value.trim();
+          self.librarySelectedId = "";
+          self.renderAssetLibraryPanel();
+        }
+      });
+    }
+
+    root.querySelectorAll("[data-library-id]").forEach(function (btn) {
+      if (btn.classList.contains("library-import-btn")) return;
+      btn.addEventListener("click", function () {
+        self.librarySelectedId = btn.getAttribute("data-library-id");
+        self.renderAssetLibraryPanel();
+      });
+    });
+
+    root.querySelectorAll(".library-import-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var entryId = btn.getAttribute("data-library-id");
+        if (!entryId || !self.feedbackUserId) {
+          self.onSaveError("Sign in to import library assets.");
+          return;
+        }
+        btn.disabled = true;
+        ScenaAssetLibrary.importToSeries(self.series, entryId, self.feedbackUserId).then(function (imported) {
+          if (!imported.ok) throw new Error("Could not import asset.");
+          self.markDirty();
+          return self.saveNow(true);
+        }).then(function (ok) {
+          btn.disabled = false;
+          if (ok !== false) {
+            self.setSaveStatus("Imported from your library.");
+            self.resourceTab = "characters";
+            self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
+              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === "characters");
+            });
+            var split = self.container.querySelector(".resources-split");
+            if (split) split.classList.remove("resources-split--store");
+            self.renderResourcesPanel();
+          }
+        }).catch(function (err) {
+          btn.disabled = false;
+          self.onSaveError((err && err.message) || "Import failed.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".library-sell-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var entryId = btn.getAttribute("data-library-id");
+        if (!entryId || !self.feedbackUserId || !self.workspaceModal) return;
+        ScenaAssetLibrary.get(self.feedbackUserId, entryId).then(function (entry) {
+          if (!entry) return;
+          self._workspaceModalMode = "library_sell";
+          self._librarySellEntryId = entryId;
+          self.container.querySelector("#workspaceModalTitle").textContent = "Sell on marketplace";
+          self.container.querySelector("#workspaceModalBody").innerHTML =
+            ScenaAssetLibrary.renderSellModalBody(entry);
+          self.container.querySelector("#workspaceModalSave").textContent = "Publish listing";
+          self.workspaceModal.hidden = false;
+        });
+      });
+    });
   };
 
   ScenaGraphEditor.prototype.openMarketplaceSellModal = function () {
@@ -5564,6 +5760,39 @@
       self.closeModal();
       self.setSaveStatus("Listing published on the asset store.");
       if (self.resourceTab === "store") self.renderMarketplacePanel();
+    }).catch(function (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      self.onSaveError((err && err.message) || "Could not publish listing.");
+    });
+  };
+
+  ScenaGraphEditor.prototype.submitLibrarySellModal = function () {
+    var self = this;
+    var entryId = this._librarySellEntryId;
+    var modal = this.container;
+    var saveBtn = modal.querySelector("#workspaceModalSave");
+    if (!entryId || !this.feedbackUserId || !window.ScenaAssetLibrary) return;
+
+    var title = (modal.querySelector("#libSellTitle") || {}).value || "";
+    var desc = (modal.querySelector("#libSellDesc") || {}).value || "";
+    var category = (modal.querySelector("#libSellCategory") || {}).value || "pack";
+    var price = parseInt((modal.querySelector("#libSellPrice") || {}).value, 10) || 0;
+    title = title.trim();
+    if (title.length < 2) {
+      this.onSaveError("Enter a listing title.");
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaAssetLibrary.publishFromLibrary(this.feedbackUserId, entryId, {
+      title: title,
+      description: desc.trim(),
+      category: category,
+      priceDucats: Math.max(0, price),
+      sellerName: (this.feedbackProfile && this.feedbackProfile.displayName) || "Creator",
+    }).then(function () {
+      self.closeModal();
+      self.setSaveStatus("Listed on the asset store from your library.");
+      if (self.resourceTab === "library") self.renderAssetLibraryPanel();
     }).catch(function (err) {
       if (saveBtn) saveBtn.disabled = false;
       self.onSaveError((err && err.message) || "Could not publish listing.");

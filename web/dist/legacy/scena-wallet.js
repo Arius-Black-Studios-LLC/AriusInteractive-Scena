@@ -243,6 +243,33 @@
       });
     },
 
+    spendBalance: function (scopeId, amount, reason) {
+      amount = Math.max(0, parseInt(amount, 10) || 0);
+      if (!amount) return Promise.resolve({ balance: getWallet(scopeId).balance });
+      if (!isSignedIn(scopeId)) {
+        return Promise.reject(new Error("Sign in to spend Ducats."));
+      }
+      var wallet = getWallet(scopeId);
+      if (wallet.balance < amount) {
+        return Promise.reject(new Error("Not enough Ducats. You need " + formatDucats(amount) + "."));
+      }
+      wallet.balance -= amount;
+      setWallet(scopeId, wallet);
+      return Promise.resolve({ balance: wallet.balance, reason: reason || "spend", beta: true });
+    },
+
+    creditBalance: function (scopeId, amount, reason) {
+      amount = Math.max(0, parseInt(amount, 10) || 0);
+      if (!amount) return Promise.resolve({ balance: getWallet(scopeId).balance });
+      if (!isSignedIn(scopeId)) {
+        return Promise.reject(new Error("Sign in to receive Ducats."));
+      }
+      var wallet = getWallet(scopeId);
+      wallet.balance += amount;
+      setWallet(scopeId, wallet);
+      return Promise.resolve({ balance: wallet.balance, reason: reason || "credit", beta: true });
+    },
+
     requestCashout: function (scopeId, ducats) {
       ducats = Math.max(0, parseInt(ducats, 10) || 0);
       if (!isSignedIn(scopeId)) {

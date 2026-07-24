@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { DucatBalance } from "../DucatBalance";
 
 export function LearnHeader() {
   return (
@@ -15,6 +16,7 @@ export function LearnHeader() {
         <Link to="/account">Account</Link>
         <Link to="/studio">Creator studio</Link>
       </nav>
+      <DucatBalance className="ducat-hud--learn" />
     </header>
   );
 }

@@ -2062,8 +2062,11 @@ body.is-resizing-center {
 .graph-edges {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 }
 
 .graph-edges path {
@@ -2087,6 +2090,11 @@ body.is-resizing-center {
   stroke: var(--scena-border-strong);
   stroke-width: 2;
   pointer-events: none;
+}
+
+.workspace-editor--learn .graph-edge-line {
+  stroke: var(--scena-accent);
+  stroke-width: 2.5;
 }
 
 .graph-edge.is-edge-selected .graph-edge-line {
@@ -4349,6 +4357,48 @@ body.is-resizing-center {
   opacity: 0.85;
 }
 
+.page-library .library-root {
+  margin-top: 8px;
+}
+
+.asset-library-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.asset-library-tab {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--scena-border);
+  background: var(--scena-surface-2);
+  color: var(--scena-text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.asset-library-tab.is-active {
+  background: var(--scena-accent);
+  border-color: var(--scena-accent);
+  color: #fff;
+}
+
+.asset-library-tab:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.library-series-select {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--scena-border);
+  background: var(--scena-surface-2);
+  font: inherit;
+}
+
 @media (max-width: 900px) {
   .marketplace-layout {
     grid-template-columns: 1fr;
@@ -4358,5 +4408,114 @@ body.is-resizing-center {
     padding-left: 0;
     border-top: 1px solid var(--scena-border);
     padding-top: 12px;
+  }
+}
+
+/* Game jams */
+.jam-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.jam-card {
+  display: block;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--scena-border);
+  background: var(--scena-surface-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.jam-card:hover {
+  border-color: var(--scena-accent);
+}
+
+.jam-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.jam-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.jam-phase {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.jam-phase--submissions { background: rgba(46, 125, 50, 0.12); color: #2e7d32; }
+.jam-phase--judging { background: rgba(124, 17, 40, 0.1); color: var(--scena-accent); }
+.jam-phase--closed { background: rgba(0, 0, 0, 0.08); }
+
+.jam-card-theme {
+  margin: 0 0 8px;
+  font-size: 0.875rem;
+  color: var(--scena-text-muted);
+}
+
+.jam-card-meta,
+.jam-card-prize {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.jam-card-prize--none {
+  color: var(--scena-text-faint);
+}
+
+.jam-age {
+  color: var(--scena-accent);
+  font-weight: 600;
+}
+
+.jam-form .field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.jam-entry {
+  padding: 12px;
+  border: 1px solid var(--scena-border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.jam-entry--winner {
+  border-color: var(--scena-accent);
+  background: rgba(124, 17, 40, 0.04);
+}
+
+.jam-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.jam-likes {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.jam-age-gate {
+  max-width: 520px;
+}
+
+@media (max-width: 700px) {
+  .jam-form .field-row {
+    grid-template-columns: 1fr;
   }
 }

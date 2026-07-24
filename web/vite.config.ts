@@ -22,6 +22,8 @@ const LEGACY_JS = [
   "scena-badges.js",
   "scena-wallet.js",
   "scena-marketplace.js",
+  "scena-asset-library.js",
+  "scena-jams.js",
   "scena-feedback.js",
   "studio-store.js",
   "studio-app.js",

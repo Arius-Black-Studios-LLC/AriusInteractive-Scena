@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { DucatBalance } from "../DucatBalance";
 import { useStudioContext } from "../../context/StudioContext";
 
 export function StudioTopbar() {
@@ -28,6 +29,7 @@ export function StudioTopbar() {
         </div>
       </div>
       <div className="studio-topbar-right">
+        <DucatBalance className="ducat-hud--studio" />
         <span className="user-email" id="studioUserEmail">
           {userEmail}
         </span>

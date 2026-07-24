@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { DucatBalance } from "./DucatBalance";
 import "./SiteHeader.css";
 
 type Props = {
@@ -21,8 +22,10 @@ export function SiteHeader({ onOpenLogin }: Props) {
           <a href="/#featured">Featured</a>
           <Link to="/blog">Blog</Link>
           <Link to="/learn">Conservatory</Link>
+          <a href="/studio#/jams">Game jams</a>
         </nav>
         <div className="site-header-actions">
+          <DucatBalance />
           {userId ? (
             <>
               <Link className="btn btn-ghost btn-sm" to="/account">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { DucatBalance } from "../components/DucatBalance";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import "./AccountPage.css";
 
@@ -87,6 +88,7 @@ export function AccountPage() {
           <span className="account-tag">Account</span>
         </div>
         <div className="studio-topbar-right">
+          <DucatBalance className="ducat-hud--studio" />
           <span className="user-email" id="accountUserEmail" />
           <Link className="btn btn-ghost btn-sm" to="/studio">
             Creator studio

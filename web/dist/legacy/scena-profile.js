@@ -55,6 +55,7 @@
       username: String(row.username || base.username || "").trim(),
       pronouns: String(row.pronouns || base.pronouns || "").trim(),
       avatarUrl: row.avatar_url || row.avatarUrl || base.avatarUrl || "",
+      adultVerifiedAt: row.adult_verified_at || row.adultVerifiedAt || base.adultVerifiedAt || "",
     };
   }
 
@@ -110,6 +111,15 @@
     avatarColor: avatarColor,
     authorSnapshot: authorSnapshot,
     sessionProfile: defaultFromSession,
+
+    isAdultVerified: function (profile) {
+      return Boolean(profile && profile.adultVerifiedAt);
+    },
+
+    seriesNeedsAgeGate: function (series) {
+      if (!series) return false;
+      return (series.contentFlags || []).indexOf("sexual_content") >= 0;
+    },
 
     /** Public author block for comments UI */
     renderAvatar: function (profile, className) {
@@ -191,6 +201,9 @@
           username: patch.username != null ? String(patch.username).trim().replace(/^@/, "") : current.username,
           pronouns: patch.pronouns != null ? String(patch.pronouns).trim() : current.pronouns,
           avatarUrl: patch.avatarUrl != null ? patch.avatarUrl : current.avatarUrl,
+          adultVerifiedAt: patch.adultVerifiedAt != null
+            ? String(patch.adultVerifiedAt || "")
+            : current.adultVerifiedAt || "",
         };
 
         if (!next.displayName) next.displayName = "Reader";

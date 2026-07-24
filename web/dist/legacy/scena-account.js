@@ -64,6 +64,15 @@
               '<p class="field-hint">Shown in parentheses after your name on comments.</p></div>' +
           "</section>" +
           '<section class="form-section">' +
+            "<h2>Mature content</h2>" +
+            '<label class="check-row">' +
+              '<input type="checkbox" id="accountAdultVerify"' +
+                (profile.adultVerifiedAt ? " checked" : "") + ">" +
+              "I am 18 or older and may view age-restricted visual novels and game jams" +
+            "</label>" +
+            '<p class="field-hint">Required for stories and jams labeled with sexual content. We store your confirmation on this account.</p>' +
+          "</section>" +
+          '<section class="form-section">' +
             "<h2>Sign-in</h2>" +
             '<div class="field"><label>Email</label><input type="email" name="email" value="' +
               escapeAttr(profile.email || userEmail) + '" readonly><p class="field-hint">Used for magic-link login — not shown on comments.</p></div>' +
@@ -120,11 +129,13 @@
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         if (!window.ScenaProfile) return;
+        var adultEl = $("#accountAdultVerify");
         var patch = {
           displayName: form.querySelector('[name="displayName"]').value,
           username: form.querySelector('[name="username"]').value,
           pronouns: form.querySelector('[name="pronouns"]').value,
           avatarUrl: draftAvatar,
+          adultVerifiedAt: adultEl && adultEl.checked ? new Date().toISOString() : "",
         };
         ScenaProfile.update(userId, patch, { user: { id: userId, email: userEmail } })
           .then(function (next) {

@@ -68,6 +68,8 @@ declare global {
         ctx: Record<string, unknown>,
       ) => Promise<Record<string, unknown>>;
       authorSnapshot: (profile: Record<string, unknown>) => Record<string, unknown>;
+      isAdultVerified?: (profile?: Record<string, unknown>) => boolean;
+      seriesNeedsAgeGate?: (series: { contentFlags?: string[] }) => boolean;
     };
     ScenaAccount?: {
       renderPage: (profile: Record<string, unknown>, ctx: Record<string, unknown>) => string;
@@ -126,6 +128,11 @@ declare global {
     };
     ScenaComments?: { load: (seriesId: string, episodeId: string) => Promise<void> };
     ScenaHearts?: { load: (seriesId: string, episodeId: string) => Promise<void> };
+    ScenaWallet?: {
+      load: (userId: string) => Promise<unknown>;
+      getBalance: (userId: string) => number;
+      formatDucats: (n: number) => string;
+    };
     ScenaDemo?: { getSeries: (id: string) => unknown };
   }
 }

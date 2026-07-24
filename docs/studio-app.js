@@ -62,6 +62,13 @@
     var parts = hash.split("/").filter(Boolean);
     if (parts.length === 0) return { view: "dashboard" };
     if (parts[0] === "account") return { view: "account" };
+    if (parts[0] === "library") return { view: "library", libraryTab: parts[1] === "shop" ? "shop" : "assets" };
+    if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
+    if (parts[0] === "jams") {
+      if (parts[1] === "new") return { view: "jams", jamMode: "new" };
+      if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
+      return { view: "jams", jamMode: "list" };
+    }
     if (parts[0] === "series" && parts[1]) {
       var seriesId = parts[1];
       if (parts[2] === "settings") return { view: "settings", seriesId: seriesId };
@@ -146,6 +153,8 @@
     sidebar.innerHTML =
       '<div class="sidebar-section-label">Studio</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
+      sidebarLink("#/library", "My assets", activeView === "library") +
+      sidebarLink("#/jams", "Game jams", activeView === "jams") +
       sidebarLink("#/account", "Account", activeView === "account") +
       nav;
 
@@ -262,6 +271,20 @@
         });
         paintTopbarProfile(profile);
       });
+      return;
+    }
+
+    if (route.view === "library") {
+      ScenaStore.setActiveSeries(null);
+      renderShell("library", null);
+      renderLibraryPage(main, route.libraryTab || "assets");
+      return;
+    }
+
+    if (route.view === "jams") {
+      ScenaStore.setActiveSeries(null);
+      renderShell("jams", null);
+      renderJamsPage(main, route);
       return;
     }
 
@@ -1385,6 +1408,519 @@
 
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  var libraryUiState = { tab: "assets", category: "", query: "", selectedId: "", shopCategory: "", shopQuery: "", shopSelectedId: "" };
+
+  function listUserSeries() {
+    return ScenaStore.listSeries(userId).filter(function (s) { return !s.templateSource; });
+  }
+
+  function renderLibraryPage(main, tab) {
+    libraryUiState.tab = tab || "assets";
+    if (!window.ScenaAssetLibrary) {
+      main.innerHTML = '<div class="page"><p class="field-hint">Asset library failed to load.</p></div>';
+      return;
+    }
+    main.innerHTML =
+      '<div class="page page-library">' +
+        '<div class="page-head">' +
+          '<div><h1>Asset library</h1>' +
+          '<p>Reuse characters, stages, and audio across projects. Purchased assets stay yours — import anytime without paying again.</p></div>' +
+        '</div>' +
+        '<div id="libraryRoot" class="library-root"><p class="field-hint">Loading…</p></div>' +
+        '<div class="workspace-modal-backdrop" id="librarySellModal" hidden>' +
+          '<div class="modal" role="dialog">' +
+            '<h2 id="librarySellTitle">Sell on marketplace</h2>' +
+            '<div id="librarySellBody"></div>' +
+            '<div class="modal-actions">' +
+              '<button type="button" class="btn" id="librarySellCancel">Cancel</button>' +
+              '<button type="button" class="btn btn-primary" id="librarySellSave">Publish listing</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    paintLibraryRoot();
+  }
+
+  function paintLibraryRoot() {
+    var root = $("#libraryRoot");
+    if (!root) return;
+
+    if (libraryUiState.tab === "shop") {
+      paintLibraryShop(root);
+      return;
+    }
+
+    ScenaAssetLibrary.list(userId, {
+      category: libraryUiState.category,
+      query: libraryUiState.query,
+    }).then(function (entries) {
+      var detailHtml = "";
+      var seriesList = listUserSeries();
+      if (libraryUiState.selectedId) {
+        return ScenaAssetLibrary.get(userId, libraryUiState.selectedId).then(function (entry) {
+          detailHtml = ScenaAssetLibrary.renderEntryDetail(entry, {
+            seriesList: seriesList,
+            selectedSeriesId: seriesList[0] ? seriesList[0].id : "",
+            showRemove: entry && entry.source === "made",
+            showSell: entry && entry.source === "made",
+            importLabel: "Import to series",
+          });
+          return { entries: entries, detailHtml: detailHtml };
+        });
+      }
+      return { entries: entries, detailHtml: detailHtml };
+    }).then(function (payload) {
+      root.innerHTML = ScenaAssetLibrary.renderPanel(payload.entries, {
+        category: libraryUiState.category,
+        query: libraryUiState.query,
+        selectedId: libraryUiState.selectedId,
+        detailHtml: payload.detailHtml,
+        pageTab: "assets",
+      });
+      bindLibraryAssetsPanel(root);
+      bindLibrarySellModal();
+    });
+  }
+
+  function paintLibraryShop(root) {
+    if (!window.ScenaMarketplace) {
+      root.innerHTML = '<p class="field-hint">Marketplace unavailable.</p>';
+      return;
+    }
+    var balancePromise = window.ScenaWallet
+      ? ScenaWallet.load(userId).then(function (w) {
+          if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+          return ScenaWallet.getBalance(userId);
+        })
+      : Promise.resolve(null);
+
+    balancePromise.then(function (balance) {
+      return ScenaMarketplace.loadListings({
+        category: libraryUiState.shopCategory,
+        query: libraryUiState.shopQuery,
+      }).then(function (listings) {
+        var detailHtml = "";
+        if (libraryUiState.shopSelectedId) {
+          return ScenaMarketplace.getListing(libraryUiState.shopSelectedId, userId).then(function (listing) {
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
+            return { listings: listings, detailHtml: detailHtml, balance: balance };
+          });
+        }
+        return { listings: listings, detailHtml: detailHtml, balance: balance };
+      });
+    }).then(function (payload) {
+      var shopHtml = ScenaMarketplace.renderStorePanel(payload.listings, {
+        category: libraryUiState.shopCategory,
+        query: libraryUiState.shopQuery,
+        selectedId: libraryUiState.shopSelectedId,
+        detailHtml: payload.detailHtml,
+        balance: payload.balance,
+      });
+      root.innerHTML = ScenaAssetLibrary.renderPanel([], {
+        pageTab: "shop",
+        shopHtml: shopHtml,
+      });
+      bindLibraryShopPanel(root);
+    });
+  }
+
+  function bindLibraryAssetsPanel(root) {
+    root.querySelectorAll("[data-library-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var page = btn.getAttribute("data-library-page");
+        libraryUiState.tab = page === "shop" ? "shop" : "assets";
+        if (page === "shop") navigate("/library/shop");
+        else navigate("/library");
+      });
+    });
+    root.querySelectorAll("[data-library-category]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryUiState.category = btn.getAttribute("data-library-category") || "";
+        libraryUiState.selectedId = "";
+        paintLibraryRoot();
+      });
+    });
+    var search = root.querySelector(".library-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        libraryUiState.query = search.value.trim();
+        libraryUiState.selectedId = "";
+        paintLibraryRoot();
+      });
+    }
+    root.querySelectorAll(".library-card").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryUiState.selectedId = btn.getAttribute("data-library-id");
+        paintLibraryRoot();
+      });
+    });
+    root.querySelectorAll(".library-import-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var entryId = btn.getAttribute("data-library-id");
+        var select = root.querySelector(".library-series-select");
+        var seriesId = select ? select.value : "";
+        if (!seriesId) {
+          toast("Create a series first, then import.");
+          return;
+        }
+        var series = ScenaStore.getSeries(userId, seriesId);
+        if (!series) {
+          toast("Series not found.");
+          return;
+        }
+        btn.disabled = true;
+        ScenaAssetLibrary.importToSeries(series, entryId, userId).then(function (imported) {
+          if (!imported.ok) throw new Error("Import failed.");
+          return ScenaStore.saveSeries(userId, series);
+        }).then(function (result) {
+          btn.disabled = false;
+          if (result && result.ok) toast("Imported into “" + (series.title || "series") + "”. Open the graph to use it.");
+          else toast("Imported locally — open the story editor to use it.");
+        }).catch(function (err) {
+          btn.disabled = false;
+          toast((err && err.message) || "Could not import.");
+        });
+      });
+    });
+    root.querySelectorAll(".library-remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var entryId = btn.getAttribute("data-library-id");
+        if (!entryId || !window.confirm("Remove this asset from your library? Projects you already imported into are unchanged.")) return;
+        ScenaAssetLibrary.remove(userId, entryId).then(function () {
+          libraryUiState.selectedId = "";
+          toast("Removed from library.");
+          paintLibraryRoot();
+        });
+      });
+    });
+    root.querySelectorAll(".library-sell-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        openLibrarySellModal(btn.getAttribute("data-library-id"));
+      });
+    });
+  }
+
+  var librarySellEntryId = null;
+
+  function openLibrarySellModal(entryId) {
+    librarySellEntryId = entryId;
+    var modal = $("#librarySellModal");
+    if (!modal || !window.ScenaAssetLibrary) return;
+    ScenaAssetLibrary.get(userId, entryId).then(function (entry) {
+      if (!entry) return;
+      $("#librarySellBody").innerHTML = ScenaAssetLibrary.renderSellModalBody(entry);
+      modal.hidden = false;
+    });
+  }
+
+  function closeLibrarySellModal() {
+    librarySellEntryId = null;
+    var modal = $("#librarySellModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function bindLibrarySellModal() {
+    var modal = $("#librarySellModal");
+    if (!modal || modal.dataset.bound === "1") return;
+    modal.dataset.bound = "1";
+    $("#librarySellCancel").addEventListener("click", closeLibrarySellModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeLibrarySellModal(); });
+    $("#librarySellSave").addEventListener("click", function () {
+      if (!librarySellEntryId) return;
+      var title = ($("#libSellTitle") || {}).value || "";
+      var desc = ($("#libSellDesc") || {}).value || "";
+      var category = ($("#libSellCategory") || {}).value || "pack";
+      var price = parseInt(($("#libSellPrice") || {}).value, 10) || 0;
+      if (title.trim().length < 2) {
+        toast("Enter a listing title.");
+        return;
+      }
+      ScenaAssetLibrary.publishFromLibrary(userId, librarySellEntryId, {
+        title: title.trim(),
+        description: desc.trim(),
+        category: category,
+        priceDucats: price,
+        sellerName: (userProfile && userProfile.displayName) || userEmail || "Creator",
+      }).then(function () {
+        closeLibrarySellModal();
+        toast("Listed on the asset store.");
+        paintLibraryRoot();
+      }).catch(function (err) {
+        toast((err && err.message) || "Could not publish listing.");
+      });
+    });
+  }
+
+  function bindLibraryShopPanel(root) {
+    root.querySelectorAll("[data-library-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var page = btn.getAttribute("data-library-page");
+        libraryUiState.tab = page === "shop" ? "shop" : "assets";
+        if (page === "shop") navigate("/library/shop");
+        else navigate("/library");
+      });
+    });
+    root.querySelectorAll("[data-marketplace-category]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryUiState.shopCategory = btn.getAttribute("data-marketplace-category") || "";
+        libraryUiState.shopSelectedId = "";
+        paintLibraryRoot();
+      });
+    });
+    var search = root.querySelector(".marketplace-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        libraryUiState.shopQuery = search.value.trim();
+        libraryUiState.shopSelectedId = "";
+        paintLibraryRoot();
+      });
+    }
+    root.querySelectorAll("[data-listing-id]").forEach(function (btn) {
+      if (btn.classList.contains("marketplace-acquire-btn")) return;
+      btn.addEventListener("click", function () {
+        libraryUiState.shopSelectedId = btn.getAttribute("data-listing-id");
+        paintLibraryRoot();
+      });
+    });
+    root.querySelectorAll(".marketplace-acquire-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-listing-id");
+        if (!listingId) return;
+        btn.disabled = true;
+        ScenaMarketplace.purchase(userId, listingId).then(function (result) {
+          return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (window.ScenaAssetLibrary && listing) {
+              ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
+            }
+            return result;
+          });
+        }).then(function () {
+          btn.disabled = false;
+          toast("Added to your library — import into any project from My assets.");
+          libraryUiState.tab = "assets";
+          libraryUiState.selectedId = "";
+          navigate("/library");
+        }).catch(function (err) {
+          btn.disabled = false;
+          toast((err && err.message) || "Purchase failed.");
+        });
+      });
+    });
+    if (window.ScenaWallet) {
+      ScenaWallet.bindPackButtons(root, userId, function (result) {
+        if (result && result.redirecting) return;
+        if (result && result.purchased) toast("Payment received — Ducats added to your wallet.");
+        paintLibraryRoot();
+      }, function (err) {
+        toast((err && err.message) || "Could not buy Ducats.");
+      });
+    }
+  }
+
+  function renderJamsPage(main, route) {
+    if (!window.ScenaJams) {
+      main.innerHTML = '<div class="page"><p class="field-hint">Game jams module failed to load.</p></div>';
+      return;
+    }
+
+    if (route.jamMode === "new") {
+      var balancePromise = window.ScenaWallet
+        ? ScenaWallet.load(userId).then(function (w) {
+            if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+            return ScenaWallet.getBalance(userId);
+          })
+        : Promise.resolve(null);
+      balancePromise.then(function (balance) {
+        main.innerHTML =
+          '<div class="page page-jams">' +
+            '<div class="page-head">' +
+              '<div><h1>Host a game jam</h1>' +
+              '<p>Set theme, rules, schedule, entry requirements, and optional Ducat prizes.</p></div>' +
+              '<button type="button" class="btn btn-primary" id="jamSaveDraftBtn">Save &amp; continue</button>' +
+            "</div>" +
+            ScenaJams.renderForm({}, { balance: balance }) +
+          "</div>";
+        bindJamForm(main);
+      });
+      return;
+    }
+
+    if (route.jamMode === "detail" && route.jamId) {
+      ScenaJams.get(route.jamId).then(function (jam) {
+        if (!jam) {
+          main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
+          return;
+        }
+        if (ScenaJams.requiresAgeGate(jam) && window.ScenaProfile &&
+            !ScenaProfile.isAdultVerified(userProfile)) {
+          main.innerHTML = ScenaJams.renderAgeGate(jam);
+          return;
+        }
+        var seriesList = listUserSeries();
+        main.innerHTML = ScenaJams.renderDetail(jam, {
+          userId: userId,
+          adultVerified: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+          seriesList: seriesList,
+        });
+        bindJamDetail(main, jam, seriesList);
+      });
+      return;
+    }
+
+    ScenaJams.list({ publishedOnly: true }).then(function (published) {
+      ScenaJams.list({ hostUserId: userId }).then(function (mine) {
+        main.innerHTML =
+          '<div class="page page-jams">' +
+            '<div class="page-head">' +
+              '<div><h1>Game jams</h1><p>Community events — create under your rules, optional Ducat rewards.</p></div>' +
+              '<a class="btn btn-primary" href="#/jams/new">Host a jam</a>' +
+            "</div>" +
+            (mine.length
+              ? '<section class="form-section"><h2>Your jams</h2>' +
+                  ScenaJams.renderList(mine.filter(function (j) { return j.status === "draft"; }), { canHost: true }) +
+                "</section>"
+              : "") +
+            '<section class="form-section"><h2>Active &amp; upcoming</h2>' +
+              ScenaJams.renderList(published, { canHost: true }) +
+            "</section>" +
+          "</div>";
+        main.querySelectorAll(".jam-card").forEach(function (card) {
+          card.addEventListener("click", function (e) {
+            e.preventDefault();
+            navigate(card.getAttribute("href").replace(/^#/, ""));
+          });
+        });
+      });
+    });
+  }
+
+  function bindJamForm(root) {
+    var form = $("#jamForm", root);
+    if (!form) return;
+    var prizeToggle = $("#jamPrizeEnabled", root);
+    var prizeFields = $("#jamPrizeFields", root);
+    if (prizeToggle && prizeFields) {
+      prizeToggle.addEventListener("change", function () {
+        prizeFields.hidden = !prizeToggle.checked;
+      });
+    }
+    form.querySelectorAll("[data-jam-flag]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        if (el.getAttribute("data-jam-flag") === "sexual_content" && el.checked) {
+          var age = $("#jamAgeRestricted", root);
+          if (age) age.checked = true;
+        }
+      });
+    });
+    var saveBtn = $("#jamSaveDraftBtn", root);
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        var spec;
+        try {
+          spec = ScenaJams.readForm(form);
+          ScenaJams.validateJamSpec(spec);
+        } catch (err) {
+          toast((err && err.message) || "Fix the form and try again.");
+          return;
+        }
+        saveBtn.disabled = true;
+        ScenaJams.createDraft(userId, userProfile, spec).then(function (jam) {
+          toast("Jam saved — publish when ready.");
+          navigate("/jams/" + jam.id);
+        }).catch(function (err) {
+          saveBtn.disabled = false;
+          toast((err && err.message) || "Could not save jam.");
+        });
+      });
+    }
+  }
+
+  function bindJamDetail(root, jam, seriesList) {
+    var publishBtn = $("#jamPublishBtn", root);
+    if (publishBtn) {
+      publishBtn.addEventListener("click", function () {
+        publishBtn.disabled = true;
+        ScenaJams.publish(userId, jam.id).then(function () {
+          toast("Jam published!");
+          render();
+        }).catch(function (err) {
+          publishBtn.disabled = false;
+          toast((err && err.message) || "Could not publish jam.");
+        });
+      });
+    }
+
+    var seriesSel = $("#jamSubmitSeries", root);
+    var epSel = $("#jamSubmitEpisode", root);
+    function paintEpisodes() {
+      if (!seriesSel || !epSel) return;
+      var sid = seriesSel.value;
+      var series = seriesList.find(function (s) { return s.id === sid; });
+      if (!series) {
+        epSel.innerHTML = "";
+        return;
+      }
+      var eps = ScenaStore.orderedEpisodes(series).filter(function (ep) {
+        return ScenaStore.isEpisodePublic ? ScenaStore.isEpisodePublic(ep) : ep.isLive;
+      });
+      epSel.innerHTML = eps.map(function (ep) {
+        return '<option value="' + escapeAttr(ep.id) + '">' +
+          escapeHtml(ep.title || ("Episode " + (ep.number || ""))) + "</option>";
+      }).join("");
+    }
+    if (seriesSel) {
+      paintEpisodes();
+      seriesSel.addEventListener("change", paintEpisodes);
+    }
+
+    var submitBtn = $("#jamSubmitBtn", root);
+    if (submitBtn) {
+      submitBtn.addEventListener("click", function () {
+        var sid = seriesSel && seriesSel.value;
+        var eid = epSel && epSel.value;
+        var series = seriesList.find(function (s) { return s.id === sid; });
+        var episode = series && (series.episodes || []).find(function (ep) { return ep.id === eid; });
+        var contribEl = $("#jamSubmitContrib", root);
+        var contribution = contribEl ? contribEl.value : 0;
+        submitBtn.disabled = true;
+        ScenaJams.submitEntry(userId, userProfile, jam.id, {
+          series: series,
+          episode: episode,
+          contribution: contribution,
+        }).then(function () {
+          toast("Entry submitted!");
+          render();
+        }).catch(function (err) {
+          submitBtn.disabled = false;
+          toast((err && err.message) || "Could not submit.");
+        });
+      });
+    }
+
+    root.querySelectorAll(".jam-like-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-like-sub");
+        ScenaJams.toggleLike(userId, jam.id, subId).then(function () {
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not update like.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-pick-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-pick-sub");
+        ScenaJams.pickWinner(userId, jam.id, subId).then(function () {
+          toast("Winner chosen — prize sent if funded.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not pick winner.");
+        });
+      });
+    });
   }
 
   function escapeAttr(s) {

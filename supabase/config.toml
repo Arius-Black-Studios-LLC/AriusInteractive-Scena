@@ -1,0 +1,8 @@
+# Supabase local config — deploy functions with: supabase functions deploy
+# See docs/STRIPE_SETUP.md
+
+[functions.create-ducat-checkout]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false

@@ -276,17 +276,8 @@
         };
         if (price <= 0) return Promise.resolve(finish());
         if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
-        return ScenaWallet.load(userId).then(function () {
-          if (ScenaWallet.getBalance(userId) < price) {
-            return Promise.reject(new Error("Not enough Ducats. You need " + formatPrice(price) + "."));
-          }
-          var key = "arleco_wallet_" + userId;
-          try {
-            var raw = JSON.parse(localStorage.getItem(key) || "{}");
-            raw.balance = Math.max(0, (raw.balance || 0) - price);
-            localStorage.setItem(key, JSON.stringify(raw));
-          } catch (e) { /* ignore */ }
-          return ScenaWallet.load(userId).then(finish);
+        return ScenaWallet.spendBalance(userId, price, "marketplace_demo", listingId).then(function () {
+          return finish();
         });
       }
 

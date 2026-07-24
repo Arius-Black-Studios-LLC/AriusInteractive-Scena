@@ -1,11 +1,12 @@
 -- Arleco Ducats — reader wallet, creator earnings, cash-out
 -- Run in Supabase SQL Editor after supabase-setup.sql and supabase-cloud-setup.sql
 --
--- Economics (must match scena-wallet.js):
+-- Economics (must match scena-wallet.js / MONETIZATION.md):
 --   CREATOR_SHARE = 70% of spent Ducats → creator_earned_ducats
---   PAYOUT = $0.05 USD per earned Ducat at cash-out
---   MIN_CASHOUT = 500 Ducats ($25)
--- Beta: purchase_ducat_pack grants Ducats without Stripe (wire payments before launch)
+--   REFERENCE_RETAIL = $0.04 per Ducat ($20 / 500 face value)
+--   CASHOUT = 70% of reference → $0.028 per earned Ducat ($14 / 500)
+--   MIN_CASHOUT = 500 earned Ducats ($14)
+-- Beta: Ducat purchases require Stripe — see supabase-stripe-wallet.sql (no free purchase_ducat_pack).
 
 alter table public.profiles
   add column if not exists ducat_balance int not null default 0 check (ducat_balance >= 0);
@@ -78,8 +79,16 @@ create policy "Creators read own cashout requests"
 create or replace function public._ducat_creator_share()
 returns numeric language sql immutable as $$ select 0.70; $$;
 
-create or replace function public._ducat_payout_cents()
-returns int language sql immutable as $$ select 5; $$;
+create or replace function public._ducat_reference_retail_cents()
+returns int language sql immutable as $$ select 4; $$;
+
+create or replace function public._ducat_cashout_ratio()
+returns numeric language sql immutable as $$ select 0.70; $$;
+
+create or replace function public._ducat_cashout_cents(p_ducats int)
+returns int language sql immutable as $$
+  select floor(greatest(p_ducats, 0) * public._ducat_reference_retail_cents() * public._ducat_cashout_ratio())::int;
+$$;
 
 create or replace function public._ducat_min_cashout()
 returns int language sql immutable as $$ select 500; $$;
@@ -90,7 +99,7 @@ returns int language sql immutable as $$
     when 'ducat_10' then 10
     when 'ducat_55' then 55
     when 'ducat_120' then 120
-    when 'ducat_300' then 300
+    when 'ducat_500' then 500
     else null
   end;
 $$;
@@ -101,7 +110,7 @@ returns int language sql immutable as $$
     when 'ducat_10' then 99
     when 'ducat_55' then 499
     when 'ducat_120' then 999
-    when 'ducat_300' then 1999
+    when 'ducat_500' then 2499
     else null
   end;
 $$;
@@ -155,23 +164,7 @@ begin
 end;
 $$;
 
-create or replace function public.purchase_ducat_pack(p_pack_id text)
-returns int language plpgsql security definer set search_path = public as $$
-declare
-  v_amount int;
-  v_balance int;
-begin
-  if auth.uid() is null then raise exception 'Not signed in'; end if;
-  v_amount := public._ducat_pack_amount(p_pack_id);
-  if v_amount is null then raise exception 'Unknown Ducat pack'; end if;
-  -- Beta: grant without Stripe. Production: verify payment webhook first.
-  update public.profiles
-  set ducat_balance = ducat_balance + v_amount
-  where id = auth.uid()
-  returning ducat_balance into v_balance;
-  return coalesce(v_balance, 0);
-end;
-$$;
+-- purchase_ducat_pack removed — use Stripe webhook → grant_ducat_pack_from_stripe (supabase-stripe-wallet.sql)
 
 create or replace function public.unlock_chapter_with_ducats(
   p_series_id text,
@@ -260,7 +253,7 @@ begin
     raise exception 'Not enough earned Ducats';
   end if;
 
-  v_usd_cents := p_ducats * public._ducat_payout_cents();
+  v_usd_cents := public._ducat_cashout_cents(p_ducats);
 
   update public.profiles
   set creator_earned_ducats = creator_earned_ducats - p_ducats
@@ -280,6 +273,5 @@ end;
 $$;
 
 grant execute on function public.wallet_snapshot() to authenticated;
-grant execute on function public.purchase_ducat_pack(text) to authenticated;
 grant execute on function public.unlock_chapter_with_ducats(text, text, int, uuid) to authenticated;
 grant execute on function public.request_creator_cashout(int) to authenticated;
