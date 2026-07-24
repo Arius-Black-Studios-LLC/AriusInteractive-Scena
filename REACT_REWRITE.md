@@ -8,39 +8,38 @@ This is **not** a full React rewrite of domain logic yet. It is a **hybrid shell
 
 | Layer | Owns |
 |-------|------|
-| **React (`web/src/`)** | Routing, site chrome, home/discover UI, static pages, auth modal |
-| **Legacy (`docs/*.js`)** | Player, studio graph, Conservatory lessons, saves, marketplace, Supabase auth |
-| **Bridge (`web/src/legacy/`)** | Script bundles, config loader, typed adapters |
+| **React (`web/src/`)** | Routing, site chrome, home/discover UI, Conservatory catalog, static pages, auth modal |
+| **Legacy (`docs/*.js`)** | Player, studio graph, lesson validators, graph sandbox, saves, marketplace, Supabase auth |
+| **Bridge (`web/src/legacy/`)** | Ports, adapters, script bundles, config loader |
 
-### Conservatory — not React components
+### Conservatory (React catalog + legacy graph)
 
-The Conservatory looks the same because **it is the same code**. React only provides the page shell (`LearnPage.tsx`) and calls `startLearnApp()` via `legacy/adapters.ts`.
+| Layer | Path | Responsibility |
+|-------|------|----------------|
+| Domain | `domain/learn/types.ts` | Pure types — no legacy imports |
+| Ports | `legacy/ports/BadgePort.ts`, `LearnPort.ts` | Interfaces React depends on (DIP) |
+| Adapters | `legacy/adapters/badgeAdapter.ts`, `learnAdapter.ts` | Wrap `window.Scena*` |
+| UI | `components/learn/*` | Catalog, cards, progress, lesson shell |
+| Routes | `/learn`, `/learn/:lessonId` | React Router (replaces hash + `learn-app.js`) |
+| Graph widget | `docs/studio-graph.js` via `learn-sandbox.js` | Embedded editor — not React yet |
 
-Node types, graph editor, lesson validators, and mascots still live in:
+The graph editor **looks the same** because it **is** the same editor — only the catalog, routing, and lesson chrome moved to React.
 
-- `docs/studio-graph.js` — graph UI, block palette (dialogue, choice, logic, key-item, flow-gate)
-- `docs/learn-lessons.js` — 18 lessons, setup graphs, validate()
-- `docs/learn-sandbox.js` — wraps `ScenaGraphEditor` in learn mode
-- `docs/learn-app.js` — catalog, hash routing, lesson runner
-- `docs/studio-store.js` — node/edge schema
+### SOLID progress
 
-**Nothing in React defines graph nodes.** That is intentional for this phase — zero risk to creator data and faster cutover.
+| Principle | Example |
+|-----------|---------|
+| **S** | `LearnCatalog`, `LearnLessonRunner`, `LearnBadgePanel` — one job each |
+| **O** | New catalog UI = new component; graph extends via legacy `validate()` |
+| **I** | Separate `BadgePort` and `LearnPort` |
+| **D** | Hooks/components → ports → adapters → legacy |
 
-### SOLID today
+### Next migration slices
 
-| Principle | Status |
-|-----------|--------|
-| **S** Single responsibility | React pages are thin shells ✓. Legacy `studio-graph.js` is a god object ✗ |
-| **O** Open/closed | New node types require editing legacy JS, not extending React ✗ |
-| **L** Liskov | N/A |
-| **I** Interface segregation | Per-route script bundles (`LEGACY_BUNDLES`) ✓ |
-| **D** Dependency inversion | Pages use `legacy/adapters.ts` instead of raw `window.*` (partial ✓) |
-
-### Future migration order (when you want real React components)
-
-1. **Data** — extract lesson definitions to typed TS modules
-2. **Catalog UI** — React lesson list, badges, progress
-3. **Graph editor last** — largest piece; keep legacy widget embedded until ready
+1. Extract lesson **metadata** from `learn-lessons.js` → typed TS (keep setup/validate in legacy)
+2. Port badge grid to React (read progress via `BadgePort`)
+3. **Studio** — same pattern: React shell + `StudioPort` + legacy graph
+4. **Graph editor** last — or permanent legacy widget behind `GraphEditorPort`
 
 ## User data preserved
 
@@ -78,6 +77,7 @@ Config loads from `docs/scena-config.js` (copied to `/legacy/scena-config.js`) u
 - `@supabase/supabase-js` npm dep — legacy uses CDN UMD
 - `scripts/sync-legacy-to-web.ps1` — replaced by Vite `copyLegacyFromDocs`
 - Unused `feedback` bundle key and `scena-version.js` copy
+- `learn-app.js` from React learn bundle — replaced by React routes + components
 
 ## Netlify (branch deploy)
 

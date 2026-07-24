@@ -77,6 +77,34 @@ declare global {
       ) => void;
     };
     ScenaLearnApp?: { start: (userId: string | null) => void };
+    ScenaLearnLessons?: Array<Record<string, unknown>>;
+    ScenaLearnSandbox?: new (
+      container: HTMLElement,
+      lesson: Record<string, unknown>,
+      callbacks: { onChange: (result: { ok: boolean; message?: string; hint?: string }) => void },
+    ) => { graph?: { destroy?: () => void } };
+    ScenaBadges?: {
+      all: Array<{
+        id: string;
+        title: string;
+        description: string;
+        icon: string;
+        category: string;
+      }>;
+      init: (userId?: string | null) => Promise<unknown>;
+      checkAll: (userId?: string | null) => unknown;
+      getProgress: (userId?: string | null) => Record<string, unknown>;
+      isUnlocked: (badgeId: string, userId?: string | null) => boolean;
+      lessonBadgeId: (lessonId: string) => string;
+      recordLessonComplete: (lessonId: string, userId?: string | null) => unknown[];
+      renderSummary: (container: HTMLElement, userId?: string | null) => void;
+      renderGrid: (container: HTMLElement, opts?: { userId?: string | null }) => void;
+      showUnlockCelebration: (
+        badges: unknown[],
+        toast: (msg: string) => void,
+      ) => void;
+      _defaultToast?: (msg: string) => void;
+    };
     ScenaStudio?: { start: (session: LegacySession) => void };
     ScenaFeedback?: {
       mountHomepage: (id: string) => void;

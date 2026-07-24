@@ -14,7 +14,9 @@ import { AuthProvider } from "./context/AuthContext";
 import { AccountPage } from "./pages/AccountPage";
 import { BlogPage } from "./pages/BlogPage";
 import { HomePage } from "./pages/HomePage";
-import { LearnPage } from "./pages/LearnPage";
+import { LearnLayout } from "./pages/learn/LearnLayout";
+import { LearnCatalogPage } from "./pages/learn/LearnCatalogPage";
+import { LearnLessonPage } from "./pages/learn/LearnLessonPage";
 import { PlayPage } from "./pages/PlayPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { StaticPage } from "./pages/StaticPage";
@@ -71,7 +73,10 @@ function AppRoutes() {
       <Route path="/play" element={<PlayPage />} />
       <Route path="/studio/*" element={<StudioPage />} />
       <Route path="/account" element={<AccountPage />} />
-      <Route path="/learn/*" element={<LearnPage />} />
+      <Route path="/learn" element={<LearnLayout />}>
+        <Route index element={<LearnCatalogPage />} />
+        <Route path=":lessonId" element={<LearnLessonPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

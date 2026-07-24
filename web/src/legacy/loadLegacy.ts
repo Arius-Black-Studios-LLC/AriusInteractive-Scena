@@ -135,7 +135,6 @@ export const LEGACY_BUNDLES = {
     "learn-lessons.js",
     "learn-sandbox.js",
     "learn-mascots.js",
-    "learn-app.js",
   ],
 } as const;
 
