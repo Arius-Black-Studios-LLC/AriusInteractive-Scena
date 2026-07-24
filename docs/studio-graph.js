@@ -65,6 +65,9 @@
     this.onChange = options.onChange || function () { return { ok: true }; };
     this.onSaveError = options.onSaveError || function () {};
     this.onEpisodePublished = options.onEpisodePublished || null;
+    this.feedbackUserId = options.feedbackUserId || null;
+    this.feedbackProfile = options.feedbackProfile || null;
+    this.feedbackContainer = options.feedbackContainer || null;
     this.learnMode = !!options.learnMode;
     this.learnValidate = options.learnValidate || null;
     this.onLearnChange = options.onLearnChange || null;
@@ -653,6 +656,7 @@
                 '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
                 '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
                 '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
+                '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
               '</div>' +
               '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
             '</div>' +
@@ -786,6 +790,11 @@
         self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
           b.classList.toggle("is-active", b === btn);
         });
+        var createBtn = self.container.querySelector("#resourceCreateBtn");
+        if (createBtn) {
+          createBtn.textContent = self.resourceTab === "store" ? "+ Sell pack" : "+ Create";
+          createBtn.hidden = self.learnMode && self.resourceTab === "store";
+        }
         self.renderResourcesPanel();
       });
     });
@@ -793,6 +802,10 @@
     var resourceCreateBtn = this.container.querySelector("#resourceCreateBtn");
     if (resourceCreateBtn) {
       resourceCreateBtn.addEventListener("click", function () {
+        if (self.resourceTab === "store" && window.ScenaMarketplace) {
+          self.openMarketplaceSellModal();
+          return;
+        }
         self.openCreateResourceModal();
       });
     }
@@ -832,6 +845,10 @@
         e.preventDefault();
         if (self._workspaceModalMode === "validate") {
           self.closeModal();
+          return;
+        }
+        if (self._workspaceModalMode === "marketplace_sell") {
+          self.submitMarketplaceSellModal();
           return;
         }
         self.submitCreateResourceModal();
@@ -3058,6 +3075,15 @@
     if (!this.resourcesList || !this.resourcesDetail) return;
     var self = this;
     var tab = this.resourceTab;
+
+    if (tab === "store" && window.ScenaMarketplace) {
+      this.renderMarketplacePanel();
+      return;
+    }
+
+    var split = this.container.querySelector(".resources-split");
+    if (split) split.classList.remove("resources-split--store");
+
     var listHtml = "";
 
     if (tab === "characters") {
@@ -4048,6 +4074,9 @@
         } else {
           self.setSaveStatus("Chapter " + ep.number + " published — live on Discover.");
         }
+      }
+      if (ok && window.ScenaFeedback && self.feedbackUserId && self.feedbackContainer) {
+        ScenaFeedback.afterPublish(self.feedbackUserId, self.feedbackProfile, self.feedbackContainer);
       }
       self.refreshEpisodeContextBtn();
       return ok;
@@ -5271,6 +5300,9 @@
       }
       self.isDirty = false;
       self.setSaveStatus(result.imagesPending ? "Saved (images local)" : (result.cloud ? "Saved to cloud" : "Saved"));
+      if (window.ScenaFeedback && self.feedbackUserId && self.feedbackContainer) {
+        ScenaFeedback.afterSave(self.feedbackUserId, self.feedbackProfile, self.feedbackContainer);
+      }
       return true;
     });
   };
@@ -5322,6 +5354,199 @@
         e.preventDefault();
         self.deleteSelected();
       }
+    });
+  };
+
+  ScenaGraphEditor.prototype.renderMarketplacePanel = function () {
+    var self = this;
+    var shell = this.container.querySelector("#workspaceResources");
+    if (!shell) return;
+
+    self.marketplaceCategory = self.marketplaceCategory || "";
+    self.marketplaceQuery = self.marketplaceQuery || "";
+    self.marketplaceSelectedId = self.marketplaceSelectedId || "";
+
+    var split = shell.querySelector(".resources-split");
+    if (split) split.classList.add("resources-split--store");
+
+    var userId = self.feedbackUserId || null;
+    var balancePromise = window.ScenaWallet && userId
+      ? ScenaWallet.load(userId).then(function () { return ScenaWallet.getBalance(userId); })
+      : Promise.resolve(null);
+
+    balancePromise.then(function (balance) {
+      return ScenaMarketplace.loadListings({
+        category: self.marketplaceCategory,
+        query: self.marketplaceQuery,
+      }).then(function (listings) {
+        var detailHtml = "";
+        if (self.marketplaceSelectedId) {
+          return ScenaMarketplace.getListing(self.marketplaceSelectedId, userId).then(function (listing) {
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
+            return { listings: listings, detailHtml: detailHtml, balance: balance };
+          });
+        }
+        return { listings: listings, detailHtml: detailHtml, balance: balance };
+      });
+    }).then(function (payload) {
+      var html = ScenaMarketplace.renderStorePanel(payload.listings, {
+        category: self.marketplaceCategory,
+        query: self.marketplaceQuery,
+        selectedId: self.marketplaceSelectedId,
+        detailHtml: payload.detailHtml,
+        balance: payload.balance,
+      });
+      self.resourcesList.innerHTML = "";
+      self.resourcesDetail.innerHTML = html;
+      self.bindMarketplacePanel(payload.balance);
+    });
+  };
+
+  ScenaGraphEditor.prototype.bindMarketplacePanel = function (balance) {
+    var self = this;
+    var root = this.resourcesDetail;
+    if (!root) return;
+
+    root.querySelectorAll("[data-marketplace-category]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        self.marketplaceCategory = btn.getAttribute("data-marketplace-category") || "";
+        self.marketplaceSelectedId = "";
+        self.renderMarketplacePanel();
+      });
+    });
+
+    var search = root.querySelector(".marketplace-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        self.marketplaceQuery = search.value.trim();
+        self.marketplaceSelectedId = "";
+        self.renderMarketplacePanel();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          self.marketplaceQuery = search.value.trim();
+          self.marketplaceSelectedId = "";
+          self.renderMarketplacePanel();
+        }
+      });
+    }
+
+    root.querySelectorAll("[data-listing-id]").forEach(function (btn) {
+      if (btn.classList.contains("marketplace-acquire-btn")) return;
+      btn.addEventListener("click", function () {
+        self.marketplaceSelectedId = btn.getAttribute("data-listing-id");
+        self.renderMarketplacePanel();
+      });
+    });
+
+    root.querySelectorAll(".marketplace-acquire-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-listing-id");
+        if (!listingId) return;
+        var userId = self.feedbackUserId;
+        if (!userId) {
+          self.onSaveError("Sign in to get assets from the store.");
+          return;
+        }
+        btn.disabled = true;
+        ScenaMarketplace.purchase(userId, listingId).then(function (result) {
+          var imported = ScenaMarketplace.importBundleToSeries(self.series, result.bundle);
+          if (!imported.ok) throw new Error("Could not import asset pack.");
+          self.markDirty();
+          return self.saveNow(true);
+        }).then(function (ok) {
+          btn.disabled = false;
+          if (ok !== false) {
+            self.setSaveStatus("Asset pack added to project.");
+            self.resourceTab = "characters";
+            self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
+              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === "characters");
+            });
+            var split = self.container.querySelector(".resources-split");
+            if (split) split.classList.remove("resources-split--store");
+            self.renderResourcesPanel();
+          }
+        }).catch(function (err) {
+          btn.disabled = false;
+          self.onSaveError((err && err.message) || "Purchase failed.");
+        });
+      });
+    });
+
+    if (window.ScenaWallet && self.feedbackUserId) {
+      ScenaWallet.bindPackButtons(root, self.feedbackUserId, function () {
+        self.renderMarketplacePanel();
+      }, function (err) {
+        self.onSaveError((err && err.message) || "Could not buy Ducats.");
+      });
+    }
+  };
+
+  ScenaGraphEditor.prototype.openMarketplaceSellModal = function () {
+    var self = this;
+    if (!window.ScenaMarketplace || !this.workspaceModal) return;
+    if (!this.feedbackUserId) {
+      this.onSaveError("Sign in to sell assets on the marketplace.");
+      return;
+    }
+
+    this._workspaceModalMode = "marketplace_sell";
+    this.container.querySelector("#workspaceModalTitle").textContent = "Sell asset pack";
+    this.container.querySelector("#workspaceModalBody").innerHTML =
+      ScenaMarketplace.renderSellModalBody(this.series);
+    this.container.querySelector("#workspaceModalSave").textContent = "Publish listing";
+    this.workspaceModal.hidden = false;
+  };
+
+  ScenaGraphEditor.prototype.submitMarketplaceSellModal = function () {
+    var self = this;
+    var modal = this.container;
+    var title = (modal.querySelector("#mpSellTitle") || {}).value || "";
+    var desc = (modal.querySelector("#mpSellDesc") || {}).value || "";
+    var category = (modal.querySelector("#mpSellCategory") || {}).value || "pack";
+    var price = parseInt((modal.querySelector("#mpSellPrice") || {}).value, 10) || 0;
+    var source = (modal.querySelector("#mpSellSource") || {}).value || "";
+    var saveBtn = modal.querySelector("#workspaceModalSave");
+
+    title = title.trim();
+    if (title.length < 2) {
+      this.onSaveError("Enter a listing title.");
+      return;
+    }
+    if (!source) {
+      this.onSaveError("Pick a character, stage, or asset to sell.");
+      return;
+    }
+
+    var parts = source.split(":");
+    var spec = { title: title, description: desc, category: category, priceDucats: Math.max(0, price) };
+    if (parts[0] === "char") spec.characterId = parts[1];
+    else if (parts[0] === "stage") spec.stageId = parts[1];
+    else if (parts[0] === "asset") spec.assetId = parts[1];
+
+    var built = ScenaMarketplace.buildBundleFromSeries(this.series, spec);
+    if (built.empty) {
+      this.onSaveError("Could not build asset pack from selection.");
+      return;
+    }
+
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaMarketplace.publishListing(this.feedbackUserId, {
+      title: title,
+      description: desc,
+      category: category,
+      priceDucats: Math.max(0, price),
+      bundle: built.bundle,
+      previewDataUrl: built.preview,
+      sellerName: (this.feedbackProfile && this.feedbackProfile.displayName) || "Creator",
+    }).then(function () {
+      self.closeModal();
+      self.setSaveStatus("Listing published on the asset store.");
+      if (self.resourceTab === "store") self.renderMarketplacePanel();
+    }).catch(function (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      self.onSaveError((err && err.message) || "Could not publish listing.");
     });
   };
 

@@ -1638,6 +1638,8 @@
       </div>
     </section>
 
+    <div id="creatorReviewsMount"></div>
+
     <section class="section container reveal" id="blog">
       <div class="section-head">
         <h2>From the blog</h2>
@@ -1779,6 +1781,7 @@
   <script src="studio-store.js?v=64"></script>
   <script src="scena-demo-series.js?v=14"></script>
   <script src="scena-catalog.js?v=6"></script>
+  <script src="scena-feedback.js?v=1"></script>
   <script>
     (function () {
       const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1977,6 +1980,10 @@
         }).catch(function () { bootDiscover(null); });
       } else {
         bootDiscover(null);
+      }
+
+      if (window.ScenaFeedback) {
+        ScenaFeedback.mountHomepage("creatorReviewsMount");
       }
 
       /* ── Active nav on scroll ── */

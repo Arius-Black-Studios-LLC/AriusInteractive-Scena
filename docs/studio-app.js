@@ -274,6 +274,9 @@
       main.innerHTML = '<div class="page-wide" id="graphRoot"></div>';
       graphEditor = new ScenaGraphEditor($("#graphRoot"), {
         series: series,
+        feedbackUserId: userId,
+        feedbackProfile: userProfile,
+        feedbackContainer: document.getElementById("app") || document.body,
         onChange: function (updated) {
           return ScenaStore.saveSeries(userId, updated).then(function (result) {
             if (result.warning) showStorageBanner(result.warning);
