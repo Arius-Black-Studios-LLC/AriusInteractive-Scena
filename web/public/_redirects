@@ -1,4 +1,4 @@
-/* @spa-root */
+# SPA shell — all app routes fall through to index.html (must be last)
 /blog/*              /blog/:splat              200
 /legacy/*            /legacy/:splat            200
 /studio.css           /legacy/studio.css        200
