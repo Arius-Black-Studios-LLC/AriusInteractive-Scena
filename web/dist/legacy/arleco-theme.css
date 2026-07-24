@@ -1,0 +1,69 @@
+/* Arleco brand palette — deep red + gold */
+:root {
+  --arleco-red: #7c1128;
+  --arleco-red-deep: #5a0c1e;
+  --arleco-red-soft: #8b1530;
+  --arleco-gold: #d4af37;
+  --arleco-gold-light: #f0d78c;
+  --arleco-gold-muted: #c9a84c;
+  --arleco-ink: #1a0a0e;
+
+  --scena-accent: var(--arleco-red);
+  --scena-accent-hover: var(--arleco-red-deep);
+  --scena-accent-soft: #f9ecef;
+  --scena-accent-glow: rgba(124, 17, 40, 0.28);
+  --scena-accent-yellow: var(--arleco-gold);
+  --scena-accent-gold: var(--arleco-gold);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --scena-accent-soft: rgba(212, 175, 55, 0.12);
+    --scena-accent-glow: rgba(212, 175, 55, 0.2);
+  }
+}
+
+[data-theme="dark"] {
+  --scena-accent-soft: rgba(212, 175, 55, 0.12);
+  --scena-accent-glow: rgba(212, 175, 55, 0.2);
+}
+
+/* Homepage creator reviews */
+.creator-reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.creator-review-card {
+  margin: 0;
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 17, 40, 0.12);
+  background: linear-gradient(145deg, rgba(255,255,255,0.96), rgba(249,236,239,0.9));
+  box-shadow: 0 8px 24px rgba(26, 10, 14, 0.06);
+}
+
+.creator-review-stars {
+  color: var(--arleco-gold);
+  letter-spacing: 0.08em;
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.creator-review-card p {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: #3a2028;
+}
+
+.creator-review-card footer {
+  font-size: 0.8125rem;
+  color: #6b4a54;
+}
+
+.creator-review-card cite {
+  font-style: normal;
+  font-weight: 600;
+}
