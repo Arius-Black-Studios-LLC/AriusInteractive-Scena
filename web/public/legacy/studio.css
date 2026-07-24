@@ -2076,6 +2076,11 @@ body.is-resizing-center {
   pointer-events: none;
 }
 
+.workspace-editor--learn .graph-edge-line {
+  stroke: var(--scena-accent);
+  stroke-width: 2.5;
+}
+
 .graph-edge.is-edge-selected .graph-edge-line {
   stroke: #e8c547;
   stroke-width: 3.5;

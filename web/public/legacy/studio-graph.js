@@ -2758,6 +2758,10 @@
       var line = document.createElementNS("http://www.w3.org/2000/svg", "path");
       line.setAttribute("class", "graph-edge-line");
       line.setAttribute("d", d);
+      if (self.learnMode) {
+        line.setAttribute("stroke", "#7c1128");
+        line.setAttribute("stroke-width", "2.5");
+      }
 
       hit.addEventListener("mousedown", function (e) {
         if (self.shouldIgnoreMouse()) return;

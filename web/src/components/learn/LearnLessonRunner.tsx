@@ -27,7 +27,10 @@ export function LearnLessonRunner({ lesson }: Props) {
     const container = sandboxRef.current;
     if (!container) return;
 
-    const handle = learnAdapter.createSandbox(container, lesson, (result) => {
+    const lessonDef = learnAdapter.getLesson(lesson.id);
+    if (!lessonDef) return;
+
+    const handle = learnAdapter.createSandbox(container, lessonDef, (result) => {
       if (result.ok) {
         const newly = badgeAdapter.recordLessonComplete(lesson.id, userId);
         badgeAdapter.showUnlockCelebration(newly, showToast);
@@ -41,7 +44,7 @@ export function LearnLessonRunner({ lesson }: Props) {
     });
 
     return () => handle.destroy();
-  }, [lesson, userId, showToast, refreshProgress]);
+  }, [lesson.id, userId, showToast, refreshProgress]);
 
   function goNext() {
     const lessons = learnAdapter.listLessons();
