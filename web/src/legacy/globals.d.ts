@@ -155,9 +155,20 @@ declare global {
     ScenaComments?: { load: (seriesId: string, episodeId: string) => Promise<void> };
     ScenaHearts?: { load: (seriesId: string, episodeId: string) => Promise<void> };
     ScenaWallet?: {
-      load: (userId: string) => Promise<unknown>;
+      load: (userId: string) => Promise<{ balance?: number; purchased?: boolean }>;
       getBalance: (userId: string) => number;
       formatDucats: (n: number) => string;
+      renderPackGrid: (opts?: { buttonClass?: string }) => string;
+      bindPackButtons: (
+        root: HTMLElement | null,
+        scopeId: string,
+        onSuccess?: (result?: { redirecting?: boolean; purchased?: boolean }) => void,
+        onError?: (err: Error) => void,
+      ) => void;
+      purchasePack?: (
+        scopeId: string,
+        packId: string,
+      ) => Promise<{ redirecting?: boolean; purchased?: boolean }>;
     };
     ScenaDemo?: { getSeries: (id: string) => unknown };
   }
