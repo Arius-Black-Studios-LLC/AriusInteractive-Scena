@@ -6,12 +6,61 @@
   text-align: center;
 }
 
-.account-tag {
-  color: var(--faint);
-  font-size: 0.8125rem;
+.account-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--scena-bg, var(--bg, #faf9f7));
 }
 
-.studio-body--solo .studio-main {
+.account-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--scena-border, var(--border, #ddd));
+  background: var(--scena-surface, #fff);
+}
+
+.account-topbar-left,
+.account-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  font-weight: 700;
+}
+
+.account-tag {
+  color: var(--scena-text-muted, var(--faint, #666));
+  font-size: 0.8125rem;
+  padding-left: 12px;
+  border-left: 1px solid var(--scena-border, #ddd);
+}
+
+.account-body {
+  flex: 1;
+  padding: 24px 20px 48px;
+}
+
+.account-main {
   max-width: 720px;
   margin: 0 auto;
+}
+
+.account-main .page-head h1 {
+  margin-bottom: 4px;
+}
+
+.account-main .form-section h2 {
+  font-size: 1rem;
 }

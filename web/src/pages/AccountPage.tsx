@@ -78,23 +78,23 @@ export function AccountPage() {
   }
 
   return (
-    <div className="studio-shell" id="app">
-      <header className="studio-topbar">
-        <div className="studio-topbar-left">
-          <Link className="studio-logo" to="/">
+    <div className="account-shell" id="app">
+      <header className="account-topbar">
+        <div className="account-topbar-left">
+          <Link className="account-logo" to="/">
             <span className="logo-mark" aria-hidden="true" />
             <span className="logo-text">Arleco</span>
           </Link>
-          <span className="account-tag">Account</span>
+          <span className="account-tag">Account settings</span>
         </div>
-        <div className="studio-topbar-right">
+        <div className="account-topbar-right">
           <DucatBalance className="ducat-hud--studio" />
           <span className="user-email" id="accountUserEmail" />
-          <Link className="btn btn-ghost btn-sm" to="/studio">
-            Creator studio
-          </Link>
           <Link className="btn btn-ghost btn-sm" to="/">
             Discover
+          </Link>
+          <Link className="btn btn-ghost btn-sm" to="/studio">
+            Creator studio
           </Link>
           <button
             type="button"
@@ -106,8 +106,8 @@ export function AccountPage() {
           </button>
         </div>
       </header>
-      <div className="studio-body studio-body--solo">
-        <main className="studio-main" id="accountMain" ref={mainRef}>
+      <div className="account-body">
+        <main className="account-main" id="accountMain" ref={mainRef}>
           <div className="page">
             <p className="field-hint">Loading profile…</p>
           </div>

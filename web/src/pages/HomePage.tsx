@@ -4,6 +4,7 @@ import { SeriesCard } from "../components/SeriesCard";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import { mountHomepageReviews } from "../legacy/adapters";
+import { JamHomeFeed } from "../components/JamHomeFeed";
 import {
   ADULT_GENRE_FILTERS,
   CATEGORY_SECTIONS,
@@ -13,6 +14,7 @@ import {
   type CatalogEntryExt,
   visibleEntries,
 } from "../lib/catalog";
+import type { JamHomeFeedGroup } from "../lib/jams";
 import "./HomePage.css";
 
 const HERO_WORDS = ["choose", "branch", "discover", "play"];
@@ -44,6 +46,7 @@ export function HomePage() {
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<CatalogEntryExt[]>(DEMO_SERIES);
   const [viewerIsAdult, setViewerIsAdult] = useState(false);
+  const [jamFeed, setJamFeed] = useState<JamHomeFeedGroup[]>([]);
   const [heroWordIdx, setHeroWordIdx] = useState(0);
   const [heroWordChanging, setHeroWordChanging] = useState(false);
   const [stats, setStats] = useState<HeroStats>({
@@ -110,6 +113,18 @@ export function HomePage() {
         /* keep demo fallback */
       });
   }, [ready, userId]);
+
+  useEffect(() => {
+    if (!ready || !window.ScenaJams?.listHomeSubmissionFeed) return;
+    window.ScenaJams.listHomeSubmissionFeed({
+      hideAdult: true,
+      viewerIsAdult,
+      perJam: 4,
+      limit: 5,
+    })
+      .then((groups) => setJamFeed((groups as JamHomeFeedGroup[]) || []))
+      .catch(() => setJamFeed([]));
+  }, [ready, viewerIsAdult]);
 
   useEffect(() => {
     if (!ready) return;
@@ -233,6 +248,8 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <JamHomeFeed groups={jamFeed} />
 
       {CATEGORY_SECTIONS.map((section) => {
         const picks = entriesForCategory(safeEntries, section.id, 4);

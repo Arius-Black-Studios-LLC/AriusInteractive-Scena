@@ -61,7 +61,10 @@
     var hash = location.hash.replace(/^#/, "") || "/";
     var parts = hash.split("/").filter(Boolean);
     if (parts.length === 0) return { view: "dashboard" };
-    if (parts[0] === "account") return { view: "account" };
+    if (parts[0] === "account") {
+      window.location.replace("/account");
+      return { view: "dashboard" };
+    }
     if (parts[0] === "library") return { view: "library", libraryTab: parts[1] === "shop" ? "shop" : "assets" };
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
@@ -94,6 +97,10 @@
   function navigate(hash) {
     var normalized = hash.charAt(0) === "#" ? hash.slice(1) : hash;
     if (!normalized || normalized.charAt(0) !== "/") normalized = "/" + normalized;
+    if (normalized === "/account" || normalized.indexOf("/account/") === 0) {
+      window.location.assign("/account");
+      return;
+    }
     var parts = normalized.split("/").filter(Boolean);
     if (parts[0] === "series" && parts[1] && parts[2]) {
       rememberStudioView(parts[1], parts[2] === "resources" ? "graph" : parts[2]);
@@ -152,11 +159,10 @@
     }
 
     sidebar.innerHTML =
-      '<div class="sidebar-section-label">Studio</div>' +
+      '<div class="sidebar-section-label">Creator</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
       sidebarLink("#/library", "My assets", activeView === "library") +
       sidebarLink("#/jams", "Game jams", activeView === "jams") +
-      sidebarLink("#/account", "Account", activeView === "account") +
       nav;
 
     sidebar.querySelectorAll(".sidebar-link").forEach(function (a) {
@@ -250,31 +256,6 @@
       return;
     }
 
-    if (route.view === "account") {
-      ScenaStore.setActiveSeries(null);
-      renderShell("account", null);
-      main.innerHTML = '<div class="page"><p class="field-hint">Loading profile…</p></div>';
-      if (!window.ScenaAccount || !window.ScenaProfile) {
-        main.innerHTML = '<div class="page"><p class="field-hint">Profile module failed to load.</p></div>';
-        return;
-      }
-      ScenaProfile.get(userId, { user: { id: userId, email: userEmail } }).then(function (profile) {
-        userProfile = profile;
-        main.innerHTML = ScenaAccount.renderPage(profile, { userEmail: userEmail });
-        ScenaAccount.bindPage(profile, {
-          userId: userId,
-          userEmail: userEmail,
-          toast: toast,
-          onSaved: function (next) {
-            userProfile = next;
-            paintTopbarProfile(next);
-          },
-        });
-        paintTopbarProfile(profile);
-      });
-      return;
-    }
-
     if (route.view === "library") {
       ScenaStore.setActiveSeries(null);
       renderShell("library", null);
@@ -352,7 +333,7 @@
       userEmail: userEmail,
       title: "Edit account profile",
       onClick: function () {
-        navigate("/account");
+        window.location.assign("/account");
       },
     });
   }

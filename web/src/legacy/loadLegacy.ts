@@ -90,6 +90,8 @@ export const LEGACY_BUNDLES = {
     "scena-catalog.js",
     "scena-progress.js",
     "scena-feedback.js",
+    "scena-profile.js",
+    "scena-jams.js",
   ],
   player: [
     "scena-cloud.js",

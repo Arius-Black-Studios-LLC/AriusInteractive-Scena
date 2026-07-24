@@ -2,7 +2,6 @@ import type { LegacySession } from "../globals.d.ts";
 
 export type StudioRouteView =
   | "dashboard"
-  | "account"
   | "graph"
   | "episodes"
   | "settings"

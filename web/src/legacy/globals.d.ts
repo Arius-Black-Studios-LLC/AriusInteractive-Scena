@@ -52,6 +52,30 @@ declare global {
       enrichReaderStats: (entries: CatalogEntry[], stats: unknown) => unknown;
       renderDiscoverGrid?: (el: HTMLElement, entries: CatalogEntry[], bundle: unknown) => void;
     };
+    ScenaJams?: {
+      listHomeSubmissionFeed: (opts: Record<string, unknown>) => Promise<
+        Array<{
+          jamId: string;
+          jamTitle: string;
+          tagline: string;
+          theme: string;
+          phase: string;
+          prizePool: number;
+          ageRestricted: boolean;
+          href: string;
+          totalSubmissions: number;
+          submissions: Array<{
+            id: string;
+            seriesTitle: string;
+            episodeTitle: string;
+            userName: string;
+            submittedAt: string;
+            playHref: string;
+            likes: number;
+          }>;
+        }>
+      >;
+    };
     ScenaStore?: Record<string, unknown>;
     ScenaProgress?: Record<string, unknown>;
     ScenaPlayer?: new (

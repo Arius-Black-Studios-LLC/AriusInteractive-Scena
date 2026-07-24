@@ -33,6 +33,9 @@ export function StudioTopbar() {
         <span className="user-email" id="studioUserEmail">
           {userEmail}
         </span>
+        <Link className="btn btn-ghost btn-sm" to="/account">
+          Account
+        </Link>
         <Link className="btn btn-ghost btn-sm" to="/learn">
           Conservatory
         </Link>

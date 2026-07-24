@@ -43,6 +43,7 @@
     if (!Array.isArray(jam.genres)) jam.genres = [];
     if (!Array.isArray(jam.contentFlags)) jam.contentFlags = [];
     if (!jam.keywords) jam.keywords = "";
+    if (!jam.tagline) jam.tagline = "";
     var genreKeys = genreTagDefs().map(function (g) { return g.key; });
     var matureKeys = contentFlags().map(function (g) { return g.key; });
     (jam.contentFlags || []).slice().forEach(function (key) {
@@ -219,6 +220,8 @@
     if (title.length < 3) throw new Error("Jam title must be at least 3 characters.");
     if (!String(spec.theme || "").trim()) throw new Error("Add a theme for your jam.");
     if (!String(spec.rules || "").trim()) throw new Error("Add rules so entrants know what to make.");
+    var tagline = String(spec.tagline || "").trim();
+    if (tagline.length > 140) throw new Error("Home page tagline must be 140 characters or less.");
 
     var genres = Array.isArray(spec.genres) ? spec.genres.slice() : [];
     var flags = Array.isArray(spec.contentFlags) ? spec.contentFlags.slice() : [];
@@ -240,6 +243,7 @@
 
     return {
       title: title,
+      tagline: tagline,
       theme: String(spec.theme || "").trim(),
       rules: String(spec.rules || "").trim(),
       keywords: String(spec.keywords || "").trim(),
@@ -391,6 +395,57 @@
     migrateJam: migrateJam,
     jamGenreLabels: jamGenreLabels,
 
+    listHomeSubmissionFeed: function (opts) {
+      opts = opts || {};
+      var perJam = Math.max(1, parseInt(opts.perJam, 10) || 4);
+      var limit = Math.max(1, parseInt(opts.limit, 10) || 6);
+      var rows = readAll().slice().map(migrateJam).filter(function (j) {
+        return j.status === "published";
+      });
+      rows.forEach(finalizeIfDue);
+      rows = rows.filter(function (j) {
+        if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
+        var phase = jamPhase(j);
+        return phase === "submissions" || phase === "judging" || phase === "upcoming";
+      });
+      var groups = [];
+      rows.forEach(function (jam) {
+        var subs = (jam.submissions || []).slice().sort(function (a, b) {
+          return String(b.submittedAt || "").localeCompare(String(a.submittedAt || ""));
+        });
+        if (!subs.length) return;
+        groups.push({
+          jamId: jam.id,
+          jamTitle: jam.title,
+          tagline: String(jam.tagline || jam.theme || "").trim(),
+          theme: jam.theme,
+          phase: jamPhase(jam),
+          prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+          ageRestricted: requiresAgeGate(jam),
+          href: "/studio#/jams/" + jam.id,
+          totalSubmissions: subs.length,
+          submissions: subs.slice(0, perJam).map(function (s) {
+            return {
+              id: s.id,
+              seriesTitle: s.seriesTitle,
+              episodeTitle: s.episodeTitle,
+              userName: s.userName,
+              submittedAt: s.submittedAt,
+              playHref: "/play?series=" + encodeURIComponent(s.seriesId) +
+                "&episode=" + encodeURIComponent(s.episodeId),
+              likes: (s.likes || []).length,
+            };
+          }),
+        });
+      });
+      groups.sort(function (a, b) {
+        var aTime = (a.submissions[0] && a.submissions[0].submittedAt) || "";
+        var bTime = (b.submissions[0] && b.submissions[0].submittedAt) || "";
+        return String(bTime).localeCompare(String(aTime));
+      });
+      return Promise.resolve(groups.slice(0, limit));
+    },
+
     get: function (jamId, opts) {
       opts = opts || {};
       var jam = findJam(jamId);
@@ -426,6 +481,11 @@
       if (!jam) return Promise.reject(new Error("Jam not found."));
       if (jam.hostUserId !== userId) return Promise.reject(new Error("Only the host can publish this jam."));
       if (jam.status === "published") return Promise.resolve(jam);
+
+      var tagline = String(jam.tagline || "").trim();
+      if (tagline.length < 10) {
+        return Promise.reject(new Error("Add a home page tagline (at least 10 characters) before publishing."));
+      }
 
       var contribution = jam.prizeEnabled ? Math.max(0, parseInt(jam.hostContribution, 10) || 0) : 0;
       return checkWalletBalance(userId, contribution).then(function () {
@@ -647,7 +707,10 @@
                 '<h3>' + escapeHtml(jam.title) + "</h3>" +
                 '<span class="jam-phase jam-phase--' + escapeAttr(phase) + '">' + escapeHtml(phase) + "</span>" +
               "</div>" +
-              '<p class="jam-card-theme">' + escapeHtml(jam.theme) + "</p>" +
+              '<p class="jam-card-theme">' + escapeHtml(jam.tagline || jam.theme) + "</p>" +
+              (jam.tagline && jam.tagline !== jam.theme
+                ? '<p class="jam-card-theme-sub field-hint">Theme: ' + escapeHtml(jam.theme) + "</p>"
+                : "") +
               (genreLine ? '<p class="jam-card-genres">' + escapeHtml(genreLine) + "</p>" : "") +
               '<p class="jam-card-meta">Host: ' + escapeHtml(jam.hostName || "Creator") +
                 (jam.ageRestricted ? ' · <span class="jam-age">18+</span>' : "") +
@@ -724,6 +787,9 @@
         '<form class="jam-form" id="jamForm">' +
           '<div class="field"><label>Jam title</label><input type="text" name="title" maxlength="80" value="' +
             escapeAttr(draft.title || "") + '" required></div>' +
+          '<div class="field"><label>Home page tagline</label><input type="text" name="tagline" maxlength="140" value="' +
+            escapeAttr(draft.tagline || "") + '" placeholder="One line for readers on Discover — what is this jam about?">' +
+            '<p class="field-hint">Shown on the home page with recent entries. Required before you publish (10–140 characters).</p></div>' +
           '<div class="field"><label>Theme</label><input type="text" name="theme" maxlength="120" value="' +
             escapeAttr(draft.theme || "") + '" placeholder="What should entrants explore?" required></div>' +
           '<div class="field"><label>Search keywords</label><input type="text" name="keywords" maxlength="200" value="' +
@@ -777,6 +843,7 @@
       });
       return {
         title: form.title && form.title.value,
+        tagline: form.tagline && form.tagline.value,
         theme: form.theme && form.theme.value,
         rules: form.rules && form.rules.value,
         keywords: form.keywords && form.keywords.value,
@@ -896,7 +963,8 @@
         '<div class="page jam-detail">' +
           '<div class="page-head">' +
             "<div><h1>" + escapeHtml(jam.title) + "</h1>" +
-              '<p class="jam-detail-theme">' + escapeHtml(jam.theme) + "</p>" +
+              '<p class="jam-detail-tagline">' + escapeHtml(jam.tagline || jam.theme) + "</p>" +
+              '<p class="field-hint jam-detail-theme-label">Theme: ' + escapeHtml(jam.theme) + "</p>" +
               '<p class="field-hint">Host: ' + escapeHtml(jam.hostName) +
                 " · " + escapeHtml(phase) +
                 (jam.ageRestricted ? ' · <span class="jam-age">18+</span>' : "") +

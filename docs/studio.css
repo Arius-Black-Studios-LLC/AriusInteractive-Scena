@@ -4470,6 +4470,15 @@ body.is-resizing-center {
   font-size: 0.8125rem;
 }
 
+.jam-detail-tagline {
+  font-size: 1.0625rem;
+  margin: 0 0 4px;
+}
+
+.jam-detail-theme-label {
+  margin-top: 0;
+}
+
 .jam-card-prize--none {
   color: var(--scena-text-faint);
 }
