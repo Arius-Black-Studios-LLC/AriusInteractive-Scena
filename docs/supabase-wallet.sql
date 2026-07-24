@@ -84,7 +84,9 @@ create policy "Creators read own cashout requests"
 
 -- ========== PART B: functions + grants (run after part A succeeds) ==========
 
--- Constantscreate or replace function public._ducat_creator_share()
+-- Constants
+
+create or replace function public._ducat_creator_share()
 returns numeric language sql immutable as $$ select 0.70; $$;
 
 create or replace function public._ducat_reference_retail_cents()

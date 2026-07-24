@@ -1,5 +1,5 @@
--- Arleco — Stripe-backed Ducat purchases (run after supabase-wallet.sql + supabase-wallet-security.sql)
--- Removes free pack grants from browsers. Ducats credit ONLY after Stripe webhook confirms payment.
+-- Arleco — Stripe-backed Ducat purchases
+-- Run order: supabase-wallet.sql → supabase-wallet-security.sql → THIS FILE
 
 create table if not exists public.stripe_ducat_payments (
   id uuid primary key default gen_random_uuid(),
@@ -115,6 +115,9 @@ begin
   );
 end;
 $$;
+
+comment on function public.grant_ducat_pack_from_stripe(uuid, text, text, int, text) is
+  'Credits Ducats after Stripe payment — invoke from stripe-webhook Edge Function only (service_role).';
 
 -- Spend spending-wallet Ducats (jams, etc.) — server-side only
 create or replace function public.wallet_spend_balance(
