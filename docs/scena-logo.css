@@ -1,4 +1,4 @@
-/* Arleco — theatrical logo mark (proscenium, curtains, spotlight) */
+/* Arleco — logo mark (stage arch, curtains, branching choices) */
 .logo,
 .studio-logo,
 .modal-logo {
@@ -44,39 +44,73 @@
 }
 
 .logo-curtain-left,
-.logo-curtain-right {
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+.logo-curtain-right,
+.logo-branch-left,
+.logo-branch-right,
+.logo-choice,
+.logo-glow,
+.logo-star {
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
   transform-origin: center;
 }
 
-.logo-spot {
-  transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+.logo-branch-left {
+  transform-origin: 16px 18.6px;
+}
+
+.logo-branch-right {
+  transform-origin: 16px 18.6px;
 }
 
 .logo:hover .logo-mark,
 .studio-logo:hover .logo-mark,
 .modal-logo:hover .logo-mark {
   transform: scale(1.07) rotate(-1deg);
-  filter: drop-shadow(0 3px 10px rgba(255, 140, 0, 0.28));
+  filter: drop-shadow(0 3px 10px rgba(124, 17, 40, 0.28));
 }
 
 .logo:hover .logo-curtain-left,
 .studio-logo:hover .logo-curtain-left,
 .modal-logo:hover .logo-curtain-left {
-  transform: translateX(-0.75px);
+  transform: translateX(-0.8px);
 }
 
 .logo:hover .logo-curtain-right,
 .studio-logo:hover .logo-curtain-right,
 .modal-logo:hover .logo-curtain-right {
-  transform: translateX(0.75px);
+  transform: translateX(0.8px);
 }
 
-.logo:hover .logo-spot,
-.studio-logo:hover .logo-spot,
-.modal-logo:hover .logo-spot {
+.logo:hover .logo-branch-left,
+.studio-logo:hover .logo-branch-left,
+.modal-logo:hover .logo-branch-left {
+  transform: rotate(-4deg);
+}
+
+.logo:hover .logo-branch-right,
+.studio-logo:hover .logo-branch-right,
+.modal-logo:hover .logo-branch-right {
+  transform: rotate(4deg);
+}
+
+.logo:hover .logo-choice,
+.studio-logo:hover .logo-choice,
+.modal-logo:hover .logo-choice {
+  transform: scale(1.12);
+}
+
+.logo:hover .logo-glow,
+.studio-logo:hover .logo-glow,
+.modal-logo:hover .logo-glow {
+  opacity: 0.28;
+  transform: scale(1.08);
+}
+
+.logo:hover .logo-star,
+.studio-logo:hover .logo-star,
+.modal-logo:hover .logo-star {
+  transform: scale(1.15);
   opacity: 1;
-  transform: scale(1.06);
 }
 
 .modal-logo .logo-mark {
