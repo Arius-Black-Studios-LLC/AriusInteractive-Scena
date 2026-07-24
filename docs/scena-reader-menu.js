@@ -1,5 +1,5 @@
 /**
- * Scena — in-game reader menu (transcript, inventory, audio settings)
+ * Arleco — in-game reader menu (transcript, inventory, audio settings)
  * Attaches to a .preview-frame / .player-frame element during play.
  */
 (function (root) {

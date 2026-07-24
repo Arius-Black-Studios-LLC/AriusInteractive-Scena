@@ -18,7 +18,7 @@ Confirm **`docs/scena-config.js` is NOT listed** (it is gitignored — it holds 
 3. First commit:
 
 ```powershell
-git commit -m "Initial Scena beta — studio, reader, learn, deploy workflow"
+git commit -m "Initial Arleco beta — studio, reader, learn, deploy workflow"
 ```
 
 4. Create a GitHub repo and connect:

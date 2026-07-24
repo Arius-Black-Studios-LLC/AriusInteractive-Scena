@@ -1,5 +1,5 @@
 /**
- * Scena — shared account profile page UI (readers and creators).
+ * Arleco — shared account profile page UI (readers and creators).
  */
 (function () {
   function $(sel, root) {

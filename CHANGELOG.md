@@ -1,6 +1,6 @@
 # Changelog
 
-All notable Scena changes are documented here. Version numbers match `VERSION` at the repo root.
+All notable Arleco changes are documented here. Version numbers match `VERSION` at the repo root.
 
 ## [0.1.0-beta] — 2026-03-20
 

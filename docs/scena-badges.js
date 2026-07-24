@@ -1,5 +1,5 @@
 /**
- * Scena — creator badges & achievements
+ * Arleco — creator badges & achievements
  */
 (function () {
   var LS_PREFIX = "scena_badges_";

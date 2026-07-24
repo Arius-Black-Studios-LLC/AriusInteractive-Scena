@@ -1,5 +1,5 @@
 /**
- * Scena — built-in key item icon library (SVG data URLs).
+ * Arleco — built-in key item icon library (SVG data URLs).
  */
 (function (global) {
   var FG = "#6b5520";

@@ -1,5 +1,5 @@
 /**
- * Scena Learn — interactive lesson sandbox
+ * Arleco Learn — interactive lesson sandbox
  * Graph and resource lessons use the real ScenaGraphEditor in learn mode.
  */
 (function () {

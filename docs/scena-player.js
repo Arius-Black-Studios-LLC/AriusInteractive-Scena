@@ -1,5 +1,5 @@
 /**
- * Scena — immersive episode reader (public / creator preview).
+ * Arleco — immersive episode reader (public / creator preview).
  */
 (function () {
   function escapeHtml(s) {
@@ -116,12 +116,12 @@
 
   ScenaPlayer.prototype.seriesMenuHref = function () {
     if (this.fromStudio) {
-      return "studio.html#/series/" + encodeURIComponent(this.series.id) + "/episodes";
+      return "/studio#/series/" + encodeURIComponent(this.series.id) + "/episodes";
     }
     if (window.ScenaProgress && ScenaProgress.seriesMenuUrl) {
       return ScenaProgress.seriesMenuUrl(this.series.id);
     }
-    return "scena-design-preview.html";
+    return "/";
   };
 
   ScenaPlayer.prototype.getNode = function (id) {
@@ -885,7 +885,7 @@
         '<div class="player-end-heart">' +
           '<p class="player-heart-summary">' + escapeHtml(countLabel) + "</p>" +
           '<p class="player-heart-signin">' +
-            '<a href="scena-design-preview.html">Sign in</a> to heart this chapter.' +
+            '<a href="/">Sign in</a> to heart this chapter.' +
           "</p>" +
         "</div>"
       );
@@ -974,7 +974,7 @@
               '<span class="player-comment-as-label">' + (this.replyToId ? "Replying as" : "Commenting as") + "</span> " +
               '<span class="player-comment-as-name">' + authorLine + "</span>" +
             "</div>" +
-            '<a class="player-comment-edit-profile" href="account.html">Edit profile</a>' +
+            '<a class="player-comment-edit-profile" href="/account">Edit profile</a>' +
           "</div>" +
           '<form class="player-comment-form" id="playerCommentForm">' +
             '<textarea placeholder="' + escapeAttr(placeholder) + '" maxlength="2000" aria-label="Comment"></textarea>' +
@@ -986,7 +986,7 @@
     }
     return (
       '<p class="player-comments-signin">' +
-        '<a href="scena-design-preview.html">Sign in</a> to comment, react, and reply with your profile.' +
+        '<a href="/">Sign in</a> to comment, react, and reply with your profile.' +
       "</p>"
     );
   };

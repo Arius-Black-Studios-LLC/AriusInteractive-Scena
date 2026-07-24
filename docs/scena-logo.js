@@ -1,5 +1,5 @@
 /**
- * Scena — inject theatrical logo mark (proscenium + curtains + spotlight)
+ * Arleco — inject theatrical logo mark (proscenium + curtains + spotlight)
  */
 (function () {
   var SVG =

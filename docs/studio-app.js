@@ -1,5 +1,5 @@
 /**
- * Scena creator studio — SPA router + views
+ * Arleco creator studio — SPA router + views
  */
 (function () {
   var userId = null;
@@ -403,7 +403,7 @@
             '<div class="studio-badges-head">' +
               '<h2>Your laurels</h2>' +
               '<div id="studioBadgeSummary"></div>' +
-              '<a class="btn btn-sm btn-ghost" href="learn.html">The Conservatory →</a>' +
+              '<a class="btn btn-sm btn-ghost" href="/learn">The Conservatory →</a>' +
             '</div>' +
             '<div class="studio-badges-scroll">' +
               '<div id="studioBadgeGrid"></div>' +
@@ -671,7 +671,7 @@
           '<section class="form-section">' +
             '<h2>Basics</h2>' +
             field("Title", "title", series.title, "Required for listing") +
-            field("URL slug", "slug", series.slug || ScenaStore.slugify(series.title), "scena.app/s/your-slug") +
+            field("URL slug", "slug", series.slug || ScenaStore.slugify(series.title), "arleco.app/s/your-slug") +
             field("Short description", "shortDescription", series.shortDescription, "Max 160 chars — grid card blurb", true) +
             field("Long description", "longDescription", series.longDescription, "Series detail page body", true, 5) +
           '</section>' +

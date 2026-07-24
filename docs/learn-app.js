@@ -1,5 +1,5 @@
 /**
- * Scena Learn — lesson catalog + runner
+ * Arleco Learn — lesson catalog + runner
  */
 (function () {
   var sandbox = null;

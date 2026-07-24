@@ -1,0 +1,30 @@
+# Clean URLs (rewrite — address bar stays short)
+/studio              /studio.html              200
+/learn               /learn.html               200
+/play                /play.html                200
+/series              /series.html              200
+/account             /account.html             200
+/help                /help.html                200
+/about               /about.html               200
+/blog                /blog.html                200
+/contact             /contact.html             200
+/privacy             /privacy.html             200
+/terms               /terms.html               200
+/content-guidelines  /content-guidelines.html  200
+
+# Legacy home URL
+/scena-design-preview.html  /  301
+
+# Canonicalize .html paths to clean URLs
+/studio.html              /studio              301
+/learn.html               /learn               301
+/play.html                /play                301
+/series.html              /series              301
+/account.html             /account             301
+/help.html                /help                301
+/about.html               /about               301
+/blog.html                /blog                301
+/contact.html             /contact             301
+/privacy.html             /privacy             301
+/terms.html               /terms               301
+/content-guidelines.html  /content-guidelines  301

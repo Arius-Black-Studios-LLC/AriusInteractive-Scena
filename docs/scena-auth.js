@@ -1,11 +1,11 @@
 /**
- * Scena — Supabase magic-link auth (browser)
+ * Arleco — Supabase magic-link auth (browser)
  */
 (function () {
   var client = null;
 
   function getConfig() {
-    return window.SCENA_CONFIG || {};
+    return window.ARLECO_CONFIG || window.SCENA_CONFIG || {};
   }
 
   function isConfigured() {
@@ -192,13 +192,13 @@
         return Promise.reject(new Error("Supabase is not configured. Fill in docs/scena-config.js with your project URL and anon key."));
       }
       if (window.location.protocol === "file:") {
-        return Promise.reject(new Error("This page is open as a file, not a website. Magic links need http://. Open http://127.0.0.1:5500/scena-design-preview.html instead (run docs\\serve.ps1 first if needed)."));
+        return Promise.reject(new Error("This page is open as a file, not a website. Magic links need http://. Open http://127.0.0.1:5500/ instead (run docs\\serve.ps1 first if needed)."));
       }
 
       if (postLoginPath) {
         setPostLogin(postLoginPath);
       } else if (role === "creator") {
-        setPostLogin("studio.html");
+        setPostLogin("/studio");
       }
 
       return sb.auth.signInWithOtp({

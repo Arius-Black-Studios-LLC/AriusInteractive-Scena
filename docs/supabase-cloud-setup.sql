@@ -1,7 +1,7 @@
--- Scena: easy cloud save (Supabase Dashboard → SQL → New query)
+-- Arleco: easy cloud save (Supabase Dashboard → SQL → New query)
 -- Requires supabase-setup.sql (profiles) to be applied first.
 --
--- Run ONCE when setting up cloud save. If Scena already says "Saved to cloud",
+-- Run ONCE when setting up cloud save. If Arleco already says "Saved to cloud",
 -- you are done — do not re-run this unless you are fixing a broken setup.
 --
 -- Safe to re-run (this file): existing policies are dropped before recreate.

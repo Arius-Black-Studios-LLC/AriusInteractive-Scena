@@ -1,5 +1,5 @@
 /**
- * Scena — Key Item assets (inventory tokens stored in series.assets).
+ * Arleco — Key Item assets (inventory tokens stored in series.assets).
  */
 (function (global) {
   var KIND = "keyItem";

@@ -1,5 +1,5 @@
 /**
- * Scena — built-in audio library (included in every project).
+ * Arleco — built-in audio library (included in every project).
  */
 (function () {
   window.ScenaDefaultAudio = [

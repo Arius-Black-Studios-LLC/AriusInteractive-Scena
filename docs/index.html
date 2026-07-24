@@ -2,12 +2,2123 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="refresh" content="0; url=scena-design-preview.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scena</title>
-  <link rel="canonical" href="scena-design-preview.html" />
+  <title>Arleco — Stories you choose</title>
+  <meta name="description" content="Arleco — creator-made episodic visual novels. Read free in your browser or publish branching stories from the studio." />
+  <link rel="canonical" href="https://arleco.app/" />
+  <meta property="og:site_name" content="Arleco" />
+  <meta property="og:title" content="Arleco — Stories you choose" />
+  <meta property="og:description" content="Creator-made episodic visual novels. Read free in your browser — not AI-generated." />
+  <meta property="og:url" content="https://arleco.app/" />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="scena-logo.css?v=1" />
+  <style>
+    :root {
+      --scena-bg: #F7F6F3;
+      --scena-surface: #FFFFFF;
+      --scena-surface-2: #F0EFEC;
+      --scena-text: #141414;
+      --scena-text-muted: #6B6B6B;
+      --scena-text-faint: #9A9893;
+      --scena-border: #E5E3DE;
+      --scena-border-strong: #C9C6BE;
+      /* ABS studio palette — orange / yellow accent on neutral Arleco chrome */
+      --abs-black: #000000;
+      --abs-white: #ffffff;
+      --abs-yellow: #ffd700;
+      --abs-orange: #ff8c00;
+      --abs-orange-deep: #ff6600;
+      --abs-red: #e63946;
+      --abs-grey: #c8c8c8;
+      --scena-accent: var(--abs-orange);
+      --scena-accent-hover: var(--abs-orange-deep);
+      --scena-accent-soft: #fff4e6;
+      --scena-accent-glow: rgba(255, 140, 0, 0.35);
+      --scena-accent-yellow: var(--abs-yellow);
+      --font-display: "Fraunces", Georgia, serif;
+      --font-ui: "DM Sans", system-ui, sans-serif;
+      --radius: 8px;
+      --radius-btn: 6px;
+      --page-max: 1200px;
+      --header-h: 64px;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--scena-bg);
+      color: var(--scena-text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; }
+
+    .container {
+      max-width: var(--page-max);
+      margin: 0 auto;
+      padding-left: 40px;
+      padding-right: 40px;
+    }
+
+    /* ── Scroll reveal ── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+    }
+
+    .reveal.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .reveal-stagger > * {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.55s var(--ease-out), transform 0.55s var(--ease-out);
+    }
+
+    .reveal-stagger.is-visible > *:nth-child(1) { transition-delay: 0.05s; opacity: 1; transform: none; }
+    .reveal-stagger.is-visible > *:nth-child(2) { transition-delay: 0.1s; opacity: 1; transform: none; }
+    .reveal-stagger.is-visible > *:nth-child(3) { transition-delay: 0.15s; opacity: 1; transform: none; }
+    .reveal-stagger.is-visible > *:nth-child(4) { transition-delay: 0.2s; opacity: 1; transform: none; }
+    .reveal-stagger.is-visible > *:nth-child(5) { transition-delay: 0.25s; opacity: 1; transform: none; }
+    .reveal-stagger.is-visible > *:nth-child(6) { transition-delay: 0.3s; opacity: 1; transform: none; }
+
+    /* ── Header ── */
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      height: var(--header-h);
+      transition: height 0.35s var(--ease-out), background 0.35s, box-shadow 0.35s, backdrop-filter 0.35s;
+    }
+
+    .site-header.is-scrolled {
+      --header-h: 56px;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      box-shadow: 0 1px 0 var(--scena-border), 0 8px 32px rgba(20, 20, 20, 0.06);
+    }
+
+    .site-header:not(.is-scrolled) {
+      background: transparent;
+      border-bottom: 1px solid transparent;
+    }
+
+    .header-inner {
+      max-width: var(--page-max);
+      margin: 0 auto;
+      height: 100%;
+      padding: 0 40px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-main {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      position: relative;
+    }
+
+    .nav-main a {
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--scena-text-muted);
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: var(--radius-btn);
+      transition: color 0.2s, background 0.2s;
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav-main a:hover { color: var(--scena-text); background: rgba(255,255,255,0.5); }
+    .nav-main a.is-active { color: var(--scena-accent); }
+
+    .search-wrap {
+      flex: 1;
+      max-width: 320px;
+      position: relative;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--scena-text-faint);
+      pointer-events: none;
+      transition: color 0.2s;
+    }
+
+    .search-wrap:focus-within svg { color: var(--scena-accent); }
+
+    .search-input {
+      width: 100%;
+      font-family: var(--font-ui);
+      font-size: 0.875rem;
+      padding: 9px 12px 9px 36px;
+      border: 1px solid var(--scena-border);
+      border-radius: var(--radius-btn);
+      background: rgba(255,255,255,0.7);
+      color: var(--scena-text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, transform 0.2s var(--ease-out);
+    }
+
+    .search-wrap:focus-within .search-input {
+      border-color: var(--scena-accent);
+      box-shadow: 0 0 0 3px var(--scena-accent-soft), 0 4px 16px rgba(255, 140, 0, 0.12);
+      background: #fff;
+      transform: translateY(-1px);
+    }
+
+    .search-input::placeholder { color: var(--scena-text-faint); }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: var(--font-ui);
+      font-size: 0.9375rem;
+      font-weight: 500;
+      padding: 10px 18px;
+      border-radius: var(--radius-btn);
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      position: relative;
+      overflow: hidden;
+      transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.25s var(--ease-out), box-shadow 0.25s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--scena-accent);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(255, 102, 0, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: var(--scena-accent-hover);
+      box-shadow: 0 4px 20px var(--scena-accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%);
+      transform: translateX(-120%);
+      transition: transform 0.6s;
+    }
+
+    .btn-primary:hover::after { transform: translateX(120%); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.8);
+      color: var(--scena-text);
+      border: 1px solid var(--scena-border-strong);
+    }
+
+    .btn-secondary:hover {
+      background: #fff;
+      border-color: var(--scena-accent);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--scena-text-muted);
+      padding: 10px 14px;
+    }
+
+    .btn-ghost:hover { color: var(--scena-text); background: rgba(255,255,255,0.6); }
+
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      padding: 8px;
+      cursor: pointer;
+      color: var(--scena-text);
+    }
+
+    /* ── Live toast ── */
+    .live-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px 12px 12px;
+      background: var(--scena-text);
+      color: #fff;
+      border-radius: 999px;
+      font-size: 0.875rem;
+      box-shadow: 0 12px 40px rgba(20,20,20,0.25);
+      opacity: 0;
+      transition: transform 0.55s var(--ease-spring), opacity 0.4s;
+      max-width: calc(100vw - 32px);
+    }
+
+    .live-toast.is-show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      flex-shrink: 0;
+      animation: pulse-dot 2s ease infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
+    }
+
+    .live-toast strong { font-weight: 600; }
+    .live-toast button {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      margin-left: 4px;
+      transition: background 0.2s;
+    }
+
+    .live-toast button:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── Hero ── */
+    .hero-wrap {
+      position: relative;
+      padding-top: var(--header-h);
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .hero-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.45;
+      animation: blob-drift 18s ease-in-out infinite;
+    }
+
+    .hero-blob--1 {
+      width: 480px;
+      height: 480px;
+      background: radial-gradient(circle, rgba(255, 140, 0, 0.28) 0%, transparent 70%);
+      top: -120px;
+      right: -80px;
+    }
+
+    .hero-blob--2 {
+      width: 360px;
+      height: 360px;
+      background: radial-gradient(circle, rgba(255, 215, 0, 0.18) 0%, transparent 70%);
+      bottom: 0;
+      left: -100px;
+      animation-delay: -6s;
+    }
+
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 140, 0, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 140, 0, 0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 85%);
+    }
+
+    @keyframes blob-drift {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -20px) scale(1.05); }
+      66% { transform: translate(-20px, 15px) scale(0.95); }
+    }
+
+    .hero {
+      position: relative;
+      padding: 88px 0 56px;
+      text-align: center;
+    }
+
+    .hero-accent-line {
+      width: 32px;
+      height: 3px;
+      background: var(--scena-accent);
+      margin: 0 auto 28px;
+      border-radius: 2px;
+      transform: scaleX(0);
+      animation: line-grow 0.8s var(--ease-out) 0.3s forwards;
+    }
+
+    @keyframes line-grow { to { transform: scaleX(1); } }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: clamp(2.5rem, 6vw, 3.75rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    .hero h1 .word {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(24px);
+      animation: word-up 0.65s var(--ease-out) forwards;
+    }
+
+    .hero h1 .word:nth-child(1) { animation-delay: 0.15s; }
+    .hero h1 .word:nth-child(2) { animation-delay: 0.28s; }
+    .hero h1 .word:nth-child(3) { animation-delay: 0.41s; }
+
+    @keyframes word-up {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-rotate {
+      display: inline-block;
+      color: var(--scena-accent);
+      min-width: 4ch;
+      transition: opacity 0.35s, transform 0.35s var(--ease-out);
+    }
+
+    .hero-rotate.is-changing {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .hero-lede {
+      font-size: 1.125rem;
+      color: var(--scena-text-muted);
+      max-width: 520px;
+      margin: 0 auto 28px;
+      opacity: 0;
+      animation: fade-up 0.7s var(--ease-out) 0.55s forwards;
+    }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+      opacity: 0;
+      animation: fade-up 0.7s var(--ease-out) 0.7s forwards;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat-num {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: var(--scena-accent);
+      line-height: 1.2;
+    }
+
+    .hero-stat-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--scena-text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      opacity: 0;
+      animation: fade-up 0.7s var(--ease-out) 0.85s forwards;
+    }
+
+    /* ── Sections ── */
+    .section {
+      padding-bottom: 72px;
+      position: relative;
+    }
+
+    #featured {
+      z-index: 2;
+      padding-bottom: 48px;
+    }
+
+    #discover {
+      z-index: 1;
+      scroll-margin-top: calc(var(--header-h) + 24px);
+      padding-top: 56px;
+      margin-top: 8px;
+      border-top: 1px solid var(--scena-border);
+      clear: both;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      gap: 16px;
+    }
+
+    .section-head h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 1.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .section-head-meta {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--scena-text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .section-head-link {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--scena-accent);
+      text-decoration: none;
+      transition: gap 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .section-head-link:hover { text-decoration: underline; }
+
+    /* ── Filter chips ── */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .filter-chip {
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--scena-border);
+      background: var(--scena-surface);
+      color: var(--scena-text-muted);
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+    }
+
+    .filter-chip:hover {
+      border-color: var(--scena-accent);
+      color: var(--scena-text);
+      transform: translateY(-1px);
+    }
+
+    .filter-chip.is-active {
+      background: var(--scena-accent);
+      border-color: var(--scena-accent);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--scena-accent-glow);
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--scena-text-muted);
+      display: none;
+    }
+
+    .empty-state.is-show { display: block; }
+
+    /* ── Featured ── */
+    .featured-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .featured-card {
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+      background: var(--scena-surface);
+      border: 1px solid var(--scena-border);
+      border-top: 3px solid var(--scena-accent);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: transform 0.35s var(--ease-out), box-shadow 0.35s;
+    }
+
+    .featured-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(20, 20, 20, 0.1);
+    }
+
+    .featured-card--hero .featured-visual { aspect-ratio: 16 / 9; }
+
+    .featured-side {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .featured-card--side {
+      flex-direction: row;
+    }
+
+    .featured-card--side .featured-visual {
+      width: 120px;
+      flex-shrink: 0;
+      aspect-ratio: 3 / 4;
+    }
+
+    .featured-card--side .featured-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .featured-visual {
+      background: var(--scena-surface-2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .featured-visual::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(20,20,20,0.15) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+
+    .featured-card:hover .featured-visual::after { opacity: 1; }
+
+    .featured-visual--a { background: linear-gradient(145deg, #3d4540 0%, #1a1f1c 50%, #4a3f35 100%); }
+    .featured-visual--b { background: linear-gradient(160deg, #c4c0d4 0%, #6e7a8a 100%); }
+    .featured-visual--c { background: linear-gradient(160deg, #d4c4c8 0%, #8a6e72 100%); }
+
+    .badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--scena-surface);
+      color: var(--scena-text);
+      border: 1px solid var(--scena-border);
+      z-index: 1;
+      animation: badge-pop 0.5s var(--ease-spring) 1s both;
+    }
+
+    @keyframes badge-pop {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .featured-body { padding: 20px 22px 22px; }
+
+    .featured-eyebrow {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--scena-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .featured-title {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 1.375rem;
+      line-height: 1.25;
+      margin-bottom: 8px;
+    }
+
+    .featured-card--hero .featured-title { font-size: 1.75rem; }
+
+    .featured-desc {
+      font-size: 0.9375rem;
+      color: var(--scena-text-muted);
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+
+    .featured-meta {
+      font-size: 0.8125rem;
+      color: var(--scena-text-faint);
+      font-weight: 500;
+    }
+
+    /* ── Series cards + 3D tilt ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 24px;
+    }
+
+    .card-wrap {
+      perspective: 800px;
+      min-height: 0;
+    }
+
+    .card {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: var(--scena-surface);
+      border: 1px solid var(--scena-border);
+      border-top: 3px solid var(--scena-accent);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: box-shadow 0.35s var(--ease-out);
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .card-wrap:hover .card {
+      box-shadow: 0 12px 36px rgba(20, 20, 20, 0.12);
+    }
+
+    .card.is-hidden {
+      display: none;
+    }
+
+    .card-wrap.is-hidden {
+      display: none;
+    }
+
+    .card-thumb {
+      aspect-ratio: 3 / 4;
+      background: var(--scena-surface-2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-thumb::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
+      transform: translateX(-100%);
+      transition: transform 0.6s;
+    }
+
+    .card-wrap:hover .card-thumb::before { transform: translateX(100%); }
+
+    .card[data-cover="a"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #3d4540, #1a1f1c); }
+    .card[data-cover="b"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #c8d4d0, #5a7268); }
+    .card[data-cover="c"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #d8d0c4, #7a6e5a); }
+    .card[data-cover="d"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #bcc8d8, #506080); }
+    .card[data-cover="e"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #d4cfc4, #8a8070); }
+    .card[data-cover="f"] .card-thumb:not(.card-thumb--image) { background: linear-gradient(160deg, #c8c4d8, #6a6488); }
+
+    .card-thumb.card-thumb--image {
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: cover;
+    }
+
+    .card-ep {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(20, 20, 20, 0.72);
+      color: #fff;
+      backdrop-filter: blur(4px);
+    }
+
+    .card-body { padding: 14px 16px 16px; }
+
+    .card-title {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      line-height: 1.35;
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-desc {
+      font-size: 0.8125rem;
+      color: var(--scena-text-muted);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .card-readers {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--scena-text-faint);
+      margin-bottom: 10px;
+    }
+
+    .flags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .flag {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: var(--scena-text-muted);
+      padding: 3px 9px;
+      border: 1px solid var(--scena-border);
+      border-radius: 999px;
+    }
+
+    /* ── Steps ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .step {
+      background: var(--scena-surface);
+      border: 1px solid var(--scena-border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: transform 0.35s var(--ease-out), box-shadow 0.35s, border-color 0.35s;
+    }
+
+    .step:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(20,20,20,0.07);
+      border-color: var(--scena-accent);
+    }
+
+    .step-num {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 500;
+      color: var(--scena-accent);
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .step h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+    .step p { font-size: 0.875rem; color: var(--scena-text-muted); line-height: 1.55; }
+
+    /* ── Creator band ── */
+    .creator-band {
+      position: relative;
+      overflow: hidden;
+      background: var(--scena-text);
+      color: #fff;
+      padding: 72px 0;
+      margin-bottom: 72px;
+    }
+
+    .creator-band-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(255, 140, 0, 0.4) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 50%, rgba(255, 215, 0, 0.22) 0%, transparent 60%);
+      animation: band-shift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes band-shift {
+      from { opacity: 0.8; transform: scale(1); }
+      to { opacity: 1; transform: scale(1.05); }
+    }
+
+    .creator-band-inner {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 40px;
+    }
+
+    .creator-band h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+
+    .creator-band p {
+      color: rgba(255,255,255,0.72);
+      max-width: 480px;
+      font-size: 1rem;
+    }
+
+    .creator-band .btn-primary {
+      background: #fff;
+      color: var(--scena-text);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+
+    .creator-band .btn-primary:hover {
+      background: var(--abs-yellow);
+      color: var(--abs-black);
+    }
+
+    .footer-operator {
+      margin-top: 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .footer-operator a {
+      color: var(--scena-text-muted);
+      text-decoration: none;
+    }
+
+    .footer-operator a:hover { color: var(--scena-accent); }
+
+    .creator-band-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .creator-band-note {
+      font-size: 0.8125rem;
+      color: rgba(255,255,255,0.5);
+      text-align: center;
+    }
+
+    /* ── Footer ── */
+    .site-footer {
+      background: var(--scena-surface);
+      border-top: 1px solid var(--scena-border);
+      padding: 48px 0 32px;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr repeat(3, 1fr);
+      gap: 40px;
+      margin-bottom: 40px;
+    }
+
+    .footer-brand p {
+      font-size: 0.875rem;
+      color: var(--scena-text-muted);
+      margin-top: 12px;
+      max-width: 260px;
+      line-height: 1.55;
+    }
+
+    .footer-col h4 {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--scena-text-faint);
+      margin-bottom: 14px;
+    }
+
+    .footer-col ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-col a {
+      font-size: 0.875rem;
+      color: var(--scena-text-muted);
+      text-decoration: none;
+      transition: color 0.2s, transform 0.2s;
+      display: inline-block;
+    }
+
+    .footer-col a:hover { color: var(--scena-accent); transform: translateX(3px); }
+
+    .footer-bottom {
+      padding-top: 24px;
+      border-top: 1px solid var(--scena-border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.8125rem;
+      color: var(--scena-text-faint);
+    }
+
+    .footer-bottom strong { color: var(--scena-text); font-weight: 600; }
+
+    .footer-version {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(20, 20, 20, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .modal-backdrop.is-open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--scena-surface);
+      border: 1px solid var(--scena-border);
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 32px 64px rgba(20, 20, 20, 0.2);
+      transform: scale(0.92) translateY(16px);
+      opacity: 0;
+      transition: transform 0.4s var(--ease-spring), opacity 0.3s;
+    }
+
+    .modal-backdrop.is-open .modal {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    .modal-close {
+      float: right;
+      background: var(--scena-surface-2);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      line-height: 1;
+      color: var(--scena-text-muted);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .modal-close:hover { background: var(--scena-border); transform: rotate(90deg); }
+
+    .modal-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      clear: both;
+    }
+
+    .modal-content {
+      transition: opacity 0.25s, transform 0.25s var(--ease-out);
+    }
+
+    .modal-content.is-swapping {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    .modal h2 {
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 1.375rem;
+      margin-bottom: 8px;
+    }
+
+    .modal-lede {
+      font-size: 0.9375rem;
+      color: var(--scena-text-muted);
+      margin-bottom: 24px;
+    }
+
+    .field { margin-bottom: 16px; }
+
+    .field label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      font-family: var(--font-ui);
+      font-size: 0.9375rem;
+      padding: 11px 14px;
+      border: 1px solid var(--scena-border);
+      border-radius: var(--radius-btn);
+      background: var(--scena-bg);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .field input:focus {
+      border-color: var(--scena-accent);
+      box-shadow: 0 0 0 3px var(--scena-accent-soft);
+    }
+
+    .login-error {
+      display: none;
+      font-size: 0.8125rem;
+      color: var(--abs-red);
+      background: #fdecea;
+      border: 1px solid #f5c2c0;
+      border-radius: var(--radius-btn);
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    .login-error.is-show { display: block; }
+
+    #headerLoggedIn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      min-width: 0;
+    }
+
+    #headerLoggedIn[hidden] {
+      display: none !important;
+    }
+
+    #headerLoggedIn .btn {
+      flex-shrink: 0;
+    }
+
+    #mobileLoggedIn[hidden] {
+      display: none !important;
+    }
+
+    .mobile-nav #mobileLoggedIn .header-user-avatar {
+      margin-bottom: 4px;
+    }
+
+    .header-user-avatar {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+      text-decoration: none;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .header-user-avatar:hover {
+      box-shadow: 0 0 0 2px var(--scena-accent-soft);
+      transform: translateY(-1px);
+    }
+
+    .header-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .header-avatar.comment-avatar--initials {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-label-short { display: none; }
+
+    .config-banner {
+      display: none;
+      background: #fff8e6;
+      border-bottom: 1px solid #f0dca0;
+      color: #6b5a20;
+      font-size: 0.8125rem;
+      padding: 10px 40px;
+      text-align: center;
+    }
+
+    .config-banner.is-show { display: block; }
+
+    .config-banner code {
+      font-size: 0.75rem;
+      background: rgba(0,0,0,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .modal .btn-primary { width: 100%; margin-bottom: 16px; }
+
+    .modal-foot {
+      font-size: 0.8125rem;
+      color: var(--scena-text-faint);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .modal-foot a { color: var(--scena-accent); text-decoration: none; }
+    .modal-foot a:hover { text-decoration: underline; }
+
+    .modal-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--scena-bg);
+      padding: 4px;
+      border-radius: var(--radius-btn);
+      margin-bottom: 24px;
+    }
+
+    .modal-tab {
+      flex: 1;
+      font-family: var(--font-ui);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--scena-text-muted);
+      cursor: pointer;
+      transition: all 0.25s var(--ease-out);
+    }
+
+    .modal-tab.is-active {
+      background: var(--scena-surface);
+      color: var(--scena-text);
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+
+    .submit-success {
+      display: none;
+      text-align: center;
+      padding: 16px 0;
+    }
+
+    .submit-success.is-show { display: block; }
+
+    .submit-success-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      background: var(--scena-accent-soft);
+      color: var(--scena-accent);
+      font-size: 1.5rem;
+      line-height: 48px;
+      animation: success-pop 0.5s var(--ease-spring);
+    }
+
+    @keyframes success-pop {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    /* ── Mobile nav ── */
+    .mobile-nav {
+      display: none;
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      right: 0;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--scena-border);
+      padding: 16px 20px 20px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.08);
+      transform: translateY(-8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.35s var(--ease-out), opacity 0.35s;
+    }
+
+    .mobile-nav.is-open {
+      display: flex;
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .mobile-nav a,
+    .mobile-nav button {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--scena-text);
+      text-decoration: none;
+      padding: 12px 8px;
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      border-radius: var(--radius-btn);
+    }
+
+    .mobile-nav a:hover,
+    .mobile-nav button:hover { background: var(--scena-surface-2); }
+
+    .mobile-nav .search-wrap { max-width: none; margin-bottom: 8px; }
+
+    @media (max-width: 960px) {
+      .featured-grid { grid-template-columns: 1fr; }
+      .featured-card--side { flex-direction: column; }
+      .featured-card--side .featured-visual { width: 100%; aspect-ratio: 16 / 9; }
+      .steps { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .creator-band-inner { flex-direction: column; text-align: center; }
+      .creator-band p { max-width: none; }
+    }
+
+    @media (max-width: 768px) {
+      .container { padding-left: 20px; padding-right: 20px; }
+      .header-inner { padding: 0 20px; gap: 12px; }
+      .nav-main, .search-wrap,
+      .header-actions .btn-ghost { display: none; }
+      .menu-toggle { display: block; margin-left: auto; }
+      .header-actions { gap: 6px; }
+      #headerLoggedIn { gap: 6px; }
+      #headerLoggedIn .btn { padding: 8px 10px; font-size: 0.8125rem; }
+      .header-user-avatar,
+      .header-avatar { width: 28px; height: 28px; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .hero-stats { gap: 20px; }
+    }
+
+    @media (max-width: 420px) {
+      #headerLoggedIn .btn-label-full { display: none; }
+      #headerLoggedIn .btn-label-short { display: inline; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      .reveal, .reveal-stagger > * { opacity: 1; transform: none; }
+      .card { transform: none !important; }
+    }
+  </style>
 </head>
 <body>
-  <p><a href="scena-design-preview.html">Continue to Scena</a></p>
+
+  <div class="config-banner" id="configBanner" role="status">
+    <span id="configBannerText">Auth not configured — fill in <code>scena-config.js</code> with your Supabase URL + anon key. See <code>scena-config.example.js</code>.</span>
+  </div>
+
+  <header class="site-header" id="siteHeader">
+    <div class="header-inner">
+      <a class="logo" href="#">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-text">Arleco</span>
+      </a>
+      <nav class="nav-main" aria-label="Main">
+        <a href="#discover" class="is-active" data-nav>Discover</a>
+        <a href="#featured" data-nav>Featured</a>
+        <a href="#creators" data-nav>For creators</a>
+        <a href="/learn">Conservatory</a>
+      </nav>
+      <div class="search-wrap">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+        </svg>
+        <input class="search-input" id="globalSearch" type="search" placeholder="Search series…" aria-label="Search series" />
+      </div>
+      <div class="header-actions" id="headerActions">
+        <div id="headerLoggedOut">
+          <button type="button" class="btn btn-ghost" data-open-login="reader">Log in</button>
+          <button type="button" class="btn btn-primary" data-open-login="creator">Creator studio</button>
+        </div>
+        <div id="headerLoggedIn" hidden>
+          <a href="/account" class="header-user-avatar" id="headerUserAvatar" title="Your account" aria-label="Your account"></a>
+          <a href="/account" class="btn btn-primary" id="headerAccountBtn">Account</a>
+          <a href="/studio" class="btn btn-secondary" id="headerStudioBtn"><span class="btn-label-full">Creator studio</span><span class="btn-label-short">Studio</span></a>
+          <button type="button" class="btn btn-ghost" id="headerSignOutBtn">Log out</button>
+        </div>
+      </div>
+      <button type="button" class="menu-toggle" id="menuToggle" aria-label="Open menu" aria-expanded="false">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="mobile-nav" id="mobileNav" aria-label="Mobile">
+    <div class="search-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+      </svg>
+      <input class="search-input" id="mobileSearch" type="search" placeholder="Search series…" aria-label="Search series" />
+    </div>
+    <a href="#discover">Discover</a>
+    <a href="#featured">Featured</a>
+    <a href="#creators">For creators</a>
+    <a href="/learn">Conservatory</a>
+    <div id="mobileLoggedOut">
+      <button type="button" data-open-login="reader">Log in</button>
+      <button type="button" data-open-login="creator">Creator studio</button>
+    </div>
+    <div id="mobileLoggedIn" hidden>
+      <a href="/account" class="header-user-avatar" id="mobileUserAvatar" title="Your account" aria-label="Your account"></a>
+      <a href="/account">Account</a>
+      <a href="/studio">Creator studio</a>
+      <button type="button" id="mobileSignOutBtn">Log out</button>
+    </div>
+  </nav>
+
+  <div class="live-toast" id="liveToast" role="status" aria-live="polite">
+    <span class="live-dot" aria-hidden="true"></span>
+    <span><strong>Signal Lost</strong> Chapter 2 is live</span>
+    <a href="/series?series=signal-lost">Read now</a>
+  </div>
+
+  <main>
+    <div class="hero-wrap">
+      <div class="hero-bg" aria-hidden="true">
+        <div class="hero-blob hero-blob--1"></div>
+        <div class="hero-blob hero-blob--2"></div>
+        <div class="hero-grid"></div>
+      </div>
+      <section class="hero container">
+        <div class="hero-accent-line" aria-hidden="true"></div>
+        <h1>
+          <span class="word">Stories</span>
+          <span class="word">you</span>
+          <span class="word"><span class="hero-rotate" id="heroRotate">choose</span>.</span>
+        </h1>
+        <p class="hero-lede">Episodic visual novels from independent creators. Read free in your browser — new chapters every week.</p>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-num" id="heroReaderCount" data-count="0">0</div>
+            <div class="hero-stat-label">Chapters read this week</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-num" id="heroLiveSeriesCount" data-count="2">0</div>
+            <div class="hero-stat-label">Live series</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-num" id="heroEpisodeCount" data-count="4">0</div>
+            <div class="hero-stat-label">Episodes published</div>
+          </div>
+        </div>
+        <div class="hero-actions">
+          <a href="#discover" class="btn btn-primary">Browse series</a>
+          <button type="button" class="btn btn-secondary" data-open-login="creator">Publish your story</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="section container reveal" id="featured">
+      <div class="section-head">
+        <h2>Featured</h2>
+        <span class="section-head-meta">Staff picks</span>
+      </div>
+      <div class="featured-grid">
+        <a class="featured-card featured-card--hero" href="/series?series=signal-lost">
+          <div class="featured-visual featured-visual--c">
+            <span class="badge">Read free</span>
+          </div>
+          <div class="featured-body">
+            <div class="featured-eyebrow">Editor's pick</div>
+            <h3 class="featured-title">Signal Lost</h3>
+            <p class="featured-desc">A sci-fi mystery aboard Kerberos-9 — comms dead, crew uneasy, and something knocking inside the hull.</p>
+            <div class="flags"><span class="flag">Sci-fi</span><span class="flag">Strong language</span></div>
+            <p class="featured-meta" style="margin-top:12px">by Lotus Wave · 2 chapters · ~10 min each</p>
+          </div>
+        </a>
+        <div class="featured-side">
+          <a class="featured-card featured-card--side" href="/series?series=cafe-at-sunset">
+            <div class="featured-visual featured-visual--b"></div>
+            <div class="featured-body">
+              <h3 class="featured-title">Café at Sunset</h3>
+              <p class="featured-desc">Two playable chapters of cozy romance and too much matcha.</p>
+              <div class="flags"><span class="flag">Romance</span><span class="flag">2 chapters</span></div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section container reveal" id="discover">
+      <div class="section-head">
+        <h2>Discover</h2>
+        <a href="#" class="section-head-link">View all →</a>
+      </div>
+      <div class="filter-bar" id="filterBar">
+        <button type="button" class="filter-chip is-active" data-filter="all">All</button>
+        <button type="button" class="filter-chip" data-filter="romance">Romance</button>
+        <button type="button" class="filter-chip" data-filter="horror">Horror</button>
+        <button type="button" class="filter-chip" data-filter="comedy">Comedy</button>
+        <button type="button" class="filter-chip" data-filter="scifi">Sci-fi</button>
+      </div>
+      <div class="grid reveal-stagger" id="seriesGrid">
+        <p class="empty-state" id="emptyState">Loading series…</p>
+      </div>
+    </section>
+
+    <section class="section container reveal">
+      <div class="section-head">
+        <h2>How Arleco works</h2>
+        <span class="section-head-meta">For readers</span>
+      </div>
+      <div class="steps reveal-stagger">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Pick a series</h3>
+          <p>Browse episodic visual novels — romance, horror, comedy, and everything between.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Make choices</h3>
+          <p>Branch the story with your decisions. Your progress and stats carry into the next episode.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Come back weekly</h3>
+          <p>New chapters drop on a schedule. Pick up right where you left off — no account required.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="creator-band reveal" id="creators">
+      <div class="creator-band-bg" aria-hidden="true"></div>
+      <div class="container creator-band-inner">
+        <div>
+          <h2>Build your story. Publish weekly.</h2>
+          <p>Graph editor, project assets, branching routes, and one-click publish — free for creators on Arleco.</p>
+        </div>
+        <div class="creator-band-actions">
+          <button type="button" class="btn btn-primary" data-open-login="creator">Open creator studio</button>
+          <a href="/learn" class="btn btn-secondary">Enter the Conservatory</a>
+          <span class="creator-band-note">Free to publish · No credit card</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid reveal">
+        <div class="footer-brand">
+          <a class="logo" href="#">
+            <span class="logo-mark" aria-hidden="true"></span>
+            <span class="logo-text">Arleco</span>
+          </a>
+          <p>Episodic visual novels you read in the browser.</p>
+          <p class="footer-operator"><a href="../index.html">Arius Interactive</a></p>
+        </div>
+        <div class="footer-col">
+          <h4>Read</h4>
+          <ul>
+            <li><a href="#discover">Discover</a></li>
+            <li><a href="#featured">Featured</a></li>
+            <li><a href="#discover">New releases</a></li>
+            <li><a href="#discover">Genres</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Create</h4>
+          <ul>
+            <li><a href="#" data-open-login="creator">Creator studio</a></li>
+            <li><a href="/learn">The Conservatory</a></li>
+            <li><a href="#creators">How publishing works</a></li>
+            <li><a href="/content-guidelines">Content guidelines</a></li>
+            <li><a href="/blog">Blog</a></li>
+            <li><a href="/help">Help center</a></li>
+            <li><a href="https://discord.gg/83V5SQAeez" target="_blank" rel="noopener noreferrer">Discord community</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="/terms">Terms of service</a></li>
+            <li><a href="/privacy">Privacy policy</a></li>
+            <li><a href="/contact">Contact</a></li>
+            <li><a href="/about">About</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span><strong>Arleco</strong> by Arius Interactive</span>
+        <span id="scenaVersionLabel" class="footer-version"></span>
+        <span>© 2026 Arius Interactive. All rights reserved.</span>
+      </div>
+    </div>
+  </footer>
+
+  <div class="modal-backdrop" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
+    <div class="modal">
+      <button type="button" class="modal-close" id="closeLogin" aria-label="Close">×</button>
+      <div class="modal-logo">
+        <span class="logo-mark" aria-hidden="true"></span>
+        <span class="logo-text">Arleco</span>
+      </div>
+      <div class="modal-tabs" role="tablist">
+        <button type="button" class="modal-tab is-active" data-tab="reader" role="tab" aria-selected="true">Reader</button>
+        <button type="button" class="modal-tab" data-tab="creator" role="tab" aria-selected="false">Creator</button>
+      </div>
+      <div class="modal-content" id="modalContent">
+        <h2 id="loginTitle">Log in</h2>
+        <p class="modal-lede" id="loginLede">We'll email you a magic link — no password needed.</p>
+        <div class="login-error" id="loginError" role="alert"></div>
+        <form id="loginForm" action="#" method="post">
+          <div class="field">
+            <label for="loginEmail">Email address</label>
+            <input id="loginEmail" name="email" type="email" placeholder="you@example.com" autocomplete="email" required />
+          </div>
+          <button type="submit" class="btn btn-primary" id="loginSubmit">Send magic link</button>
+        </form>
+        <div class="submit-success" id="submitSuccess">
+          <div class="submit-success-icon">✓</div>
+          <p><strong>Check your email</strong><br/>We sent a magic link to sign in.</p>
+        </div>
+        <p class="modal-foot" id="loginFoot">New to Arleco? <a href="#">Create a free account</a> with the same email.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="scena-config.js"></script>
+  <script src="scena-version.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="scena-auth.js?v=3"></script>
+  <script src="scena-profile.js?v=2"></script>
+  <script src="scena-cloud.js?v=25"></script>
+  <script src="studio-store.js?v=64"></script>
+  <script src="scena-demo-series.js?v=14"></script>
+  <script src="scena-catalog.js?v=6"></script>
+  <script>
+    (function () {
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      /* ── Scroll header ── */
+      const header = document.getElementById("siteHeader");
+      window.addEventListener("scroll", function () {
+        header.classList.toggle("is-scrolled", window.scrollY > 24);
+      }, { passive: true });
+
+      /* ── Reveal on scroll ── */
+      const revealEls = document.querySelectorAll(".reveal, .reveal-stagger");
+      const revealObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            revealObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+      revealEls.forEach(function (el) { revealObs.observe(el); });
+
+      /* ── Hero word rotate ── */
+      const rotateEl = document.getElementById("heroRotate");
+      const words = ["choose", "branch", "discover", "play"];
+      let wordIdx = 0;
+      if (!reducedMotion) {
+        setInterval(function () {
+          rotateEl.classList.add("is-changing");
+          setTimeout(function () {
+            wordIdx = (wordIdx + 1) % words.length;
+            rotateEl.textContent = words[wordIdx];
+            rotateEl.classList.remove("is-changing");
+          }, 350);
+        }, 2800);
+      }
+
+      /* ── Count-up stats ── */
+      function animateCount(el) {
+        const target = parseInt(el.dataset.count, 10);
+        const suffix = el.dataset.suffix || "";
+        const duration = 1400;
+        const start = performance.now();
+        function tick(now) {
+          const p = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.floor(target * eased).toLocaleString() + suffix;
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      const statsObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.querySelectorAll("[data-count]:not(#heroReaderCount)").forEach(animateCount);
+            statsObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+      statsObs.observe(document.querySelector(".hero-stats"));
+
+      function animateReaderCount(el, target, suffix) {
+        if (!el) return;
+        el.dataset.count = String(target);
+        el.dataset.suffix = suffix || "";
+        animateCount(el);
+      }
+
+      /* ── Live toast ── */
+      const toast = document.getElementById("liveToast");
+      setTimeout(function () { toast.classList.add("is-show"); }, 2200);
+      setTimeout(function () { toast.classList.remove("is-show"); }, 9000);
+
+      /* ── 3D card tilt ── */
+      if (!reducedMotion) {
+        document.querySelectorAll(".card-wrap").forEach(function (wrap) {
+          const card = wrap.querySelector(".card");
+          wrap.addEventListener("mousemove", function (e) {
+            const rect = wrap.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width - 0.5;
+            const y = (e.clientY - rect.top) / rect.height - 0.5;
+            card.style.transform = "rotateY(" + (x * 10) + "deg) rotateX(" + (-y * 10) + "deg) translateZ(0)";
+          });
+          wrap.addEventListener("mouseleave", function () {
+            card.style.transform = "";
+          });
+        });
+      }
+
+      /* ── Filter + search (React-style state) ── */
+      let activeFilter = "all";
+      let searchQuery = "";
+
+      let cards = document.querySelectorAll("#seriesGrid .card");
+      const filterChips = document.querySelectorAll(".filter-chip");
+      const globalSearch = document.getElementById("globalSearch");
+      const mobileSearch = document.getElementById("mobileSearch");
+
+      function refreshFilterCards() {
+        cards = document.querySelectorAll("#seriesGrid .card");
+        applyFilters();
+      }
+
+      function applyFilters() {
+        const emptyState = document.getElementById("emptyState");
+        let visible = 0;
+        cards.forEach(function (card) {
+          const genres = (card.dataset.genres || "").split(" ");
+          const title = (card.dataset.title || "").toLowerCase();
+          const matchFilter = activeFilter === "all" || genres.includes(activeFilter);
+          const matchSearch = !searchQuery || title.includes(searchQuery.toLowerCase());
+          const show = matchFilter && matchSearch;
+          card.classList.toggle("is-hidden", !show);
+          var wrap = card.closest(".card-wrap");
+          if (wrap) wrap.classList.toggle("is-hidden", !show);
+          if (show) visible++;
+        });
+        if (!emptyState) return;
+        if (visible === 0 && cards.length === 0) {
+          emptyState.textContent = "No live series yet. Publish a chapter in the studio to appear here.";
+        } else if (visible === 0) {
+          emptyState.textContent = "No series match your search. Try another genre or term.";
+        }
+        emptyState.classList.toggle("is-show", visible === 0);
+      }
+
+      filterChips.forEach(function (chip) {
+        chip.addEventListener("click", function () {
+          filterChips.forEach(function (c) { c.classList.remove("is-active"); });
+          chip.classList.add("is-active");
+          activeFilter = chip.dataset.filter;
+          applyFilters();
+        });
+      });
+
+      function onSearchInput(e) {
+        searchQuery = e.target.value.trim();
+        if (e.target === globalSearch) mobileSearch.value = searchQuery;
+        else globalSearch.value = searchQuery;
+        applyFilters();
+        if (searchQuery) document.getElementById("discover").scrollIntoView({ behavior: "smooth" });
+      }
+
+      globalSearch.addEventListener("input", onSearchInput);
+      mobileSearch.addEventListener("input", onSearchInput);
+
+      function updateHeroStats(entries, readerBundle) {
+        var liveEl = document.getElementById("heroLiveSeriesCount");
+        var epEl = document.getElementById("heroEpisodeCount");
+        var readerEl = document.getElementById("heroReaderCount");
+        var episodeTotal = (entries || []).reduce(function (sum, entry) {
+          return sum + (entry.liveCount || 0);
+        }, 0);
+        if (liveEl) liveEl.dataset.count = String((entries || []).length);
+        if (epEl) epEl.dataset.count = String(episodeTotal);
+        if (readerBundle && readerEl) {
+          animateReaderCount(
+            readerEl,
+            readerBundle.chaptersReadThisWeek || readerBundle.readersThisWeek || 0,
+            readerBundle.readersSuffix || ""
+          );
+        }
+      }
+
+      function bootDiscover(userId) {
+        if (!window.ScenaCatalog) {
+          if (emptyState) {
+            emptyState.textContent = "Could not load series catalog.";
+            emptyState.classList.add("is-show");
+          }
+          return;
+        }
+        Promise.all([
+          ScenaCatalog.listDiscover(userId),
+          ScenaCatalog.fetchReaderStats(),
+        ]).then(function (results) {
+          var entries = results[0];
+          var cloudStats = results[1];
+          var readerBundle = ScenaCatalog.enrichReaderStats(entries, cloudStats);
+          var grid = document.getElementById("seriesGrid");
+          ScenaCatalog.renderDiscoverGrid(grid, entries, readerBundle);
+          updateHeroStats(entries, readerBundle);
+          refreshFilterCards();
+        }).catch(function () {
+          if (emptyState) {
+            emptyState.textContent = "Could not load series catalog.";
+            emptyState.classList.add("is-show");
+          }
+        });
+      }
+
+      if (window.ScenaAuth && ScenaAuth.isConfigured()) {
+        ScenaAuth.init().then(function (session) {
+          bootDiscover(session && session.user ? session.user.id : null);
+        }).catch(function () { bootDiscover(null); });
+      } else {
+        bootDiscover(null);
+      }
+
+      /* ── Active nav on scroll ── */
+      const sections = ["featured", "discover", "creators"];
+      const navLinks = document.querySelectorAll("[data-nav]");
+      const sectionObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            navLinks.forEach(function (a) {
+              a.classList.toggle("is-active", a.getAttribute("href") === "#" + entry.target.id);
+            });
+          }
+        });
+      }, { threshold: 0.35 });
+      sections.forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) sectionObs.observe(el);
+      });
+
+      /* ── Modal ── */
+      const modal = document.getElementById("loginModal");
+      const closeBtn = document.getElementById("closeLogin");
+      const modalContent = document.getElementById("modalContent");
+      const loginTitle = document.getElementById("loginTitle");
+      const loginLede = document.getElementById("loginLede");
+      const loginSubmit = document.getElementById("loginSubmit");
+      const loginFoot = document.getElementById("loginFoot");
+      const loginForm = document.getElementById("loginForm");
+      const submitSuccess = document.getElementById("submitSuccess");
+      const loginError = document.getElementById("loginError");
+      const loginEmailInput = document.getElementById("loginEmail");
+      const configBanner = document.getElementById("configBanner");
+      const configBannerText = document.getElementById("configBannerText");
+      const headerLoggedOut = document.getElementById("headerLoggedOut");
+      const headerLoggedIn = document.getElementById("headerLoggedIn");
+      const headerUserAvatar = document.getElementById("headerUserAvatar");
+      const headerSignOutBtn = document.getElementById("headerSignOutBtn");
+      const mobileLoggedOut = document.getElementById("mobileLoggedOut");
+      const mobileLoggedIn = document.getElementById("mobileLoggedIn");
+      const mobileUserAvatar = document.getElementById("mobileUserAvatar");
+      const mobileSignOutBtn = document.getElementById("mobileSignOutBtn");
+      const tabs = document.querySelectorAll(".modal-tab");
+      const menuToggle = document.getElementById("menuToggle");
+      const mobileNav = document.getElementById("mobileNav");
+      let activeTab = "reader";
+
+      function refreshConfigBanner() {
+        if (!window.ScenaAuth) {
+          configBannerText.textContent = "Auth module failed to load.";
+          configBanner.classList.add("is-show");
+          return;
+        }
+        if (ScenaAuth.isFileProtocol()) {
+          configBannerText.innerHTML = "Login needs <code>http://</code> — open <code>http://127.0.0.1:5500/</code> (run <code>serve.ps1</code> in this folder first).";
+          configBanner.classList.add("is-show");
+          return;
+        }
+        if (!ScenaAuth.isConfigured()) {
+          configBannerText.innerHTML = "Fill in <code>scena-config.js</code> with your Supabase URL + anon key, then add <code>http://127.0.0.1:5500/</code> to Supabase redirect URLs.";
+          configBanner.classList.add("is-show");
+        }
+      }
+      refreshConfigBanner();
+
+      function showLoginError(message) {
+        loginError.textContent = message;
+        loginError.classList.add("is-show");
+      }
+
+      function clearLoginError() {
+        loginError.textContent = "";
+        loginError.classList.remove("is-show");
+      }
+
+      var currentSession = null;
+
+      function paintHeaderAvatars(profile, session) {
+        if (!window.ScenaProfile) return;
+        var label = (profile && profile.displayName) || (session.user && session.user.email) || "Your account";
+        var html = ScenaProfile.renderAvatar(profile, "header-avatar");
+        [headerUserAvatar, mobileUserAvatar].forEach(function (el) {
+          if (!el) return;
+          el.innerHTML = html;
+          el.title = label;
+          el.setAttribute("aria-label", "Your account");
+        });
+      }
+
+      function updateAuthUI(session) {
+        currentSession = session;
+        var signedIn = Boolean(session && session.user);
+        headerLoggedOut.hidden = signedIn;
+        headerLoggedIn.hidden = !signedIn;
+        mobileLoggedOut.hidden = signedIn;
+        mobileLoggedIn.hidden = !signedIn;
+        if (signedIn && window.ScenaProfile) {
+          var quick = ScenaProfile.sessionProfile(session) || { id: session.user.id, displayName: "Reader", avatarUrl: "" };
+          paintHeaderAvatars(quick, session);
+          ScenaProfile.get(session.user.id, session).then(function (profile) {
+            if (currentSession && currentSession.user && currentSession.user.id === session.user.id) {
+              paintHeaderAvatars(profile, session);
+            }
+          });
+        }
+      }
+
+      if (window.ScenaAuth) {
+        ScenaAuth.onSessionChange = updateAuthUI;
+        ScenaAuth.init().then(function (session) {
+          if (session) {
+            closeLogin();
+            return;
+          }
+          try {
+            if (sessionStorage.getItem("scena_post_login") === "/account") {
+              openLogin("reader");
+            }
+          } catch (e) { /* ignore */ }
+        });
+      }
+
+      function handleSignOut() {
+        if (!window.ScenaAuth) return;
+        ScenaAuth.signOut();
+        mobileNav.classList.remove("is-open");
+      }
+
+      headerSignOutBtn.addEventListener("click", handleSignOut);
+      mobileSignOutBtn.addEventListener("click", handleSignOut);
+
+      function setModalTab(mode) {
+        activeTab = mode;
+        tabs.forEach(function (t) {
+          var on = t.dataset.tab === activeTab;
+          t.classList.toggle("is-active", on);
+          t.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        modalContent.classList.add("is-swapping");
+        setTimeout(function () {
+          loginForm.style.display = "";
+          submitSuccess.classList.remove("is-show");
+          clearLoginError();
+          loginSubmit.disabled = false;
+          loginSubmit.textContent = "Send magic link";
+          loginEmailInput.value = loginEmailInput.value;
+          if (activeTab === "creator") {
+            loginTitle.textContent = "Creator studio";
+            loginLede.textContent = "Log in to edit your series, graph, and publish episodes.";
+            loginFoot.innerHTML = 'Publishing is free. <a href="#">Learn about creator tools</a>.';
+          } else {
+            loginTitle.textContent = "Log in";
+            loginLede.textContent = "Save your library and reading progress across devices.";
+            loginFoot.innerHTML = 'New to Arleco? <a href="#">Create a free account</a> with the same email.';
+          }
+          modalContent.classList.remove("is-swapping");
+        }, 180);
+      }
+
+      function openLogin(mode) {
+        setModalTab(mode || "reader");
+        modal.hidden = false;
+        requestAnimationFrame(function () { modal.classList.add("is-open"); });
+        document.body.style.overflow = "hidden";
+        setTimeout(function () { document.getElementById("loginEmail").focus(); }, 300);
+      }
+
+      function closeLogin() {
+        modal.classList.remove("is-open");
+        document.body.style.overflow = "";
+        setTimeout(function () { modal.hidden = true; }, 300);
+      }
+
+      document.querySelectorAll("[data-open-login]").forEach(function (el) {
+        el.addEventListener("click", function (e) {
+          var mode = el.getAttribute("data-open-login");
+          if (currentSession && currentSession.user) {
+            if (mode === "creator") {
+              e.preventDefault();
+              window.location.href = "/studio";
+              return;
+            }
+            if (mode === "reader") {
+              e.preventDefault();
+              window.location.href = "/account";
+              return;
+            }
+          }
+          if (e.target.closest("a")) e.preventDefault();
+          openLogin(mode);
+          mobileNav.classList.remove("is-open");
+          menuToggle.setAttribute("aria-expanded", "false");
+        });
+      });
+
+      closeBtn.addEventListener("click", closeLogin);
+      modal.addEventListener("click", function (e) { if (e.target === modal) closeLogin(); });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && modal.classList.contains("is-open")) closeLogin();
+      });
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () { setModalTab(tab.dataset.tab); });
+      });
+
+      loginForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        clearLoginError();
+        var email = loginEmailInput.value.trim();
+        if (!email) {
+          showLoginError("Enter your email address.");
+          return;
+        }
+        if (!window.ScenaAuth) {
+          showLoginError("Auth module failed to load.");
+          return;
+        }
+        loginSubmit.disabled = true;
+        loginSubmit.textContent = "Sending…";
+        ScenaAuth.signInWithEmail(email, activeTab).then(function () {
+          loginForm.style.display = "none";
+          submitSuccess.classList.add("is-show");
+          var successText = submitSuccess.querySelector("p");
+          if (successText) {
+            successText.innerHTML = "<strong>Check your email</strong><br/>We sent a magic link to <strong>" + email + "</strong>.";
+          }
+        }).catch(function (err) {
+          showLoginError(err.message || "Could not send magic link.");
+          loginSubmit.disabled = false;
+          loginSubmit.textContent = "Send magic link";
+        });
+      });
+
+      menuToggle.addEventListener("click", function () {
+        var open = mobileNav.classList.toggle("is-open");
+        menuToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    })();
+  </script>
+  <script>
+    (function () {
+      var label = document.getElementById("scenaVersionLabel");
+      if (label && window.SCENA_VERSION && window.SCENA_VERSION.app) {
+        label.textContent = "v" + window.SCENA_VERSION.app;
+      }
+    })();
+  </script>
+  <script src="scena-logo.js?v=1"></script>
 </body>
 </html>

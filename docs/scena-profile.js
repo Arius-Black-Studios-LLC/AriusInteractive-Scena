@@ -1,5 +1,5 @@
 /**
- * Scena — reader/creator account profile (display name, username, pronouns, avatar).
+ * Arleco — reader/creator account profile (display name, username, pronouns, avatar).
  */
 (function () {
   var cache = {};

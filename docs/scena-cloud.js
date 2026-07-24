@@ -1,6 +1,6 @@
 /**
 
- * Scena — cloud sync (Supabase Postgres + Storage)
+ * Arleco — cloud sync (Supabase Postgres + Storage)
 
  * "Easy save": whole series JSON in studio_series, images in series-assets bucket.
 
@@ -14,7 +14,7 @@
 
     "Storage bucket \"series-assets\" was not found in the Supabase project this site is using. " +
 
-    "Confirm Netlify/env SCENA_CONFIG points at the same project where you created the bucket, " +
+    "Confirm Netlify/env ARLECO_CONFIG points at the same project where you created the bucket, " +
 
     "or run docs/supabase-cloud-setup.sql in that project's SQL editor.";
 
@@ -42,7 +42,7 @@
 
   function config() {
 
-    return window.SCENA_CONFIG || {};
+    return window.ARLECO_CONFIG || window.SCENA_CONFIG || {};
 
   }
 

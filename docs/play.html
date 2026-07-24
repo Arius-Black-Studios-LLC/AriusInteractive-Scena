@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reading — Scena</title>
+  <title>Reading — Arleco</title>
+  <meta name="description" content="Read a Arleco visual novel episode — make choices, track stats, and follow branching story paths." />
+  <meta name="robots" content="noindex, follow" />
+  <link rel="icon" href="scena-logo.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet" />
@@ -16,9 +19,9 @@
 
   <div class="player-shell" id="playerApp" hidden>
     <div class="player-topbar" id="playerTopbar">
-      <a class="player-back" id="playerBack" href="scena-design-preview.html">← Back</a>
+      <a class="player-back" id="playerBack" href="/">← Back</a>
       <span class="player-topbar-meta" id="playerMeta"></span>
-      <a class="player-account-link" id="playerAccountLink" href="account.html" hidden>Account</a>
+      <a class="player-account-link" id="playerAccountLink" href="/account" hidden>Account</a>
     </div>
     <div id="playerRoot"></div>
   </div>
@@ -64,7 +67,7 @@
         if (window.ScenaProgress && ScenaProgress.seriesMenuUrl) {
           return ScenaProgress.seriesMenuUrl(id);
         }
-        return "series.html?series=" + encodeURIComponent(id);
+        return "/series?series=" + encodeURIComponent(id);
       }
 
       function boot(userId, session) {
@@ -125,7 +128,7 @@
           var episode = payload.episode;
 
           if (fromStudio) {
-            back.href = "studio.html#/series/" + encodeURIComponent(series.id) + "/episodes";
+            back.href = "/studio#/series/" + encodeURIComponent(series.id) + "/episodes";
             back.textContent = "← Back to studio";
           } else {
             back.href = seriesMenuHref(series.id);

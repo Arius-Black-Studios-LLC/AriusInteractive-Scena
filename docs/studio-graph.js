@@ -1,5 +1,5 @@
 /**
- * Scena graph editor — Unity-style workspace: inspector | preview+graph | resources
+ * Arleco graph editor — Unity-style workspace: inspector | preview+graph | resources
  */
 (function () {
   function uid(prefix) {
@@ -530,7 +530,7 @@
     if (!bar || !window.ScenaLearnMascots || bar.dataset.ready === "1") return;
     bar.dataset.ready = "1";
     bar.innerHTML =
-      '<p class="learn-mascot-label">Scena mascots — click to cast with a neutral sprite</p>' +
+      '<p class="learn-mascot-label">Arleco mascots — click to cast with a neutral sprite</p>' +
       '<div class="learn-mascot-grid">' +
         ScenaLearnMascots.map(function (m) {
           return '<button type="button" class="learn-mascot-card" data-mascot-id="' + m.id + '" title="' + escapeAttr(m.tagline) + '">' +
@@ -2261,7 +2261,7 @@
 
   ScenaGraphEditor.prototype.renderAudioSection = function (node, data, isGraphRoot, isLogic) {
     var html = '<div class="inspector-section"><h4>Audio</h4>' +
-      '<p class="field-hint">Your library lives in the <strong>Audio</strong> tab → upload clips or use Scena defaults.</p>';
+      '<p class="field-hint">Your library lives in the <strong>Audio</strong> tab → upload clips or use Arleco defaults.</p>';
 
     if (!isLogic) {
       if (isGraphRoot) {
@@ -3082,7 +3082,7 @@
       var defaults = ScenaStore.listAudioAssets(this.series).filter(function (a) { return a.isDefault; });
       var custom = ScenaStore.listAudioAssets(this.series).filter(function (a) { return !a.isDefault; });
       if (defaults.length) {
-        listHtml += '<p class="resource-list-heading">Scena defaults</p>';
+        listHtml += '<p class="resource-list-heading">Arleco defaults</p>';
         defaults.forEach(function (a) {
           listHtml += self.renderAudioListItem(a);
         });
@@ -3201,7 +3201,7 @@
           '<h4>Audio library</h4>' +
           '<p>Upload MP3 or WAV clips for background music, voice acting, and sound effects.</p>' +
           '<label class="btn btn-primary btn-sm">+ Upload audio<input type="file" accept="audio/*" hidden id="resAudioQuickUpload"></label>' +
-          '<p class="field-hint">Scena defaults (left list) ship with every project. Assign clips on each beat under <strong>Audio</strong> in the inspector.</p>' +
+          '<p class="field-hint">Arleco defaults (left list) ship with every project. Assign clips on each beat under <strong>Audio</strong> in the inspector.</p>' +
         '</div>';
         this.resourcesDetail.innerHTML = html;
         this.bindAudioQuickUpload();
@@ -3484,7 +3484,7 @@
       var delAudio = this.resourcesDetail.querySelector("#resDeleteAudio");
       if (delAudio) delAudio.addEventListener("click", function () {
         if (asset.isDefault) {
-          self.onSaveError("Built-in Scena clips cannot be deleted.");
+          self.onSaveError("Built-in Arleco clips cannot be deleted.");
           return;
         }
         if (!window.confirm("Delete this audio clip?")) return;
@@ -4223,7 +4223,7 @@
               '<button type="button" class="btn btn-sm" id="inspectorAddBoundary">+ Episode boundary</button>' +
             '</div>' +
             '<p class="field-hint">Open <strong>Blocks</strong> to drag new beats onto the graph. Drag from a Next or Choice plug into blank space to spawn a connected beat.</p>' +
-            '<p class="field-hint">Upload audio in <strong>Assets</strong> — Scena defaults are included automatically.</p>');
+            '<p class="field-hint">Upload audio in <strong>Assets</strong> — Arleco defaults are included automatically.</p>');
       this.inspector.innerHTML = html;
       var addBoundary = this.inspector.querySelector("#inspectorAddBoundary");
       if (addBoundary) {

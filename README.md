@@ -1,4 +1,4 @@
-# Scena
+# Arleco
 
 Interactive fiction platform by **Arius Interactive** — creator studio, reader, and Conservatory learn mode.
 

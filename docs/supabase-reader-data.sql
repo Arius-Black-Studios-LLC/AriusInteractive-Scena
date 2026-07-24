@@ -1,4 +1,4 @@
--- Scena: shared reader data (comments, hearts, chapter progress)
+-- Arleco: shared reader data (comments, hearts, chapter progress)
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Run AFTER docs/supabase-setup.sql (profiles + auth).
 -- Safe to re-run: policies are dropped before recreate.

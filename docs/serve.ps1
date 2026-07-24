@@ -17,17 +17,32 @@ $Mime = @{
   ".woff2" = "font/woff2"
 }
 
+# Mirror Netlify clean URLs for local preview
+$Rewrites = @{
+  "studio"              = "studio.html"
+  "learn"               = "learn.html"
+  "play"                = "play.html"
+  "series"              = "series.html"
+  "account"             = "account.html"
+  "help"                = "help.html"
+  "about"               = "about.html"
+  "blog"                = "blog.html"
+  "contact"             = "contact.html"
+  "privacy"             = "privacy.html"
+  "terms"               = "terms.html"
+  "content-guidelines"  = "content-guidelines.html"
+}
+
 $Listener = New-Object System.Net.HttpListener
 $Listener.Prefixes.Add($Prefix)
 $Listener.Start()
 
 Write-Host ""
-Write-Host "Scena preview running" -ForegroundColor Green
-Write-Host "  Landing:  ${Prefix}scena-design-preview.html"
-Write-Host "  Account:  ${Prefix}account.html"
-Write-Host "  Landing:  ${Prefix}scena-design-preview.html"
-Write-Host "  Studio:   ${Prefix}studio.html"
-Write-Host "  Deploy:   see docs/DEPLOY.md for GitHub Pages"
+Write-Host "Arleco preview running" -ForegroundColor Green
+Write-Host "  Home:     ${Prefix}"
+Write-Host "  Studio:   ${Prefix}studio"
+Write-Host "  Account:  ${Prefix}account"
+Write-Host "  Deploy:   see docs/DOMAIN.md and docs/DEPLOY.md"
 Write-Host ""
 Write-Host "Press Ctrl+C to stop."
 Write-Host ""
@@ -40,7 +55,9 @@ try {
 
     $Relative = [Uri]::UnescapeDataString($Request.Url.LocalPath).TrimStart("/")
     if ([string]::IsNullOrWhiteSpace($Relative)) {
-      $Relative = "scena-design-preview.html"
+      $Relative = "index.html"
+    } elseif ($Rewrites.ContainsKey($Relative)) {
+      $Relative = $Rewrites[$Relative]
     }
 
     $File = Join-Path $Root ($Relative -replace "/", [IO.Path]::DirectorySeparatorChar)

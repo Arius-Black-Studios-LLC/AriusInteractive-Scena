@@ -1,5 +1,5 @@
 /**
- * Scena creator studio — local cache + Supabase cloud sync
+ * Arleco creator studio — local cache + Supabase cloud sync
  */
 (function () {
   var root = typeof globalThis !== "undefined" ? globalThis : window;
@@ -2127,7 +2127,7 @@
     },
 
     episodePlayUrl: function (seriesId, episodeId, from) {
-      var url = "play.html?series=" + encodeURIComponent(seriesId) +
+      var url = "/play?series=" + encodeURIComponent(seriesId) +
         "&episode=" + encodeURIComponent(episodeId);
       if (from) url += "&from=" + encodeURIComponent(from);
       return url;
@@ -2724,7 +2724,7 @@
     },
 
     seriesMenuUrl: function (seriesId) {
-      return "series.html?series=" + encodeURIComponent(seriesId);
+      return "/series?series=" + encodeURIComponent(seriesId);
     },
 
     normalizeEpisodes: function (series) {

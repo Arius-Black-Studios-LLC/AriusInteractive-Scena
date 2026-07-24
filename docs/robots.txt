@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://arleco.app/sitemap.xml
+
+Disallow: /studio
+Disallow: /account

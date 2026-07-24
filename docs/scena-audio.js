@@ -1,5 +1,5 @@
 /**
- * Scena — preview / reader audio (BGM loop + one-shot SFX/UI) with volume prefs.
+ * Arleco — preview / reader audio (BGM loop + one-shot SFX/UI) with volume prefs.
  */
 (function () {
   var PREFS_KEY = "scena.audio.prefs.v1";

@@ -1,5 +1,5 @@
 /**
- * Scena Conservatory — Celeste mascot + sample stage flats for lessons
+ * Arleco Conservatory — Celeste mascot + sample stage flats for lessons
  */
 (function () {
   window.ScenaLearnMascots = [

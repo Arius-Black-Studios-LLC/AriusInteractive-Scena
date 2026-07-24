@@ -1,4 +1,4 @@
--- Scena: minimal auth setup for Supabase SQL editor
+-- Arleco: minimal auth setup for Supabase SQL editor
 -- ═══════════════════════════════════════════════════════════════════════════
 -- RUN THIS FILE FIRST (before profile-fields, badges, or cloud setup).
 -- Dashboard → SQL → New query → paste entire file → Run

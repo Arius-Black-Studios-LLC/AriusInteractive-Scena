@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Creator studio — Scena</title>
+  <title>Creator studio — Arleco</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
@@ -17,9 +17,9 @@
   <div class="studio-shell" id="app" hidden>
     <header class="studio-topbar">
       <div class="studio-topbar-left">
-        <a class="studio-logo" href="scena-design-preview.html">
+        <a class="studio-logo" href="/">
           <span class="logo-mark" aria-hidden="true"></span>
-          <span class="logo-text">Scena</span>
+          <span class="logo-text">Arleco</span>
         </a>
         <span class="studio-topbar-tagline" style="color:var(--scena-text-faint);font-size:0.8125rem">Creator studio</span>
       </div>
@@ -33,8 +33,8 @@
       </div>
       <div class="studio-topbar-right">
         <span class="user-email" id="studioUserEmail"></span>
-        <a class="btn btn-ghost btn-sm" href="learn.html">Conservatory</a>
-        <a class="btn btn-ghost btn-sm" href="scena-design-preview.html">View site</a>
+        <a class="btn btn-ghost btn-sm" href="/learn">Conservatory</a>
+        <a class="btn btn-ghost btn-sm" href="/">View site</a>
         <button type="button" class="btn btn-sm" id="signOutBtn">Log out</button>
       </div>
     </header>
@@ -117,17 +117,17 @@
       }
 
       function sendToLogin() {
-        try { sessionStorage.setItem("scena_post_login", "studio.html"); } catch (e) {}
-        window.location.href = "scena-design-preview.html";
+        try { sessionStorage.setItem("scena_post_login", "/studio"); } catch (e) {}
+        window.location.href = "/"
       }
 
       if (!window.ScenaAuth || !ScenaAuth.isConfigured()) {
-        showError("Configure scena-config.js, then log in from the Scena landing page.");
+        showError("Configure scena-config.js, then log in from the Arleco landing page.");
         return;
       }
 
       if (ScenaAuth.isFileProtocol()) {
-        loading.innerHTML = "Open via <strong>http://127.0.0.1:5500/studio.html</strong> (run serve.ps1 first).";
+        loading.innerHTML = "Open via <strong>http://127.0.0.1:5500/studio</strong> (run serve.ps1 first).";
         return;
       }
 
@@ -158,7 +158,7 @@
 
       document.getElementById("signOutBtn").addEventListener("click", function () {
         ScenaAuth.signOut().then(function () {
-          window.location.href = "scena-design-preview.html";
+          window.location.href = "/"
         });
       });
     })();

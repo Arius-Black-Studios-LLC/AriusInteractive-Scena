@@ -1,6 +1,6 @@
 /**
 
- * Scena Learn — interactive editor lessons (Conservatory curriculum)
+ * Arleco Learn — interactive editor lessons (Conservatory curriculum)
 
  */
 
@@ -763,7 +763,7 @@
 
         "<p>Before the curtain rises, every player is cast and costumed.</p>" +
 
-        "<ol><li>Click a <strong>Scena mascot</strong> below — each one is a theater role with a transparent neutral sprite.</li>" +
+        "<ol><li>Click a <strong>Arleco mascot</strong> below — each one is a theater role with a transparent neutral sprite.</li>" +
 
         "<li>Select your character in the list — set <strong>Name</strong> and <strong>Color</strong> if you like.</li>" +
 
@@ -1247,7 +1247,7 @@
 
         "<p>A scene needs ambience, recorded lines, and one-shot cues.</p>" +
 
-        "<ol><li>Open the <strong>Audio library</strong> tab on the right — Scena defaults are already there. Use <strong>+ Upload</strong> to add your own clips anytime.</li>" +
+        "<ol><li>Open the <strong>Audio library</strong> tab on the right — Arleco defaults are already there. Use <strong>+ Upload</strong> to add your own clips anytime.</li>" +
 
         "<li>Select the opening beat <strong>Curtain</strong>. Under <strong>Audio</strong>, set <strong>Background music</strong> to <em>Theater hum</em> and <strong>Sound effect</strong> to <em>Curtain rustle</em>.</li>" +
 

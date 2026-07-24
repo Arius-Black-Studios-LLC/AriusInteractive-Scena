@@ -1,23 +1,25 @@
 /**
  * Netlify build step — writes docs/scena-config.js from environment variables.
+ * Exposes window.ARLECO_CONFIG (and SCENA_CONFIG alias for compatibility).
  */
 const fs = require("fs");
 const path = require("path");
 
-const supabaseUrl = process.env.SCENA_SUPABASE_URL;
-const supabaseAnonKey = process.env.SCENA_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.ARLECO_SUPABASE_URL || process.env.SCENA_SUPABASE_URL;
+const supabaseAnonKey = process.env.ARLECO_SUPABASE_ANON_KEY || process.env.SCENA_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(
-    "Skipping scena-config.js: set SCENA_SUPABASE_URL and SCENA_SUPABASE_ANON_KEY."
+    "Skipping scena-config.js: set ARLECO_SUPABASE_URL and ARLECO_SUPABASE_ANON_KEY (or SCENA_*)."
   );
   process.exit(0);
 }
 
 const redirect =
+  process.env.ARLECO_AUTH_REDIRECT_URL ||
   process.env.SCENA_AUTH_REDIRECT_URL ||
   (process.env.URL
-    ? process.env.URL.replace(/\/$/, "") + "/scena-design-preview.html"
+    ? process.env.URL.replace(/\/$/, "") + "/"
     : null);
 
 function esc(value) {
@@ -26,7 +28,7 @@ function esc(value) {
 
 const lines = [
   "/** Generated at deploy time — do not edit on Netlify builds. */",
-  "window.SCENA_CONFIG = {",
+  "window.ARLECO_CONFIG = {",
   '  supabaseUrl: "' + esc(supabaseUrl) + '",',
   '  supabaseAnonKey: "' + esc(supabaseAnonKey) + '",',
 ];
@@ -35,7 +37,7 @@ if (redirect) {
   lines.push('  authRedirectUrl: "' + esc(redirect) + '",');
 }
 
-lines.push("};", "");
+lines.push("};", "window.SCENA_CONFIG = window.ARLECO_CONFIG;", "");
 
 fs.writeFileSync(
   path.join(__dirname, "..", "docs", "scena-config.js"),

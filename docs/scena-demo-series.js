@@ -1,5 +1,5 @@
 /**
- * Scena — playable demo series for the public home page.
+ * Arleco — playable demo series for the public home page.
  */
 (function () {
   var NODE_SPACING = 280;
@@ -572,7 +572,7 @@
       if (window.ScenaStore && ScenaStore.episodePlayUrl) {
         return ScenaStore.episodePlayUrl(seriesId, episodeId);
       }
-      return "play.html?series=" + encodeURIComponent(seriesId) +
+      return "/play?series=" + encodeURIComponent(seriesId) +
         "&episode=" + encodeURIComponent(episodeId);
     },
 
@@ -581,11 +581,11 @@
         return ScenaProgress.seriesMenuUrl(seriesId);
       }
       var epId = this.firstEpisodeId(seriesId);
-      return epId ? this.episodePlayUrl(seriesId, epId) : "series.html?series=" + encodeURIComponent(seriesId);
+      return epId ? this.episodePlayUrl(seriesId, epId) : "/series?series=" + encodeURIComponent(seriesId);
     },
 
     seriesMenuUrl: function (seriesId) {
-      return "series.html?series=" + encodeURIComponent(seriesId);
+      return "/series?series=" + encodeURIComponent(seriesId);
     },
   };
 })();

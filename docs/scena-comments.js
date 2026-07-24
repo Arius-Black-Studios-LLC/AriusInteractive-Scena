@@ -1,5 +1,5 @@
 /**
- * Scena — episode comments with replies & reactions (Supabase + local fallback).
+ * Arleco — episode comments with replies & reactions (Supabase + local fallback).
  */
 (function () {
   var REACTIONS = ["❤️", "👍", "😂", "✨"];

@@ -1,4 +1,4 @@
--- Scena: public profile fields for comments & reader identity
+-- Arleco: public profile fields for comments & reader identity
 -- ═══════════════════════════════════════════════════════════════════════════
 -- STEP 2 — only run AFTER docs/supabase-setup.sql succeeds.
 -- If you see: relation "public.profiles" does not exist

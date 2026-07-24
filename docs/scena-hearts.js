@@ -1,5 +1,5 @@
 /**
- * Scena — episode hearts (Supabase + local fallback).
+ * Arleco — episode hearts (Supabase + local fallback).
  */
 (function () {
   var cache = {};

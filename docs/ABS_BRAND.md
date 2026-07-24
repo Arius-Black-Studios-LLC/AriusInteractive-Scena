@@ -1,8 +1,8 @@
-# Arius Interactive — Brand Reference (Scena operator)
+# Arius Interactive — Brand Reference (Arleco operator)
 
-> **Arius Black Studios is dissolved.** Scena is operated by **Arius Interactive** (not yet incorporated). Support: help@ariusinteractive.com
+> **Arius Black Studios is dissolved.** Arleco is operated by **Arius Interactive** (not yet incorporated). Support: help@ariusinteractive.com
 
-The ABS logo below is **legacy only** — do not use on new Scena surfaces.
+The ABS logo below is **legacy only** — do not use on new Arleco surfaces.
 
 ## Legacy: Arius Black Studios logo
 
@@ -62,10 +62,10 @@ The **circular emblem** (right side of the banner) can be cropped for:
 
 No separate icon file exists yet; crop from the master PNG or export a square asset when needed.
 
-### Scena and other products
+### Arleco and other products
 
-- **Scena** uses its own neutral, product-specific palette (see `docs/scena-design-preview.html` and `docs/VN_PLATFORM_DESIGN_SPEC.md`).
-- Use this ABS logo for studio attribution only, e.g. “Scena **by Arius Black Studios**” — not as the Scena product logo.
+- **Arleco** uses its own neutral, product-specific palette (see `docs//` and `docs/VN_PLATFORM_DESIGN_SPEC.md`).
+- Use this ABS logo for studio attribution only, e.g. “Scena **by Arius Black Studios**” — not as the Arleco product logo.
 
 ### Accessibility
 

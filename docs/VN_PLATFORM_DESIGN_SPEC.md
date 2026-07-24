@@ -1,6 +1,6 @@
-# Scena — Detailed Design Specification
+# Arleco — Detailed Design Specification
 
-**Product:** Scena  
+**Product:** Arleco  
 **Studio:** Arius Interactive  
 **Document version:** 0.3 (Draft)  
 **Target ship:** 4 weeks from project start  
@@ -53,7 +53,7 @@ Month 1 delivers the **creator studio** (login, series setup, graph editor, reso
 
 ### 1.3 Product name
 
-**Name:** **Scena** *(pronounced SCEE-nah)*
+**Name:** **Arleco** *(pronounced SCEE-nah)*
 
 From *scene* / stage — reader-friendly, episodic, and neutral enough for both cozy and grimdark series.
 
@@ -61,8 +61,8 @@ From *scene* / stage — reader-friendly, episodic, and neutral enough for both 
 
 | Usage | Value |
 |-------|-------|
-| Public brand | Scena |
-| Studio credit | Scena by Arius Interactive |
+| Public brand | Arleco |
+| Studio credit | Arleco by Arius Interactive |
 | Internal repo | `scena` |
 | Package / env prefix | `scena` (e.g. `scena-dev`, `SCENA_*` env vars) |
 | Domain (TBD) | `scena.app`, `scena.io`, or `readscena.com` — confirm availability before scaffold |
@@ -286,10 +286,10 @@ flowchart TD
 
 | Section | Content |
 |---------|---------|
-| Header | Scena logo, "Creator Login" link |
+| Header | Arleco logo, "Creator Login" link |
 | Hero | Tagline (*Stories you choose.*) + optional featured series (manual `featured = true` flag) |
 | Grid | Published series cards: thumbnail, title, short description, content flag chips |
-| Footer | "Scena by Arius Black Studios", terms placeholder |
+| Footer | "Arleco by Arius Black Studios", terms placeholder |
 
 **Series card data:** `thumbnail_url`, `title`, `short_description`, `content_flags[]`, `slug`
 
@@ -1023,7 +1023,7 @@ Display on series page as chips above episode list. No filtering on landing for 
 
 ### 20.2 Logo & wordmark
 
-**Wordmark:** `Scena` set in **Fraunces** (600 weight), tight tracking (`-0.02em`).
+**Wordmark:** `Arleco` set in **Fraunces** (600 weight), tight tracking (`-0.02em`).
 
 **Mark (icon):** A minimal **proscenium frame** — an open rectangle with a slightly wider top bar, suggesting a stage opening. Single stroke, no fill. Used alone at favicon sizes; paired with wordmark in header.
 
@@ -1130,7 +1130,7 @@ Stories never inherit this frame inside the player — full-bleed art only.
 #### Header (gallery)
 
 ```
-[ ◻ Scena ]                    Discover    Creator Login
+[ ◻ Arleco ]                    Discover    Creator Login
 ```
 
 - Height `64px`, white surface, bottom border `--scena-border`
@@ -1181,7 +1181,7 @@ Studio uses **DM Sans only** (no Fraunces) — work mode, not marketing mode.
 
 #### Landing `/`
 
-1. **Header** — Scena wordmark + Creator Login  
+1. **Header** — Arleco wordmark + Creator Login  
 2. **Hero (compact)** — Fraunces H1: *Stories you choose.* One line subcopy. No illustration — whitespace is the hero.  
 3. **Featured row** (optional, manual) — 1–3 larger cards with stage-frame accent  
 4. **Discover grid** — all live series  
@@ -1253,7 +1253,7 @@ shadcn/ui theme: map `primary` → `--scena-accent`, `background` → `--scena-b
 
 ### 20.13 Design reference
 
-Open **`docs/scena-design-preview.html`** in a browser for a static mock of the landing page, tokens, and components.
+Open **`docs//`** in a browser for a static mock of the landing page, tokens, and components.
 
 ---
 
@@ -1365,7 +1365,7 @@ Open **`docs/scena-design-preview.html`** in a browser for a static mock of the 
 
 | Term | Definition |
 |------|------------|
-| **Scena** | The platform — browser studio + public reader for episodic visual novels |
+| **Arleco** | The platform — browser studio + public reader for episodic visual novels |
 | **Series** | A complete VN title; one graph; many episodes |
 | **Episode** | A published chapter — a start/end range within the graph |
 | **Scene node** | Dialogue + visuals |
@@ -1384,8 +1384,8 @@ Open **`docs/scena-design-preview.html`** in a browser for a static mock of the 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-07-17 | Arius Black Studios / AI draft | Initial specification from planning sessions |
-| 0.2 | 2026-07-17 | Arius Black Studios / AI draft | Product name set to **Scena**; repo/env prefixes, localStorage key, branding updated |
-| 0.3 | 2026-07-17 | Arius Black Studios / AI draft | Full visual design system (§20); `scena-design-preview.html` mock |
+| 0.2 | 2026-07-17 | Arius Black Studios / AI draft | Product name set to **Arleco**; repo/env prefixes, localStorage key, branding updated |
+| 0.3 | 2026-07-17 | Arius Black Studios / AI draft | Full visual design system (§20); `/` mock |
 
 ---
 

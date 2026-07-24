@@ -1,6 +1,6 @@
 /**
 
- * Scena — reader save data: multiple playthroughs per series, chapter locks, cloud sync.
+ * Arleco — reader save data: multiple playthroughs per series, chapter locks, cloud sync.
 
  */
 
@@ -1300,7 +1300,7 @@
 
     seriesMenuUrl: function (seriesId) {
 
-      return "series.html?series=" + encodeURIComponent(seriesId);
+      return "/series?series=" + encodeURIComponent(seriesId);
 
     },
 
@@ -1308,7 +1308,7 @@
 
     playUrl: function (seriesId, episodeId, restart) {
 
-      var url = "play.html?series=" + encodeURIComponent(seriesId) +
+      var url = "/play?series=" + encodeURIComponent(seriesId) +
 
         "&episode=" + encodeURIComponent(episodeId);
 

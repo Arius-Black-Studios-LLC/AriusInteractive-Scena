@@ -1,5 +1,5 @@
 /**
- * Scena — public discover catalog (demos + published creator series).
+ * Arleco — public discover catalog (demos + published creator series).
  */
 (function () {
   function escapeHtml(s) {
@@ -136,7 +136,7 @@
   function entryFromSeries(series, opts) {
     opts = opts || {};
     var demoMeta = DEMO_META[series.id] || null;
-    var desc = series.shortDescription || (demoMeta && demoMeta.description) || "Episodic visual novel on Scena.";
+    var desc = series.shortDescription || (demoMeta && demoMeta.description) || "Episodic visual novel on Arleco.";
     var thumbStyle = series.thumbnailDataUrl
       ? (' style="background-image:url(' + escapeAttr(series.thumbnailDataUrl) + ');background-size:cover;background-position:center;background-repeat:no-repeat"')
       : "";
@@ -152,7 +152,7 @@
             ? ScenaStore.isEpisodePublic(ep)
             : ep.isLive;
         }).length,
-      href: "series.html?series=" + encodeURIComponent(series.id),
+      href: "/series?series=" + encodeURIComponent(series.id),
       cover: coverKey(series, demoMeta, opts.index || 0),
       thumbStyle: thumbStyle,
       flags: flagLabels(series, demoMeta),

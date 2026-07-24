@@ -1,4 +1,4 @@
--- Scena: creator badges & stats on profiles
+-- Arleco: creator badges & stats on profiles
 -- Run once in Supabase Dashboard → SQL (after supabase-setup.sql)
 
 alter table public.profiles
