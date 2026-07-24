@@ -1,3 +1,4 @@
+import { getLessonMeta, listLessonMeta, type LessonCatalogEntry } from "../../domain/learn/lessonCatalog";
 import type {
   LegacyLearnLesson,
   LessonMeta,
@@ -5,30 +6,23 @@ import type {
 } from "../../domain/learn/types";
 import type { LearnPort, LearnSandboxHandle } from "../ports/LearnPort";
 
-function toMeta(lesson: LegacyLearnLesson): LessonMeta {
-  return {
-    id: lesson.id,
-    title: lesson.title,
-    category: lesson.category,
-    order: lesson.order,
-    summary: lesson.summary,
-  };
+function mergeLesson(legacy: LegacyLearnLesson, meta?: LessonCatalogEntry): LegacyLearnLesson {
+  if (!meta) return legacy;
+  return { ...legacy, ...meta };
 }
 
 export const learnAdapter: LearnPort = {
-  listLessons() {
-    const lessons = (window.ScenaLearnLessons || []) as LegacyLearnLesson[];
-    return lessons
-      .slice()
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map(toMeta);
+  listLessons(): LessonMeta[] {
+    return listLessonMeta();
   },
 
-  getLesson(id) {
-    const lesson = (window.ScenaLearnLessons || []).find((l) => l.id === id) as
+  getLesson(id: string): LegacyLearnLesson | null {
+    const meta = getLessonMeta(id);
+    const legacy = (window.ScenaLearnLessons || []).find((lesson) => lesson.id === id) as
       | LegacyLearnLesson
       | undefined;
-    return lesson ?? null;
+    if (!legacy) return null;
+    return mergeLesson(legacy, meta);
   },
 
   createSandbox(container, lesson, onChange) {

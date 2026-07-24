@@ -105,7 +105,11 @@ declare global {
       ) => void;
       _defaultToast?: (msg: string) => void;
     };
-    ScenaStudio?: { start: (session: LegacySession) => void };
+    ScenaStudio?: {
+      start: (session: LegacySession) => void;
+      navigate?: (hashPath: string) => void;
+      toast?: (message: string) => void;
+    };
     ScenaFeedback?: {
       mountHomepage: (id: string) => void;
       fetchPublicReviews: () => Promise<unknown[]>;

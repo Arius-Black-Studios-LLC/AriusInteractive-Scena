@@ -1,15 +1,14 @@
 import type { LegacySession } from "../globals.d.ts";
 import { badgeAdapter } from "./badgeAdapter";
 import { learnAdapter } from "./learnAdapter";
+import { studioAdapter } from "./studioAdapter";
 
 export { badgeAdapter } from "./badgeAdapter";
 export { learnAdapter } from "./learnAdapter";
+export { studioAdapter } from "./studioAdapter";
 
-export function startStudio(session: LegacySession): void {
-  if (!window.ScenaStudio?.start) {
-    throw new Error("Studio modules failed to load.");
-  }
-  window.ScenaStudio.start(session);
+export function startStudio(session: LegacySession): Promise<void> {
+  return studioAdapter.boot(session);
 }
 
 export function mountHomepageReviews(anchorId: string): void {

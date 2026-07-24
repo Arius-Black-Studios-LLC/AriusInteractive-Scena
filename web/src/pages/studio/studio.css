@@ -10,3 +10,7 @@
   color: var(--scena-text-faint, var(--faint));
   font-size: 0.8125rem;
 }
+
+.studio-shell {
+  min-height: 100vh;
+}

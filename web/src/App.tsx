@@ -20,7 +20,7 @@ import { LearnLessonPage } from "./pages/learn/LearnLessonPage";
 import { PlayPage } from "./pages/PlayPage";
 import { SeriesPage } from "./pages/SeriesPage";
 import { StaticPage } from "./pages/StaticPage";
-import { StudioPage } from "./pages/StudioPage";
+import { StudioLayout } from "./pages/studio/StudioLayout";
 import "./App.css";
 
 function ShellLayout() {
@@ -71,7 +71,7 @@ function AppRoutes() {
         <Route path="/series" element={<SeriesPage />} />
       </Route>
       <Route path="/play" element={<PlayPage />} />
-      <Route path="/studio/*" element={<StudioPage />} />
+      <Route path="/studio/*" element={<StudioLayout />} />
       <Route path="/account" element={<AccountPage />} />
       <Route path="/learn" element={<LearnLayout />}>
         <Route index element={<LearnCatalogPage />} />

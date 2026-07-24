@@ -34,12 +34,25 @@ The graph editor **looks the same** because it **is** the same editor — only t
 | **I** | Separate `BadgePort` and `LearnPort` |
 | **D** | Hooks/components → ports → adapters → legacy |
 
+### Studio (React shell + legacy workspace)
+
+| Layer | Path | Responsibility |
+|-------|------|----------------|
+| Port | `legacy/ports/StudioPort.ts` | `boot`, `navigate`, `toast` |
+| Adapter | `legacy/adapters/studioAdapter.ts` | Wraps `ScenaStudio` |
+| Context | `context/StudioContext.tsx` | Auth gate, bundle load, boot |
+| UI | `components/studio/*`, `pages/studio/StudioLayout.tsx` | Topbar, modals, mount points |
+| Workspace | `docs/studio-app.js` | Dashboard, graph, episodes (hash routes) |
+
+### Lesson data (`domain/learn/lessonCatalog.ts`)
+
+All 18 Conservatory lessons — id, title, category, order, mode, summary — live in TypeScript. Legacy `learn-lessons.js` still provides `setup`, `validate`, and `instructions`.
+
 ### Next migration slices
 
-1. Extract lesson **metadata** from `learn-lessons.js` → typed TS (keep setup/validate in legacy)
-2. Port badge grid to React (read progress via `BadgePort`)
-3. **Studio** — same pattern: React shell + `StudioPort` + legacy graph
-4. **Graph editor** last — or permanent legacy widget behind `GraphEditorPort`
+1. Extract lesson **instructions** to TS or MD
+2. React Router paths for studio (`/studio/series/:id/graph`) instead of hash
+3. **Graph editor** last — legacy widget behind `GraphEditorPort`
 
 ## User data preserved
 

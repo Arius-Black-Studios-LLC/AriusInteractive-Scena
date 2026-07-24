@@ -5,6 +5,7 @@ export type LessonMeta = {
   category: string;
   order: number;
   summary: string;
+  mode?: "graph" | "resources";
 };
 
 export type LessonValidationResult = {

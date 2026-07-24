@@ -1377,6 +1377,8 @@
   }
 
   window.ScenaStudio = {
+    navigate: navigate,
+    toast: toast,
     start: function (session) {
       userId = session.user.id;
       userEmail = session.user.email || "";
