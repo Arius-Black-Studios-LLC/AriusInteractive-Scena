@@ -1,0 +1,7 @@
+.learn-loading {
+  min-height: 50vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+}

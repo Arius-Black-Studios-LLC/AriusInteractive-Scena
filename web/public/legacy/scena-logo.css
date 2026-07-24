@@ -1,0 +1,64 @@
+/* Arleco — logo mark (app icon + wordmark) */
+.logo,
+.studio-logo,
+.modal-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--scena-text, #141414);
+  flex-shrink: 0;
+}
+
+.logo-text,
+.studio-logo > span:not(.logo-mark),
+.modal-logo > span:not(.logo-mark) {
+  font-family: var(--font-display, "Fraunces", Georgia, serif);
+  font-weight: 600;
+  font-size: 1.375rem;
+  letter-spacing: 0.01em;
+}
+
+.studio-logo > span:not(.logo-mark) {
+  font-size: 1.125rem;
+}
+
+.modal-logo > span:not(.logo-mark) {
+  font-size: 1.125rem;
+}
+
+.logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+}
+
+.logo-mark .logo-img,
+.logo-mark .logo-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.logo:hover .logo-mark,
+.studio-logo:hover .logo-mark,
+.modal-logo:hover .logo-mark {
+  transform: scale(1.06);
+  filter: drop-shadow(0 3px 10px rgba(124, 17, 40, 0.25));
+}
+
+.modal-logo .logo-mark {
+  width: 28px;
+  height: 28px;
+}
+
+.studio-topbar .logo-mark {
+  width: 28px;
+  height: 28px;
+}

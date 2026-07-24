@@ -1,3 +1,7 @@
 [build]
-  publish = "docs"
-  command = "node scripts/write-scena-config.js"
+  base = "web"
+  command = "npm ci && npm run build"
+  publish = "web/dist"
+
+[build.environment]
+  NODE_VERSION = "20"

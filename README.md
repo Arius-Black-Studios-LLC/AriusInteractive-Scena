@@ -25,6 +25,8 @@ Fill in Supabase URL, anon key, and auth redirect URL. **Never commit** `scena-c
 
 Push to `main` on GitHub — Actions publishes the `docs/` folder to GitHub Pages. Full steps: **`docs/DEPLOY.md`**.
 
+**React rewrite:** see **`REACT_REWRITE.md`** on the `react-rewrite` branch (`web/` app).
+
 ## Version control
 
 Git workflow, tagging, and branches: **`VERSIONING.md`**. Release notes: **`CHANGELOG.md`**.
