@@ -1,58 +1,146 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://arleco.app/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/blog</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/blog/what-is-a-visual-novel.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/blog/how-to-write-branching-story.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/blog/publish-interactive-fiction-online.html</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/learn</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/help</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/about</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/content-guidelines</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/privacy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>https://arleco.app/terms</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-</urlset>
+<?xml version="1.0" encoding="UTF-8"?>
+
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <url>
+
+    <loc>https://arleco.app/</loc>
+
+    <changefreq>weekly</changefreq>
+
+    <priority>1.0</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog</loc>
+
+    <changefreq>weekly</changefreq>
+
+    <priority>0.9</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/what-is-a-visual-novel.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.8</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/how-to-write-branching-story.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.8</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/publish-interactive-fiction-online.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.8</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/how-to-make-a-visual-novel.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.9</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/best-visual-novel-engines-compared.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.9</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/blog/visual-novel-development-checklist.html</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.9</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/learn</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.8</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/help</loc>
+
+    <changefreq>monthly</changefreq>
+
+    <priority>0.6</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/about</loc>
+
+    <changefreq>yearly</changefreq>
+
+    <priority>0.5</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/content-guidelines</loc>
+
+    <changefreq>yearly</changefreq>
+
+    <priority>0.5</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/privacy</loc>
+
+    <changefreq>yearly</changefreq>
+
+    <priority>0.3</priority>
+
+  </url>
+
+  <url>
+
+    <loc>https://arleco.app/terms</loc>
+
+    <changefreq>yearly</changefreq>
+
+    <priority>0.3</priority>
+
+  </url>
+
+</urlset>
+

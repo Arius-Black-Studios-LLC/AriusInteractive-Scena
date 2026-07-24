@@ -117,22 +117,102 @@
   margin-top: 6px;
 }
 
-.scena-article-body a {
+.scena-article-body a:not(.btn) {
   color: var(--scena-accent, #7c1128);
 }
 
 .scena-article-cta {
   margin-top: 36px;
-  padding: 20px 22px;
-  background: var(--scena-accent-soft, #f9ecef);
-  border: 1px solid rgba(124, 17, 40, 0.18);
+  padding: 22px 24px;
+  background: var(--scena-surface, #fff);
+  border: 1px solid rgba(124, 17, 40, 0.22);
   border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(26, 10, 14, 0.06);
 }
 
 .scena-article-cta p {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--scena-text, #141414);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.scena-article-cta .btn-primary {
+  background: var(--scena-accent, #7c1128);
+  border-color: var(--scena-accent, #7c1128);
+  color: #fff;
+  font-weight: 600;
+}
+
+.scena-article-cta .btn-primary:hover {
+  background: var(--scena-accent-hover, #5a0c1e);
+  border-color: var(--scena-accent-hover, #5a0c1e);
+  color: #fff;
+}
+
+.scena-blog-pillars {
+  display: grid;
+  gap: 28px;
+  margin: 32px 0 40px;
+}
+
+.scena-blog-pillar h2 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.scena-blog-pillar > p {
+  margin: 0 0 14px;
+  color: var(--scena-text-muted, #6b6b6b);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.scena-blog-roadmap {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--scena-border, #e5e3de);
+}
+
+.scena-blog-roadmap h2 {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.scena-blog-roadmap > p {
+  color: var(--scena-text-muted, #6b6b6b);
+  margin: 0 0 16px;
+  line-height: 1.65;
+}
+
+.scena-blog-roadmap ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--scena-text-muted, #6b6b6b);
+  line-height: 1.75;
+}
+
+.scena-blog-roadmap li + li {
+  margin-top: 6px;
+}
+
+.scena-blog-card--soon {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.scena-blog-card-soon {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--scena-text-faint, #9a9893);
+  margin-left: 8px;
 }
 
 .scena-breadcrumb {

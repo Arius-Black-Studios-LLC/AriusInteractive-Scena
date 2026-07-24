@@ -1,82 +1,293 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Blog — Arleco | Visual novels &amp; interactive fiction</title>
-  <meta name="description" content="Guides on reading and creating episodic visual novels and branching stories on Arleco — creator-made, browser-based interactive fiction." />
+
+  <title>Blog — Arleco | Visual novel development &amp; publishing</title>
+
+  <meta name="description" content="Guides for visual novel creators — writing, art, engines, publishing, and browser-based episodic stories. The blog indie VN developers find through Google." />
+
   <link rel="canonical" href="https://arleco.app/blog" />
+
   <meta property="og:site_name" content="Arleco" />
-  <meta property="og:title" content="Arleco Blog" />
-  <meta property="og:description" content="Guides for readers and creators of episodic visual novels." />
+
+  <meta property="og:title" content="Arleco Blog — for visual novel creators" />
+
+  <meta property="og:description" content="Development, writing, art, and publishing guides for interactive fiction creators." />
+
   <meta property="og:url" content="https://arleco.app/blog" />
+
   <link rel="icon" href="arleco-icon.png" type="image/png" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
+
   <link rel="stylesheet" href="studio.css?v=74" />
+
   <link rel="stylesheet" href="scena-logo.css?v=3" />
+
   <link rel="stylesheet" href="arleco-theme.css?v=1" />
+
   <link rel="stylesheet" href="scena-page.css?v=2" />
-  <link rel="stylesheet" href="blog.css?v=2" />
+
+  <link rel="stylesheet" href="blog.css?v=3" />
+
 </head>
+
 <body class="scena-page-body">
+
   <div class="scena-page-shell">
+
     <header class="studio-topbar">
+
       <div class="studio-topbar-left">
+
         <a class="studio-logo" href="/">
+
           <span class="logo-mark" aria-hidden="true"></span>
+
           <span class="logo-text">Arleco</span>
+
         </a>
+
         <span style="color:var(--scena-text-faint);font-size:0.8125rem">Blog</span>
+
       </div>
+
       <div class="studio-topbar-right">
+
         <a class="btn btn-ghost btn-sm" href="/">Discover</a>
+
         <a class="btn btn-ghost btn-sm is-active" href="/blog">Blog</a>
+
         <a class="btn btn-ghost btn-sm" href="/learn">Conservatory</a>
+
         <a class="btn btn-ghost btn-sm" href="/studio">Creator studio</a>
+
       </div>
+
     </header>
+
     <main class="scena-page-main scena-blog-main">
-      <h1>Arleco blog</h1>
-      <p class="scena-page-lede">Guides on episodic visual novels, branching plots, and publishing interactive fiction in the browser — hand-written stories, not AI slop.</p>
 
-      <div class="scena-blog-grid">
-        <a class="scena-blog-card" href="/blog/what-is-a-visual-novel.html">
-          <div class="scena-blog-card-meta">
-            <span class="scena-blog-card-tag">For readers</span>
-            <time datetime="2026-07-24">Jul 24, 2026</time>
-          </div>
-          <h2>What is a visual novel? A reader's guide</h2>
-          <p>Dialogue, choices, and chapters — how browser visual novels work and why they feel different from AI choose-your-adventure apps.</p>
-        </a>
+      <h1>For visual novel creators</h1>
 
-        <a class="scena-blog-card" href="/blog/how-to-write-branching-story.html">
-          <div class="scena-blog-card-meta">
-            <span class="scena-blog-card-tag">For creators</span>
-            <time datetime="2026-07-24">Jul 24, 2026</time>
-          </div>
-          <h2>How to write a branching story that still feels coherent</h2>
-          <p>Plot nodes, meaningful choices, and episode structure for interactive fiction writers using a graph editor.</p>
-        </a>
+      <p class="scena-page-lede">Practical guides for writers, artists, and indie developers building choice-based stories — not player news, not AI slop. Publish episodic visual novels in the browser with Arleco.</p>
 
-        <a class="scena-blog-card" href="/blog/publish-interactive-fiction-online.html">
-          <div class="scena-blog-card-meta">
-            <span class="scena-blog-card-tag">For creators</span>
-            <time datetime="2026-07-24">Jul 24, 2026</time>
-          </div>
-          <h2>How to publish interactive fiction online (without building an app)</h2>
-          <p>From first draft to live chapter: preview, validate, schedule releases, and grow a readership on the web.</p>
-        </a>
+
+
+      <section class="scena-blog-pillar" aria-labelledby="pillar-published">
+
+        <h2 id="pillar-published">Published</h2>
+
+        <p>Start here — then explore the roadmap below for what we are writing next.</p>
+
+        <div class="scena-blog-grid">
+
+          <a class="scena-blog-card" href="/blog/how-to-make-a-visual-novel.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Development</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>How to make a visual novel (complete guide)</h2>
+
+            <p>From concept to playable chapter — writing, art, branching, and shipping without drowning in scope.</p>
+
+          </a>
+
+
+
+          <a class="scena-blog-card" href="/blog/best-visual-novel-engines-compared.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Development</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>Best visual novel engines compared</h2>
+
+            <p>Ren'Py, Unity, Godot, TyranoBuilder, and browser-first tools — honest tradeoffs for indie creators.</p>
+
+          </a>
+
+
+
+          <a class="scena-blog-card" href="/blog/visual-novel-development-checklist.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Development</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>Visual novel development checklist</h2>
+
+            <p>Pre-production through launch — a printable list so nothing falls through the cracks.</p>
+
+          </a>
+
+
+
+          <a class="scena-blog-card" href="/blog/how-to-write-branching-story.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Writing</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>How to write a branching story that still feels coherent</h2>
+
+            <p>Plot nodes, meaningful choices, and episode structure for interactive fiction writers.</p>
+
+          </a>
+
+
+
+          <a class="scena-blog-card" href="/blog/publish-interactive-fiction-online.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Publishing</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>How to publish interactive fiction online (without building an app)</h2>
+
+            <p>Preview, validate, schedule releases, and grow a readership on the web.</p>
+
+          </a>
+
+
+
+          <a class="scena-blog-card" href="/blog/what-is-a-visual-novel.html">
+
+            <div class="scena-blog-card-meta">
+
+              <span class="scena-blog-card-tag">Interactive fiction</span>
+
+              <time datetime="2026-07-24">Jul 24, 2026</time>
+
+            </div>
+
+            <h2>What is a visual novel? A reader's guide</h2>
+
+            <p>Dialogue, choices, and chapters — useful context when you explain your project to players.</p>
+
+          </a>
+
+        </div>
+
+      </section>
+
+
+
+      <div class="scena-blog-pillars">
+
+        <section class="scena-blog-pillar" aria-labelledby="pillar-dev">
+
+          <h2 id="pillar-dev">Pillar: Development</h2>
+
+          <p>Engines, tooling, branching systems, and production checklists — highest SEO priority.</p>
+
+        </section>
+
+        <section class="scena-blog-pillar" aria-labelledby="pillar-writing">
+
+          <h2 id="pillar-writing">Pillar: Writing</h2>
+
+          <p>Dialogue, romance, villains, pacing episodic stories, and choices that matter.</p>
+
+        </section>
+
+        <section class="scena-blog-pillar" aria-labelledby="pillar-publishing">
+
+          <h2 id="pillar-publishing">Pillar: Publishing &amp; growth</h2>
+
+          <p>Where to publish, episodic releases, marketing with no budget, and getting your first 100 players.</p>
+
+        </section>
+
       </div>
+
+
+
+      <section class="scena-blog-roadmap" aria-labelledby="cornerstone-heading">
+
+        <h2 id="cornerstone-heading">Cornerstone articles (roadmap)</h2>
+
+        <p>We are building topical authority from day one on <strong>arleco.app</strong> — starting with posts creators actually search for:</p>
+
+        <ul>
+
+          <li>How to get players for your VN</li>
+
+          <li>Browser-based visual novels — why the web is the future</li>
+
+          <li>Best Ren'Py alternatives &amp; no-code story tools</li>
+
+          <li>Monetization models for visual novels</li>
+
+          <li>Can AI help write a visual novel? (ethical workflow for indies)</li>
+
+        </ul>
+
+        <p class="field-hint" style="margin-top:16px">New guides added regularly — follow the blog or open the studio to publish while we grow the library.</p>
+
+      </section>
+
+
+
+      <div class="scena-article-cta">
+
+        <p>Ready to publish?</p>
+
+        <a class="btn btn-primary btn-sm" href="/studio">Open creator studio</a>
+
+      </div>
+
+
 
       <nav class="scena-page-nav" aria-label="Related pages">
+
         <a href="/">Discover stories</a>
+
         <a href="/learn">The Conservatory</a>
+
         <a href="/help">Help center</a>
+
       </nav>
+
     </main>
+
   </div>
+
   <script src="scena-logo.js?v=3"></script>
+
 </body>
+
 </html>
+
+
