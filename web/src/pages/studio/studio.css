@@ -1,0 +1,16 @@
+.studio-loading {
+  min-height: 60vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.studio-topbar-tagline {
+  color: var(--scena-text-faint, var(--faint));
+  font-size: 0.8125rem;
+}
+
+.studio-shell {
+  min-height: 100vh;
+}

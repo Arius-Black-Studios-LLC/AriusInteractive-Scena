@@ -1,0 +1,17 @@
+.account-loading {
+  min-height: 50vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.account-tag {
+  color: var(--faint);
+  font-size: 0.8125rem;
+}
+
+.studio-body--solo .studio-main {
+  max-width: 720px;
+  margin: 0 auto;
+}
