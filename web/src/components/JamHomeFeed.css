@@ -6,43 +6,51 @@
   margin-bottom: 20px;
 }
 
-.jam-home-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.jam-home-group {
+.jam-home-featured {
   border: 1px solid var(--border, #e5e2dc);
-  border-radius: 14px;
-  background: var(--surface, #fff);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(124, 17, 40, 0.06) 0%, var(--surface, #fff) 120px);
   overflow: hidden;
 }
 
-.jam-home-group-head {
+.jam-home-featured-head {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border, #eee);
-  background: rgba(124, 17, 40, 0.03);
+  padding: 20px 20px 16px;
 }
 
-.jam-home-group-title {
-  font-size: 1.125rem;
+.jam-home-featured-head > div:first-of-type::before {
+  content: "Most active";
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent, #7c1128);
+  background: rgba(124, 17, 40, 0.1);
+}
+
+.jam-home-featured-title {
+  display: block;
+  font-size: 1.375rem;
   font-weight: 700;
   color: inherit;
   text-decoration: none;
 }
 
-.jam-home-group-title:hover {
+.jam-home-featured-title:hover {
   color: var(--accent, #7c1128);
 }
 
 .jam-home-tagline {
-  margin: 6px 0 8px;
-  font-size: 0.9375rem;
-  line-height: 1.45;
+  margin: 8px 0;
+  font-size: 1rem;
+  line-height: 1.5;
   color: var(--text, #222);
 }
 
@@ -64,6 +72,10 @@
   color: #0d7a4a;
 }
 
+.jam-home-phase--judging {
+  color: #8a5a00;
+}
+
 .jam-home-age {
   color: var(--accent, #7c1128);
   font-weight: 700;
@@ -73,6 +85,7 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--border, #eee);
 }
 
 .jam-home-entry {
@@ -80,7 +93,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 18px;
+  padding: 12px 20px;
   border-top: 1px solid var(--border, #f0eeea);
 }
 
@@ -112,13 +125,134 @@
   color: var(--faint, #666);
 }
 
+.jam-home-featured-foot {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border, #f0eeea);
+}
+
+.jam-home-empty {
+  margin: 0;
+  padding: 0 20px 20px;
+  font-size: 0.875rem;
+  color: var(--faint, #666);
+}
+
+.jam-home-others {
+  margin-top: 28px;
+}
+
+.jam-home-others-title {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.jam-home-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.jam-home-menu-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 92px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.jam-home-menu-glyph {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--accent, #7c1128);
+  background: rgba(124, 17, 40, 0.08);
+  border: 2px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.jam-home-menu-icon:hover .jam-home-menu-glyph,
+.jam-home-menu-icon--active .jam-home-menu-glyph {
+  border-color: rgba(124, 17, 40, 0.35);
+  background: rgba(124, 17, 40, 0.14);
+}
+
+.jam-home-menu-name {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: var(--text, #333);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jam-home-menu-hint {
+  margin: 14px 0 0;
+  font-size: 0.8125rem;
+  color: var(--faint, #666);
+}
+
+.jam-home-preview {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border, #e5e2dc);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+}
+
+.jam-home-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.jam-home-preview-head h4 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.jam-home-preview-copy {
+  margin: 12px 0 8px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--text, #222);
+}
+
+.jam-home-preview-theme {
+  margin: 0 0 12px;
+  font-size: 0.8125rem;
+  color: var(--faint, #666);
+}
+
+.jam-home-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 640px) {
-  .jam-home-group-head {
+  .jam-home-featured-head {
     flex-direction: column;
   }
 
   .jam-home-entry {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .jam-home-preview-head {
+    flex-direction: column;
   }
 }

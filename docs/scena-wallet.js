@@ -358,11 +358,7 @@
 
         window.history.replaceState({}, "", next);
 
-        return ScenaWallet.load(scopeId).then(function () {
-
-          return { purchased: true };
-
-        });
+        return Promise.resolve({ purchased: true });
 
       }
 
@@ -479,6 +475,12 @@
           });
 
         });
+
+      }).catch(function (err) {
+
+        console.warn("ScenaWallet.load:", err && err.message ? err.message : err);
+
+        return getWallet(scopeId);
 
       });
 

@@ -110,6 +110,19 @@
     if (current === normalized) render();
   }
 
+  function bindStudioHashLinks(root) {
+    if (!root) return;
+    root.querySelectorAll('a[href^="#/"]').forEach(function (a) {
+      if (a.dataset.studioNavBound === "1") return;
+      a.dataset.studioNavBound = "1";
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var href = a.getAttribute("href") || "";
+        navigate(href.replace(/^#/, ""));
+      });
+    });
+  }
+
   function formatDate(iso) {
     if (!iso) return "—";
     return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -1482,6 +1495,11 @@
       });
       bindLibraryAssetsPanel(root);
       bindLibrarySellModal();
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load assets' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        "</p>";
     });
   }
 
@@ -1493,6 +1511,9 @@
     var balancePromise = window.ScenaWallet
       ? ScenaWallet.load(userId).then(function (w) {
           if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+          return ScenaWallet.getBalance(userId);
+        }).catch(function (err) {
+          console.warn("Shop wallet load:", err && err.message ? err.message : err);
           return ScenaWallet.getBalance(userId);
         })
       : Promise.resolve(null);
@@ -1524,6 +1545,11 @@
         shopHtml: shopHtml,
       });
       bindLibraryShopPanel(root);
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load shop' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        " Try refreshing the page.</p>";
     });
   }
 
@@ -1760,6 +1786,8 @@
     }
 
     if (route.jamMode === "new") {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam form…</p></div>';
       loadJamFormBalance().then(function (balance) {
         main.innerHTML =
           '<div class="page page-jams">' +
@@ -1771,11 +1799,18 @@
             ScenaJams.renderForm({}, { balance: balance }) +
           "</div>";
         bindJamForm(main);
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not open jam form.") +
+          "</p></div>";
       });
       return;
     }
 
     if (route.jamMode === "edit" && route.jamId) {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam editor…</p></div>';
       ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
@@ -1799,11 +1834,18 @@
             "</div>";
           bindJamForm(main, jam);
         });
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not open jam editor.") +
+          "</p></div>";
       });
       return;
     }
 
     if (route.jamMode === "detail" && route.jamId) {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam…</p></div>';
       ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
@@ -1821,6 +1863,11 @@
           seriesList: seriesList,
         });
         bindJamDetail(main, jam, seriesList);
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not load jam.") +
+          "</p></div>";
       });
       return;
     }
@@ -1905,6 +1952,7 @@
         navigate(card.getAttribute("href").replace(/^#/, ""));
       });
     });
+    bindStudioHashLinks(root);
   }
 
   function bindJamForm(root, existingJam) {
@@ -1952,6 +2000,7 @@
         });
       });
     }
+    bindStudioHashLinks(root);
   }
 
   function bindJamDetail(root, jam, seriesList) {
@@ -2075,6 +2124,7 @@
         });
       });
     });
+    bindStudioHashLinks(root);
   }
 
   function escapeAttr(s) {

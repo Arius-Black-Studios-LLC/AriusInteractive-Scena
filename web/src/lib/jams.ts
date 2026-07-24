@@ -21,6 +21,24 @@ export type JamHomeFeedGroup = {
   submissions: JamHomeSubmission[];
 };
 
+export type JamHomeMenuItem = {
+  jamId: string;
+  jamTitle: string;
+  tagline: string;
+  taglinePreview: string;
+  theme: string;
+  phase: string;
+  prizePool: number;
+  ageRestricted: boolean;
+  href: string;
+  totalSubmissions: number;
+};
+
+export type JamHomeSpotlight = {
+  featured: JamHomeFeedGroup | null;
+  others: JamHomeMenuItem[];
+};
+
 export function formatJamPhase(phase: string): string {
   if (phase === "submissions") return "Open for entries";
   if (phase === "judging") return "Judging";
@@ -34,4 +52,11 @@ export function formatSubmittedWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function jamMenuIconLabel(title: string): string {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
 }

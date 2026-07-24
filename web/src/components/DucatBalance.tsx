@@ -9,7 +9,7 @@ type Props = {
 };
 
 export function DucatBalance({ className }: Props) {
-  const { balance, userId, refresh } = useDucatBalance();
+  const { balance, userId, loading, refresh } = useDucatBalance();
   const [open, setOpen] = useState(false);
   const [shopError, setShopError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -61,9 +61,11 @@ export function DucatBalance({ className }: Props) {
     };
   }, [open, userId, refresh]);
 
-  if (!userId || balance === null) return null;
+  if (!userId) return null;
 
-  const label = balance === 1 ? "1 Ducat" : `${balance.toLocaleString()} Ducats`;
+  const displayBalance = balance ?? 0;
+  const label =
+    displayBalance === 1 ? "1 Ducat" : `${displayBalance.toLocaleString()} Ducats`;
 
   return (
     <div className={`ducat-hud-wrap${className ? ` ${className}` : ""}`} ref={wrapRef}>
@@ -79,7 +81,9 @@ export function DucatBalance({ className }: Props) {
         <span className="ducat-hud-icon" aria-hidden="true">
           ◆
         </span>
-        <span className="ducat-hud-amount">{balance.toLocaleString()}</span>
+        <span className="ducat-hud-amount">
+          {loading && balance === null ? "…" : displayBalance.toLocaleString()}
+        </span>
       </button>
       {open ? (
         <div className="ducat-shop-popover" role="dialog" aria-label="Buy Ducats">

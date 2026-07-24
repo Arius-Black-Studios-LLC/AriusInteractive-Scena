@@ -396,7 +396,6 @@
     listHomeSubmissionFeed: function (opts) {
       opts = opts || {};
       var perJam = Math.max(1, parseInt(opts.perJam, 10) || 4);
-      var limit = Math.max(1, parseInt(opts.limit, 10) || 6);
       var rows = readAll().slice().map(migrateJam).filter(function (j) {
         return j.status === "published";
       });
@@ -404,44 +403,87 @@
       rows = rows.filter(function (j) {
         if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
         var phase = jamPhase(j);
-        return phase === "submissions" || phase === "judging" || phase === "upcoming";
+        if (phase !== "submissions" && phase !== "judging") return false;
+        return (j.submissions || []).length > 0;
       });
-      var groups = [];
-      rows.forEach(function (jam) {
+
+      function jamPopularityScore(jam) {
+        var subs = jam.submissions || [];
+        var likes = subs.reduce(function (sum, s) {
+          return sum + (s.likes || []).length;
+        }, 0);
+        var pool = jam.prizeEnabled ? prizePoolTotal(jam) : 0;
+        var phase = jamPhase(jam);
+        var score = subs.length * 100 + likes * 25 + Math.min(pool, 5000);
+        if (phase === "judging") score += 500;
+        return score;
+      }
+
+      function mapSubmissionPreview(jam, subs) {
+        return subs.slice(0, perJam).map(function (s) {
+          return {
+            id: s.id,
+            seriesTitle: s.seriesTitle,
+            episodeTitle: s.episodeTitle,
+            userName: s.userName,
+            submittedAt: s.submittedAt,
+            playHref: "/play?series=" + encodeURIComponent(s.seriesId) +
+              "&episode=" + encodeURIComponent(s.episodeId),
+            likes: (s.likes || []).length,
+          };
+        });
+      }
+
+      function toFeedGroup(jam) {
+        var phase = jamPhase(jam);
         var subs = (jam.submissions || []).slice().sort(function (a, b) {
+          if (phase === "judging") {
+            var la = (a.likes || []).length;
+            var lb = (b.likes || []).length;
+            if (lb !== la) return lb - la;
+          }
           return String(b.submittedAt || "").localeCompare(String(a.submittedAt || ""));
         });
-        if (!subs.length) return;
-        groups.push({
+        return {
           jamId: jam.id,
           jamTitle: jam.title,
           tagline: String(jam.tagline || jam.theme || "").trim(),
+          theme: jam.theme,
+          phase: phase,
+          prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+          ageRestricted: requiresAgeGate(jam),
+          href: "/studio#/jams/" + jam.id,
+          totalSubmissions: subs.length,
+          submissions: mapSubmissionPreview(jam, subs),
+        };
+      }
+
+      function toMenuItem(jam) {
+        var tagline = String(jam.tagline || jam.theme || "").trim();
+        return {
+          jamId: jam.id,
+          jamTitle: jam.title,
+          tagline: tagline,
+          taglinePreview: tagline.length > 120 ? tagline.slice(0, 117) + "…" : tagline,
           theme: jam.theme,
           phase: jamPhase(jam),
           prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
           ageRestricted: requiresAgeGate(jam),
           href: "/studio#/jams/" + jam.id,
-          totalSubmissions: subs.length,
-          submissions: subs.slice(0, perJam).map(function (s) {
-            return {
-              id: s.id,
-              seriesTitle: s.seriesTitle,
-              episodeTitle: s.episodeTitle,
-              userName: s.userName,
-              submittedAt: s.submittedAt,
-              playHref: "/play?series=" + encodeURIComponent(s.seriesId) +
-                "&episode=" + encodeURIComponent(s.episodeId),
-              likes: (s.likes || []).length,
-            };
-          }),
-        });
+          totalSubmissions: (jam.submissions || []).length,
+        };
+      }
+
+      if (!rows.length) return Promise.resolve({ featured: null, others: [] });
+
+      rows.sort(function (a, b) {
+        return jamPopularityScore(b) - jamPopularityScore(a);
       });
-      groups.sort(function (a, b) {
-        var aTime = (a.submissions[0] && a.submissions[0].submittedAt) || "";
-        var bTime = (b.submissions[0] && b.submissions[0].submittedAt) || "";
-        return String(bTime).localeCompare(String(aTime));
+
+      return Promise.resolve({
+        featured: toFeedGroup(rows[0]),
+        others: rows.slice(1).map(toMenuItem),
       });
-      return Promise.resolve(groups.slice(0, limit));
     },
 
     get: function (jamId, opts) {

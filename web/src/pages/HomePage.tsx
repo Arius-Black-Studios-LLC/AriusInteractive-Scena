@@ -14,7 +14,7 @@ import {
   type CatalogEntryExt,
   visibleEntries,
 } from "../lib/catalog";
-import type { JamHomeFeedGroup } from "../lib/jams";
+import type { JamHomeSpotlight } from "../lib/jams";
 import "./HomePage.css";
 
 const HERO_WORDS = ["choose", "branch", "discover", "play"];
@@ -46,7 +46,10 @@ export function HomePage() {
   const [search, setSearch] = useState("");
   const [entries, setEntries] = useState<CatalogEntryExt[]>(DEMO_SERIES);
   const [viewerIsAdult, setViewerIsAdult] = useState(false);
-  const [jamFeed, setJamFeed] = useState<JamHomeFeedGroup[]>([]);
+  const [jamSpotlight, setJamSpotlight] = useState<JamHomeSpotlight>({
+    featured: null,
+    others: [],
+  });
   const [heroWordIdx, setHeroWordIdx] = useState(0);
   const [heroWordChanging, setHeroWordChanging] = useState(false);
   const [stats, setStats] = useState<HeroStats>({
@@ -120,10 +123,13 @@ export function HomePage() {
       hideAdult: true,
       viewerIsAdult,
       perJam: 4,
-      limit: 5,
     })
-      .then((groups) => setJamFeed((groups as JamHomeFeedGroup[]) || []))
-      .catch(() => setJamFeed([]));
+      .then((data) =>
+        setJamSpotlight(
+          (data as JamHomeSpotlight) || { featured: null, others: [] },
+        ),
+      )
+      .catch(() => setJamSpotlight({ featured: null, others: [] }));
   }, [ready, viewerIsAdult]);
 
   useEffect(() => {
@@ -249,7 +255,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <JamHomeFeed groups={jamFeed} />
+      <JamHomeFeed spotlight={jamSpotlight} />
 
       {CATEGORY_SECTIONS.map((section) => {
         const picks = entriesForCategory(safeEntries, section.id, 4);

@@ -53,8 +53,8 @@ declare global {
       renderDiscoverGrid?: (el: HTMLElement, entries: CatalogEntry[], bundle: unknown) => void;
     };
     ScenaJams?: {
-      listHomeSubmissionFeed: (opts: Record<string, unknown>) => Promise<
-        Array<{
+      listHomeSubmissionFeed: (opts: Record<string, unknown>) => Promise<{
+        featured: {
           jamId: string;
           jamTitle: string;
           tagline: string;
@@ -73,8 +73,20 @@ declare global {
             playHref: string;
             likes: number;
           }>;
-        }>
-      >;
+        } | null;
+        others: Array<{
+          jamId: string;
+          jamTitle: string;
+          tagline: string;
+          taglinePreview: string;
+          theme: string;
+          phase: string;
+          prizePool: number;
+          ageRestricted: boolean;
+          href: string;
+          totalSubmissions: number;
+        }>;
+      }>;
     };
     ScenaStore?: Record<string, unknown>;
     ScenaProgress?: Record<string, unknown>;
