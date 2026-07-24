@@ -1,6 +1,3 @@
-[build]
-  publish = "docs"
-  command = "node scripts/write-scena-config.js"
-
-# After you connect arleco.app in Netlify → Domain management, set it as the primary domain.
-# Until then, scenavisualnovels.netlify.app still works; _redirects handles clean URLs on both.
+[build]
+  publish = "docs"
+  command = "node scripts/write-scena-config.js"
