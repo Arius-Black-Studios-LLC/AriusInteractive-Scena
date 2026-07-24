@@ -2,21 +2,9 @@ const SUPABASE_CDN =
   "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
 
 let configInjected = false;
+let configReady: Promise<void> | null = null;
 let supabaseLoaded = false;
 const loaded = new Set<string>();
-
-export function injectLegacyConfig(): void {
-  if (configInjected) return;
-  const cfg = {
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || "",
-    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
-    authRedirectUrl:
-      import.meta.env.VITE_AUTH_REDIRECT_URL || `${window.location.origin}/`,
-  };
-  window.ARLECO_CONFIG = cfg;
-  window.SCENA_CONFIG = cfg;
-  configInjected = true;
-}
 
 function loadScript(src: string): Promise<void> {
   if (loaded.has(src)) return Promise.resolve();
@@ -40,6 +28,41 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
+/** Loads docs/scena-config.js when Vite env vars are empty, then merges into window.ARLECO_CONFIG */
+export async function ensureLegacyConfig(): Promise<void> {
+  if (configInjected) return;
+  if (configReady) return configReady;
+
+  configReady = (async () => {
+    const hasEnv = Boolean(
+      import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY,
+    );
+    if (!hasEnv) {
+      try {
+        await loadScript("/legacy/scena-config.js");
+      } catch {
+        /* optional local config file */
+      }
+    }
+
+    const existing = window.ARLECO_CONFIG || window.SCENA_CONFIG || {};
+    const cfg = {
+      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || existing.supabaseUrl || "",
+      supabaseAnonKey:
+        import.meta.env.VITE_SUPABASE_ANON_KEY || existing.supabaseAnonKey || "",
+      authRedirectUrl:
+        import.meta.env.VITE_AUTH_REDIRECT_URL ||
+        existing.authRedirectUrl ||
+        `${window.location.origin}/`,
+    };
+    window.ARLECO_CONFIG = cfg;
+    window.SCENA_CONFIG = cfg;
+    configInjected = true;
+  })();
+
+  return configReady;
+}
+
 export async function loadSupabaseCdn(): Promise<void> {
   if (supabaseLoaded || window.supabase) {
     supabaseLoaded = true;
@@ -50,7 +73,7 @@ export async function loadSupabaseCdn(): Promise<void> {
 }
 
 export async function loadLegacyScripts(paths: string[]): Promise<void> {
-  injectLegacyConfig();
+  await ensureLegacyConfig();
   await loadSupabaseCdn();
   for (const file of paths) {
     await loadScript(`/legacy/${file}`);
@@ -114,12 +137,11 @@ export const LEGACY_BUNDLES = {
     "learn-mascots.js",
     "learn-app.js",
   ],
-  feedback: ["scena-feedback.js"],
 } as const;
 
-export async function loadLegacyBundle(
-  bundle: keyof typeof LEGACY_BUNDLES,
-): Promise<void> {
+export type LegacyBundle = keyof typeof LEGACY_BUNDLES;
+
+export async function loadLegacyBundle(bundle: LegacyBundle): Promise<void> {
   await loadLegacyScripts(["scena-auth.js", ...LEGACY_BUNDLES[bundle]]);
 }
 

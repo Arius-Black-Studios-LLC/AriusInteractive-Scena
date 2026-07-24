@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { injectLegacyConfig, loadLegacyScripts } from "../legacy/loadLegacy";
+import { loadLegacyScripts } from "../legacy/loadLegacy";
 import type { LegacySession } from "../legacy/globals.d.ts";
 
 type AuthContextValue = {
@@ -28,7 +28,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [configured, setConfigured] = useState(false);
 
   const refresh = useCallback(async () => {
-    injectLegacyConfig();
     await loadLegacyScripts(["scena-auth.js"]);
     const auth = window.ScenaAuth;
     if (!auth?.isConfigured()) {

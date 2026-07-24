@@ -2,6 +2,9 @@ import { FormEvent, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./LoginModal.css";
 
+const CONFIG_HINT =
+  "Supabase is not configured. Keys load automatically from docs/scena-config.js in dev — restart npm run dev after editing that file. For production, set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in web/.env or Netlify env vars.";
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -9,7 +12,7 @@ type Props = {
 };
 
 export function LoginModal({ open, onClose, postLogin }: Props) {
-  const { signIn } = useAuth();
+  const { signIn, configured, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +25,10 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
     setError("");
     setBusy(true);
     try {
+      if (!loading && !configured) {
+        setError(CONFIG_HINT);
+        return;
+      }
       let dest = postLogin;
       if (!dest) {
         try {
@@ -33,7 +40,8 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
       await signIn(email.trim(), "reader", dest);
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send magic link.");
+      const msg = err instanceof Error ? err.message : "Could not send magic link.";
+      setError(msg.includes("not configured") ? CONFIG_HINT : msg);
     } finally {
       setBusy(false);
     }

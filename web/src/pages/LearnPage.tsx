@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
+import { startLearnApp } from "../legacy/adapters";
 import "./LearnPage.css";
 
 export function LearnPage() {
@@ -15,8 +16,12 @@ export function LearnPage() {
   ]);
 
   useEffect(() => {
-    if (!ready || !window.ScenaLearnApp) return;
-    window.ScenaLearnApp.start(userId);
+    if (!ready) return;
+    try {
+      startLearnApp(userId);
+    } catch {
+      /* bundle race — effect re-runs when ready */
+    }
   }, [ready, userId]);
 
   if (error) {

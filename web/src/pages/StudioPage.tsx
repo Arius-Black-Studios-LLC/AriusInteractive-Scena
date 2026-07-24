@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
+import { startStudio } from "../legacy/adapters";
 import "./StudioPage.css";
 
 export function StudioPage() {
@@ -26,14 +27,14 @@ export function StudioPage() {
       navigate("/?login=studio", { replace: true });
       return;
     }
-    if (!ready || !window.ScenaStudio) return;
+    if (!ready) return;
 
     const store = window.ScenaStore as { ready?: (id: string) => Promise<void> };
     store.ready?.(userId)
       .catch(() => undefined)
       .finally(() => {
         try {
-          window.ScenaStudio?.start(session);
+          startStudio(session);
         } catch (err) {
           setBootError(err instanceof Error ? err.message : "Could not open studio.");
         }

@@ -76,8 +76,8 @@ declare global {
         ctx: Record<string, unknown>,
       ) => void;
     };
-    ScenaStudio?: { start: () => void };
-    ScenaLearnApp?: { start: () => void };
+    ScenaLearnApp?: { start: (userId: string | null) => void };
+    ScenaStudio?: { start: (session: LegacySession) => void };
     ScenaFeedback?: {
       mountHomepage: (id: string) => void;
       fetchPublicReviews: () => Promise<unknown[]>;

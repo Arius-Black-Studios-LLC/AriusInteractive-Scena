@@ -23,7 +23,6 @@ const LEGACY_JS = [
   "scena-wallet.js",
   "scena-marketplace.js",
   "scena-feedback.js",
-  "scena-version.js",
   "studio-store.js",
   "studio-app.js",
   "studio-graph.js",
@@ -58,6 +57,10 @@ function copyLegacyFromDocs(): Plugin {
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, path.join(legacyDir, file));
       }
+    }
+    const configSrc = path.join(docsDir, "scena-config.js");
+    if (fs.existsSync(configSrc)) {
+      fs.copyFileSync(configSrc, path.join(legacyDir, "scena-config.js"));
     }
     const iconSrc = path.join(docsDir, "arleco-icon.png");
     if (fs.existsSync(iconSrc)) {
