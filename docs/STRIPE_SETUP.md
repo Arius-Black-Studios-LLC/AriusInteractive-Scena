@@ -28,6 +28,9 @@ In **Supabase → SQL Editor**, run each file once:
 2. `docs/supabase-wallet.sql`
 3. `docs/supabase-wallet-security.sql`
 4. `docs/supabase-stripe-wallet.sql`
+5. `docs/supabase-jam-wallet.sql` (jam prize pool payout via `jam_payout_winner`)
+6. `docs/supabase-profile-ensure.sql` (creates missing profiles — fixes "Profile not found" on spend)
+7. `docs/supabase-profile-age.sql` (birth year + adult verification columns)
 
 After step 4, `purchase_ducat_pack` no longer exists and users **cannot** grant themselves Ducats via RPC.
 

@@ -18,6 +18,8 @@ export type CatalogEntry = {
   chaptersReadThisWeekLabel?: string;
   thumbStyle?: string;
   isDemo?: boolean;
+  genreKeys?: string[];
+  isAgeRestricted?: boolean;
 };
 
 declare global {

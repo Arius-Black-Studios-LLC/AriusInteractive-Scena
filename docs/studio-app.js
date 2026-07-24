@@ -66,6 +66,7 @@
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
       if (parts[1] === "new") return { view: "jams", jamMode: "new" };
+      if (parts[2] === "edit" && parts[1]) return { view: "jams", jamMode: "edit", jamId: parts[1] };
       if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
       return { view: "jams", jamMode: "list" };
     }
@@ -694,9 +695,14 @@
   }
 
   function renderSettingsForm(series) {
-    var flags = ScenaStore.CONTENT_FLAGS.map(function (f) {
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genreChips = ScenaStore.GENRE_TAGS.map(function (f) {
+      var on = (series.genres || []).indexOf(f.key) >= 0;
+      return '<button type="button" class="flag-chip' + (on ? " is-on" : "") + '" data-genre="' + f.key + '">' + f.label + '</button>';
+    }).join("");
+    var matureChips = ScenaStore.MATURE_CONTENT_FLAGS.map(function (f) {
       var on = (series.contentFlags || []).indexOf(f.key) >= 0;
-      return '<button type="button" class="flag-chip' + (on ? " is-on" : "") + '" data-flag="' + f.key + '">' + f.label + '</button>';
+      return '<button type="button" class="flag-chip flag-chip--mature' + (on ? " is-on" : "") + '" data-mature-flag="' + f.key + '">' + f.label + '</button>';
     }).join("");
 
     return (
@@ -732,8 +738,14 @@
             '</div>' +
           '</section>' +
           '<section class="form-section">' +
-            '<h2>Content flags</h2>' +
-            '<div class="flag-chips" id="flagChips">' + flags + '</div>' +
+            '<h2>Genres</h2>' +
+            '<p class="field-hint">Pick what kind of story this is — used for discover and search.</p>' +
+            '<div class="flag-chips" id="genreChips">' + genreChips + '</div>' +
+          '</section>' +
+          '<section class="form-section">' +
+            '<h2>Mature content (18+)</h2>' +
+            '<p class="field-hint">Any selection here marks the series as 18+ and hides it from readers who have not confirmed their age.</p>' +
+            '<div class="flag-chips" id="matureFlagChips">' + matureChips + '</div>' +
           '</section>' +
           renderReaderUiSection(series) +
           '<section class="form-section form-section--danger">' +
@@ -803,15 +815,15 @@
     form.querySelectorAll("input, textarea").forEach(function (el) {
       el.addEventListener("input", scheduleAutoSave);
     });
-    var flagChips = $("#flagChips");
-    if (flagChips) {
-      flagChips.querySelectorAll(".flag-chip").forEach(function (chip) {
+    [$("#genreChips"), $("#matureFlagChips")].forEach(function (chipRoot) {
+      if (!chipRoot) return;
+      chipRoot.querySelectorAll(".flag-chip").forEach(function (chip) {
         chip.addEventListener("click", function () {
           chip.classList.toggle("is-on");
           scheduleAutoSave();
         });
       });
-    }
+    });
 
     var presetCards = document.querySelectorAll("#uiPresetCards .ui-preset-card");
     if (presetCards.length) {
@@ -958,11 +970,18 @@
     if (slugEl) series.slug = ScenaStore.slugify(slugEl.value.trim() || series.title);
     if (shortEl) series.shortDescription = shortEl.value.trim();
     if (longEl) series.longDescription = longEl.value.trim();
+    series.genres = [];
     series.contentFlags = [];
-    var flagChips = $("#flagChips");
-    if (flagChips) {
-      flagChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
-        series.contentFlags.push(c.getAttribute("data-flag"));
+    var genreChips = $("#genreChips");
+    if (genreChips) {
+      genreChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
+        series.genres.push(c.getAttribute("data-genre"));
+      });
+    }
+    var matureChips = $("#matureFlagChips");
+    if (matureChips) {
+      matureChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
+        series.contentFlags.push(c.getAttribute("data-mature-flag"));
       });
     }
     if (form.querySelector("#readerUiSection")) collectReaderUi(form, series);
@@ -1411,6 +1430,7 @@
   }
 
   var libraryUiState = { tab: "assets", category: "", query: "", selectedId: "", shopCategory: "", shopQuery: "", shopSelectedId: "" };
+  var jamBrowseState = { genre: "all", keyword: "", sort: "date", phase: "all" };
 
   function listUserSeries() {
     return ScenaStore.listSeries(userId).filter(function (s) { return !s.templateSource; });
@@ -1719,6 +1739,39 @@
     }
   }
 
+  function handleJamNeedDucats(root, err, onRetry) {
+    if (!err || err.code !== "NEED_DUCATS") {
+      toast((err && err.message) || "Something went wrong.");
+      return false;
+    }
+    toast(err.message + " Buy Ducats below, then try again.");
+    var panel = root && $("#jamBuyDucatsPanel", root);
+    if (panel) {
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (window.ScenaWallet) {
+        ScenaWallet.bindPackButtons(panel, userId, function () {
+          toast("After payment completes, try again.");
+          if (onRetry) onRetry();
+        }, function (buyErr) {
+          toast((buyErr && buyErr.message) || "Purchase failed.");
+        });
+      }
+    } else {
+      navigate("/library/shop");
+    }
+    return true;
+  }
+
+  function loadJamFormBalance() {
+    return window.ScenaWallet
+      ? ScenaWallet.load(userId).then(function (w) {
+          if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+          return ScenaWallet.getBalance(userId);
+        })
+      : Promise.resolve(null);
+  }
+
   function renderJamsPage(main, route) {
     if (!window.ScenaJams) {
       main.innerHTML = '<div class="page"><p class="field-hint">Game jams module failed to load.</p></div>';
@@ -1726,13 +1779,7 @@
     }
 
     if (route.jamMode === "new") {
-      var balancePromise = window.ScenaWallet
-        ? ScenaWallet.load(userId).then(function (w) {
-            if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
-            return ScenaWallet.getBalance(userId);
-          })
-        : Promise.resolve(null);
-      balancePromise.then(function (balance) {
+      loadJamFormBalance().then(function (balance) {
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
@@ -1747,8 +1794,36 @@
       return;
     }
 
+    if (route.jamMode === "edit" && route.jamId) {
+      ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
+        if (!jam) {
+          main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
+          return;
+        }
+        if (jam.hostUserId !== userId) {
+          main.innerHTML = '<div class="page"><p class="field-hint">Only the host can edit this jam.</p></div>';
+          return;
+        }
+        loadJamFormBalance().then(function (balance) {
+          var published = jam.status === "published";
+          main.innerHTML =
+            '<div class="page page-jams">' +
+              '<div class="page-head">' +
+                '<div><h1>' + (published ? "Edit jam" : "Edit draft") + "</h1>" +
+                '<p>Update theme, rules, schedule, and entry settings.</p></div>' +
+                '<button type="button" class="btn btn-primary" id="jamSaveDraftBtn">Save changes</button>' +
+                ' <a class="btn btn-ghost" href="#/jams/' + escapeAttr(jam.id) + '">Back</a>' +
+              "</div>" +
+              ScenaJams.renderForm(jam, { balance: balance, published: published }) +
+            "</div>";
+          bindJamForm(main, jam);
+        });
+      });
+      return;
+    }
+
     if (route.jamMode === "detail" && route.jamId) {
-      ScenaJams.get(route.jamId).then(function (jam) {
+      ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
           return;
@@ -1769,34 +1844,89 @@
       return;
     }
 
-    ScenaJams.list({ publishedOnly: true }).then(function (published) {
+    ScenaJams.list({
+      publishedOnly: true,
+      genre: jamBrowseState.genre,
+      keyword: jamBrowseState.keyword,
+      sort: jamBrowseState.sort,
+      phase: jamBrowseState.phase,
+      hideAdult: true,
+      viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+    }).then(function (published) {
       ScenaJams.list({ hostUserId: userId }).then(function (mine) {
+        var browseOpts = {
+          genre: jamBrowseState.genre,
+          keyword: jamBrowseState.keyword,
+          sort: jamBrowseState.sort,
+          phase: jamBrowseState.phase,
+          canHost: true,
+        };
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
-              '<div><h1>Game jams</h1><p>Community events — create under your rules, optional Ducat rewards.</p></div>' +
+              '<div><h1>Game jams</h1><p>Browse by sprint week — filter by genre, prize pool, or keywords.</p></div>' +
               '<a class="btn btn-primary" href="#/jams/new">Host a jam</a>' +
             "</div>" +
-            (mine.length
-              ? '<section class="form-section"><h2>Your jams</h2>' +
+            (mine.filter(function (j) { return j.status === "draft"; }).length
+              ? '<section class="form-section"><h2>Your drafts</h2>' +
                   ScenaJams.renderList(mine.filter(function (j) { return j.status === "draft"; }), { canHost: true }) +
                 "</section>"
               : "") +
-            '<section class="form-section"><h2>Active &amp; upcoming</h2>' +
-              ScenaJams.renderList(published, { canHost: true }) +
+            '<section class="form-section"><h2>Browse jams</h2>' +
+              ScenaJams.renderBrowse(published, browseOpts) +
             "</section>" +
           "</div>";
-        main.querySelectorAll(".jam-card").forEach(function (card) {
-          card.addEventListener("click", function (e) {
-            e.preventDefault();
-            navigate(card.getAttribute("href").replace(/^#/, ""));
-          });
-        });
+        bindJamBrowse(main);
       });
     });
   }
 
-  function bindJamForm(root) {
+  function bindJamBrowse(root) {
+    function repaint() {
+      render();
+    }
+    root.querySelectorAll("[data-jam-genre]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        jamBrowseState.genre = btn.getAttribute("data-jam-genre") || "all";
+        repaint();
+      });
+    });
+    var search = $("#jamBrowseSearch", root);
+    if (search) {
+      search.addEventListener("change", function () {
+        jamBrowseState.keyword = search.value.trim();
+        repaint();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          jamBrowseState.keyword = search.value.trim();
+          repaint();
+        }
+      });
+    }
+    var sortSel = $("#jamBrowseSort", root);
+    if (sortSel) {
+      sortSel.addEventListener("change", function () {
+        jamBrowseState.sort = sortSel.value || "date";
+        repaint();
+      });
+    }
+    var phaseSel = $("#jamBrowsePhase", root);
+    if (phaseSel) {
+      phaseSel.addEventListener("change", function () {
+        jamBrowseState.phase = phaseSel.value || "all";
+        repaint();
+      });
+    }
+    root.querySelectorAll(".jam-card").forEach(function (card) {
+      card.addEventListener("click", function (e) {
+        e.preventDefault();
+        navigate(card.getAttribute("href").replace(/^#/, ""));
+      });
+    });
+  }
+
+  function bindJamForm(root, existingJam) {
     var form = $("#jamForm", root);
     if (!form) return;
     var prizeToggle = $("#jamPrizeEnabled", root);
@@ -1806,12 +1936,15 @@
         prizeFields.hidden = !prizeToggle.checked;
       });
     }
-    form.querySelectorAll("[data-jam-flag]").forEach(function (el) {
+    form.querySelectorAll("[data-jam-mature]").forEach(function (el) {
       el.addEventListener("change", function () {
-        if (el.getAttribute("data-jam-flag") === "sexual_content" && el.checked) {
-          var age = $("#jamAgeRestricted", root);
-          if (age) age.checked = true;
-        }
+        var note = $("#jamAutoAgeNote", root);
+        if (!note) return;
+        var any = false;
+        form.querySelectorAll("[data-jam-mature]").forEach(function (box) {
+          if (box.checked) any = true;
+        });
+        note.hidden = !any;
       });
     });
     var saveBtn = $("#jamSaveDraftBtn", root);
@@ -1826,8 +1959,11 @@
           return;
         }
         saveBtn.disabled = true;
-        ScenaJams.createDraft(userId, userProfile, spec).then(function (jam) {
-          toast("Jam saved — publish when ready.");
+        var savePromise = existingJam
+          ? ScenaJams.updateJam(userId, existingJam.id, spec)
+          : ScenaJams.createDraft(userId, userProfile, spec);
+        savePromise.then(function (jam) {
+          toast(existingJam ? "Jam updated." : "Jam saved — publish when ready.");
           navigate("/jams/" + jam.id);
         }).catch(function (err) {
           saveBtn.disabled = false;
@@ -1847,8 +1983,41 @@
           render();
         }).catch(function (err) {
           publishBtn.disabled = false;
-          toast((err && err.message) || "Could not publish jam.");
+          if (!handleJamNeedDucats(root, err, function () {
+            publishBtn.click();
+          })) {
+            toast((err && err.message) || "Could not publish jam.");
+          }
         });
+      });
+    }
+
+    var addPrizeBtn = $("#jamAddPrizeBtn", root);
+    if (addPrizeBtn) {
+      addPrizeBtn.addEventListener("click", function () {
+        var amountEl = $("#jamAddPrizeAmount", root);
+        var amount = amountEl ? amountEl.value : 0;
+        addPrizeBtn.disabled = true;
+        ScenaJams.addHostPrize(userId, jam.id, amount).then(function () {
+          toast("Prize pool increased.");
+          render();
+        }).catch(function (err) {
+          addPrizeBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            addPrizeBtn.click();
+          })) {
+            toast((err && err.message) || "Could not add Ducats.");
+          }
+        });
+      });
+    }
+
+    var buyPanel = $("#jamBuyDucatsPanel", root);
+    if (buyPanel && window.ScenaWallet) {
+      ScenaWallet.bindPackButtons(buyPanel, userId, function () {
+        toast("After payment completes, try again.");
+      }, function (err) {
+        toast((err && err.message) || "Purchase failed.");
       });
     }
 
@@ -1894,7 +2063,11 @@
           render();
         }).catch(function (err) {
           submitBtn.disabled = false;
-          toast((err && err.message) || "Could not submit.");
+          if (!handleJamNeedDucats(root, err, function () {
+            submitBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit.");
+          }
         });
       });
     }

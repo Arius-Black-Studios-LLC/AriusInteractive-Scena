@@ -377,6 +377,13 @@
 
       return (
         '<div class="marketplace-panel">' +
+          (window.ScenaWallet
+            ? '<section class="marketplace-ducat-buy">' +
+                '<h3 class="marketplace-ducat-buy-title">Buy Ducats</h3>' +
+                '<p class="field-hint">Top up your wallet for chapters, marketplace assets, and jam prizes.</p>' +
+                ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) +
+              "</section>"
+            : "") +
           '<div class="marketplace-toolbar">' +
             '<input type="search" class="marketplace-search" placeholder="Search assets…" value="' + escapeAttr(opts.query || "") + '">' +
             (balance != null

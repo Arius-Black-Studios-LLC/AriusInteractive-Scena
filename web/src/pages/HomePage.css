@@ -409,6 +409,33 @@
   text-decoration: none;
 }
 
+.home-category-section .section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.home-category-section h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.discover-grid--rail {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.home-adult-section {
+  border-top: 1px solid var(--border, #eee);
+  padding-top: 48px;
+}
+
+.filter-chip--adult.is-active {
+  border-color: #7c1128;
+  color: #7c1128;
+}
+
 @media (max-width: 900px) {
   .featured-grid {
     grid-template-columns: 1fr;

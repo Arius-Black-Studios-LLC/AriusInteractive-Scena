@@ -208,6 +208,7 @@
       thumbnailDataUrl: "",
       bannerDataUrl: "",
       contentFlags: [],
+      genres: [],
       metrics: [],
       assets: [],
       characterProfiles: [],
@@ -1930,16 +1931,97 @@
   }
 
   window.ScenaStore = {
-    CONTENT_FLAGS: [
+    GENRE_TAGS: [
+      { key: "slice_of_life", label: "Slice of life" },
       { key: "romance", label: "Romance" },
-      { key: "violence", label: "Violence" },
+      { key: "comedy", label: "Comedy" },
+      { key: "scifi", label: "Sci-fi" },
+      { key: "fantasy", label: "Fantasy" },
       { key: "horror", label: "Horror" },
-      { key: "sexual_content", label: "Sexual content" },
-      { key: "strong_language", label: "Strong language" },
+      { key: "mystery", label: "Mystery" },
+      { key: "drama", label: "Drama" },
+      { key: "suggestive_themes", label: "Suggestive themes" },
+    ],
+
+    MATURE_CONTENT_FLAGS: [
+      { key: "sexual_content", label: "Sexual themes" },
       { key: "gore", label: "Gore" },
+      { key: "nudity", label: "Nudity" },
+      { key: "violence", label: "Violence" },
       { key: "substance_use", label: "Substance use" },
       { key: "self_harm", label: "Self-harm themes" },
+      { key: "strong_language", label: "Strong language" },
     ],
+
+    /** @deprecated Use GENRE_TAGS + MATURE_CONTENT_FLAGS */
+    CONTENT_FLAGS: [
+      { key: "slice_of_life", label: "Slice of life" },
+      { key: "romance", label: "Romance" },
+      { key: "comedy", label: "Comedy" },
+      { key: "scifi", label: "Sci-fi" },
+      { key: "fantasy", label: "Fantasy" },
+      { key: "horror", label: "Horror" },
+      { key: "mystery", label: "Mystery" },
+      { key: "drama", label: "Drama" },
+      { key: "suggestive_themes", label: "Suggestive themes" },
+      { key: "sexual_content", label: "Sexual themes" },
+      { key: "gore", label: "Gore" },
+      { key: "nudity", label: "Nudity" },
+      { key: "violence", label: "Violence" },
+      { key: "substance_use", label: "Substance use" },
+      { key: "self_harm", label: "Self-harm themes" },
+      { key: "strong_language", label: "Strong language" },
+    ],
+
+    genreTagKeys: function () {
+      return ScenaStore.GENRE_TAGS.map(function (g) { return g.key; });
+    },
+
+    matureFlagKeys: function () {
+      return ScenaStore.MATURE_CONTENT_FLAGS.map(function (g) { return g.key; });
+    },
+
+    isMatureContentKey: function (key) {
+      return ScenaStore.matureFlagKeys().indexOf(key) >= 0;
+    },
+
+    labelForGenre: function (key) {
+      var def = ScenaStore.GENRE_TAGS.find(function (g) { return g.key === key; });
+      return def ? def.label : key;
+    },
+
+    labelForMatureFlag: function (key) {
+      var def = ScenaStore.MATURE_CONTENT_FLAGS.find(function (g) { return g.key === key; });
+      return def ? def.label : key;
+    },
+
+    migrateSeriesTaxonomy: function (series) {
+      if (!series) return series;
+      if (!Array.isArray(series.genres)) series.genres = [];
+      if (!Array.isArray(series.contentFlags)) series.contentFlags = [];
+      var genreKeys = ScenaStore.genreTagKeys();
+      var matureKeys = ScenaStore.matureFlagKeys();
+      var legacy = series.contentFlags.slice();
+      legacy.forEach(function (key) {
+        if (genreKeys.indexOf(key) >= 0 && series.genres.indexOf(key) < 0) series.genres.push(key);
+        if (matureKeys.indexOf(key) >= 0 && series.contentFlags.indexOf(key) < 0) series.contentFlags.push(key);
+      });
+      series.contentFlags = series.contentFlags.filter(function (key) {
+        return matureKeys.indexOf(key) >= 0;
+      });
+      series.genres = series.genres.filter(function (key, idx, arr) {
+        return genreKeys.indexOf(key) >= 0 && arr.indexOf(key) === idx;
+      });
+      return series;
+    },
+
+    seriesIsAgeRestricted: function (series) {
+      if (!series) return false;
+      ScenaStore.migrateSeriesTaxonomy(series);
+      return (series.contentFlags || []).some(function (key) {
+        return ScenaStore.isMatureContentKey(key);
+      });
+    },
 
     ROUTE_ELSE_ID: ROUTE_ELSE_ID,
 
@@ -3042,6 +3124,7 @@
       } catch (e) {
         /* keep editor usable if episode sync fails on legacy data */
       }
+      this.migrateSeriesTaxonomy(series);
       return series;
     },
 

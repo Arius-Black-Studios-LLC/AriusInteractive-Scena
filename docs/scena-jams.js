@@ -31,7 +31,117 @@
   }
 
   function contentFlags() {
-    return (window.ScenaStore && ScenaStore.CONTENT_FLAGS) || [];
+    return (window.ScenaStore && ScenaStore.MATURE_CONTENT_FLAGS) || [];
+  }
+
+  function genreTagDefs() {
+    return (window.ScenaStore && ScenaStore.GENRE_TAGS) || [];
+  }
+
+  function migrateJam(jam) {
+    if (!jam) return jam;
+    if (!Array.isArray(jam.genres)) jam.genres = [];
+    if (!Array.isArray(jam.contentFlags)) jam.contentFlags = [];
+    if (!jam.keywords) jam.keywords = "";
+    var genreKeys = genreTagDefs().map(function (g) { return g.key; });
+    var matureKeys = contentFlags().map(function (g) { return g.key; });
+    (jam.contentFlags || []).slice().forEach(function (key) {
+      if (genreKeys.indexOf(key) >= 0 && jam.genres.indexOf(key) < 0) jam.genres.push(key);
+    });
+    jam.contentFlags = (jam.contentFlags || []).filter(function (key) {
+      return matureKeys.indexOf(key) >= 0;
+    });
+    if (jamHasMatureFlags(jam)) jam.ageRestricted = true;
+    return jam;
+  }
+
+  function jamHasMatureFlags(jam) {
+    if (!jam) return false;
+    migrateJam(jam);
+    return (jam.contentFlags || []).length > 0;
+  }
+
+  function jamGenreLabels(jam) {
+    migrateJam(jam);
+    return (jam.genres || []).map(function (key) {
+      return window.ScenaStore && ScenaStore.labelForGenre
+        ? ScenaStore.labelForGenre(key)
+        : key;
+    });
+  }
+
+  function sprintKey(jam) {
+    var d = parseIso(jam.submissionStart);
+    if (!d) return "unknown";
+    var start = new Date(d.getTime());
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - start.getDay());
+    return start.toISOString().slice(0, 10);
+  }
+
+  function sprintLabel(key) {
+    if (key === "unknown") return "Unscheduled";
+    var d = parseIso(key + "T12:00:00");
+    if (!d) return key;
+    return "Week of " + d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function groupBySprint(jams) {
+    var map = {};
+    (jams || []).forEach(function (jam) {
+      var key = sprintKey(jam);
+      if (!map[key]) map[key] = [];
+      map[key].push(jam);
+    });
+    return Object.keys(map).sort().reverse().map(function (key) {
+      return { key: key, label: sprintLabel(key), jams: map[key] };
+    });
+  }
+
+  function queryJams(rows, opts) {
+    opts = opts || {};
+    rows = (rows || []).map(function (j) { return migrateJam(j); });
+    if (opts.genre && opts.genre !== "all") {
+      rows = rows.filter(function (j) {
+        return (j.genres || []).indexOf(opts.genre) >= 0;
+      });
+    }
+    if (opts.keyword) {
+      var q = String(opts.keyword).toLowerCase().trim();
+      if (q) {
+        rows = rows.filter(function (j) {
+          var blob = [
+            j.title, j.theme, j.keywords, j.rules, (j.genres || []).join(" "),
+          ].join(" ").toLowerCase();
+          return blob.indexOf(q) >= 0;
+        });
+      }
+    }
+    if (opts.phase && opts.phase !== "all") {
+      rows = rows.filter(function (j) { return jamPhase(j) === opts.phase; });
+    }
+    if (opts.hideAdult && !opts.viewerIsAdult) {
+      rows = rows.filter(function (j) { return !requiresAgeGate(j); });
+    }
+    var sort = opts.sort || "date";
+    if (sort === "prize") {
+      rows.sort(function (a, b) {
+        var pa = prizePoolTotal(a);
+        var pb = prizePoolTotal(b);
+        if (pb !== pa) return pb - pa;
+        return String(b.publishedAt || b.createdAt || "").localeCompare(String(a.publishedAt || a.createdAt || ""));
+      });
+    } else if (sort === "title") {
+      rows.sort(function (a, b) {
+        return String(a.title || "").localeCompare(String(b.title || ""));
+      });
+    } else {
+      rows.sort(function (a, b) {
+        return String(b.submissionStart || b.publishedAt || b.createdAt || "")
+          .localeCompare(String(a.submissionStart || a.publishedAt || a.createdAt || ""));
+      });
+    }
+    return rows;
   }
 
   function readAll() {
@@ -98,8 +208,9 @@
 
   function requiresAgeGate(jam) {
     if (!jam) return false;
+    migrateJam(jam);
     if (jam.ageRestricted) return true;
-    return (jam.contentFlags || []).indexOf("sexual_content") >= 0;
+    return jamHasMatureFlags(jam);
   }
 
   function validateJamSpec(spec) {
@@ -109,11 +220,9 @@
     if (!String(spec.theme || "").trim()) throw new Error("Add a theme for your jam.");
     if (!String(spec.rules || "").trim()) throw new Error("Add rules so entrants know what to make.");
 
+    var genres = Array.isArray(spec.genres) ? spec.genres.slice() : [];
     var flags = Array.isArray(spec.contentFlags) ? spec.contentFlags.slice() : [];
-    var ageRestricted = !!spec.ageRestricted;
-    if (flags.indexOf("sexual_content") >= 0 && !ageRestricted) {
-      throw new Error("Jams with sexual content must be age-restricted (18+).");
-    }
+    var ageRestricted = !!spec.ageRestricted || flags.length > 0;
 
     var subStart = parseIso(spec.submissionStart);
     var subEnd = parseIso(spec.submissionEnd);
@@ -133,8 +242,10 @@
       title: title,
       theme: String(spec.theme || "").trim(),
       rules: String(spec.rules || "").trim(),
+      keywords: String(spec.keywords || "").trim(),
+      genres: genres,
       contentFlags: flags,
-      ageRestricted: ageRestricted || flags.indexOf("sexual_content") >= 0,
+      ageRestricted: ageRestricted,
       submissionStart: subStart.toISOString(),
       submissionEnd: subEnd.toISOString(),
       judgingEnd: judgeEnd.toISOString(),
@@ -156,18 +267,27 @@
     return base + extra;
   }
 
-  function walletSpend(userId, amount) {
+  function walletSpend(userId, amount, jamId) {
     amount = Math.max(0, parseInt(amount, 10) || 0);
     if (!amount) return Promise.resolve();
     if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
-    return ScenaWallet.spendBalance(userId, amount, "jam_prize", null);
+    return ScenaWallet.spendBalance(userId, amount, "jam_prize", jamId || null);
   }
 
-  function walletCredit(userId, amount) {
+  function walletPayout(hostUserId, jamId, winnerUserId, amount) {
     amount = Math.max(0, parseInt(amount, 10) || 0);
     if (!amount) return Promise.resolve();
     if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
-    return ScenaWallet.creditBalance(userId, amount, "jam_prize");
+    return ScenaWallet.jamPayoutWinner(hostUserId, jamId, winnerUserId, amount);
+  }
+
+  function checkWalletBalance(userId, needed) {
+    needed = Math.max(0, parseInt(needed, 10) || 0);
+    if (!needed) return Promise.resolve();
+    if (!window.ScenaWallet || !ScenaWallet.checkBalance) {
+      return Promise.reject(new Error("Sign in with Supabase to use Ducat prizes."));
+    }
+    return ScenaWallet.checkBalance(userId, needed);
   }
 
   function validateSubmission(jam, userId, series, episode) {
@@ -226,12 +346,19 @@
     var winner = (jam.submissions || []).find(function (s) { return s.id === jam.winnerSubmissionId; });
     if (!winner || !winner.userId) return Promise.resolve(jam);
     if (jam.prize && jam.prize.paidOut) return Promise.resolve(jam);
-    return walletCredit(winner.userId, total).then(function () {
+    return walletPayout(jam.hostUserId, jam.id, winner.userId, total).then(function () {
       jam.prize = jam.prize || {};
       jam.prize.paidOut = true;
       jam.prize.paidOutAt = new Date().toISOString();
       return saveJam(jam);
     });
+  }
+
+  function tryPayoutIfHost(jam, userId) {
+    if (!jam || !userId || jam.hostUserId !== userId) return Promise.resolve(jam);
+    if (!jam.winnerSubmissionId || (jam.prize && jam.prize.paidOut)) return Promise.resolve(jam);
+    if (jamPhase(jam) !== "closed") return Promise.resolve(jam);
+    return distributePrize(jam);
   }
 
   function finalizeIfDue(jam) {
@@ -240,8 +367,7 @@
     if (jam.winnerSubmissionId) return jam;
     if (jam.winnerMode === "auto_likes") {
       jam.winnerSubmissionId = autoPickWinner(jam);
-      jam = saveJam(jam);
-      return distributePrize(jam);
+      return saveJam(jam);
     }
     return jam;
   }
@@ -253,19 +379,25 @@
 
     list: function (opts) {
       opts = opts || {};
-      var rows = readAll().slice();
+      var rows = readAll().slice().map(migrateJam);
       if (opts.publishedOnly) rows = rows.filter(function (j) { return j.status === "published"; });
       if (opts.hostUserId) rows = rows.filter(function (j) { return j.hostUserId === opts.hostUserId; });
       rows.forEach(finalizeIfDue);
-      rows.sort(function (a, b) {
-        return String(b.publishedAt || b.createdAt || "").localeCompare(String(a.publishedAt || a.createdAt || ""));
-      });
-      return Promise.resolve(rows);
+      return Promise.resolve(queryJams(rows, opts));
     },
 
-    get: function (jamId) {
+    groupBySprint: groupBySprint,
+    queryJams: queryJams,
+    migrateJam: migrateJam,
+    jamGenreLabels: jamGenreLabels,
+
+    get: function (jamId, opts) {
+      opts = opts || {};
       var jam = findJam(jamId);
-      if (jam) jam = finalizeIfDue(jam);
+      if (jam) jam = finalizeIfDue(migrateJam(jam));
+      if (jam && opts.userId) {
+        return tryPayoutIfHost(jam, opts.userId);
+      }
       return Promise.resolve(jam);
     },
 
@@ -296,17 +428,69 @@
       if (jam.status === "published") return Promise.resolve(jam);
 
       var contribution = jam.prizeEnabled ? Math.max(0, parseInt(jam.hostContribution, 10) || 0) : 0;
-      var chain = Promise.resolve();
-      if (contribution > 0) {
-        chain = walletSpend(userId, contribution).then(function () {
-          jam.prize = jam.prize || { contributions: {} };
-          jam.prize.hostContribution = contribution;
-          jam.prize.hostFundedAt = new Date().toISOString();
+      return checkWalletBalance(userId, contribution).then(function () {
+        var chain = Promise.resolve();
+        if (contribution > 0) {
+          chain = walletSpend(userId, contribution, jam.id).then(function () {
+            jam.prize = jam.prize || { contributions: {} };
+            jam.prize.hostContribution = contribution;
+            jam.prize.hostFundedAt = new Date().toISOString();
+          });
+        }
+        return chain.then(function () {
+          jam.status = "published";
+          jam.publishedAt = new Date().toISOString();
+          return saveJam(jam);
         });
+      });
+    },
+
+    updateJam: function (userId, jamId, spec) {
+      if (!userId) return Promise.reject(new Error("Sign in to edit a jam."));
+      var jam = findJam(jamId);
+      if (!jam) return Promise.reject(new Error("Jam not found."));
+      if (jam.hostUserId !== userId) return Promise.reject(new Error("Only the host can edit this jam."));
+      var validated = validateJamSpec(spec);
+      var published = jam.status === "published";
+      var funded = Math.max(0, parseInt(jam.prize && jam.prize.hostContribution, 10) || 0);
+
+      if (published) {
+        if (!validated.prizeEnabled && funded > 0) {
+          return Promise.reject(new Error("You cannot disable Ducat rewards after funding a prize pool."));
+        }
+        if (validated.prizeEnabled && validated.hostContribution < funded) {
+          return Promise.reject(new Error(
+            "You cannot reduce your Ducat contribution after publishing. Add more from the jam page instead."
+          ));
+        }
+        validated.hostContribution = funded;
       }
-      return chain.then(function () {
-        jam.status = "published";
-        jam.publishedAt = new Date().toISOString();
+
+      Object.assign(jam, validated);
+      jam.prize = jam.prize || { contributions: {}, paidOut: false };
+      if (!published) jam.prize.hostContribution = validated.hostContribution;
+      jam.prizeEnabled = validated.prizeEnabled;
+      return Promise.resolve(saveJam(jam));
+    },
+
+    addHostPrize: function (userId, jamId, amount) {
+      if (!userId) return Promise.reject(new Error("Sign in to fund a prize."));
+      amount = Math.max(0, parseInt(amount, 10) || 0);
+      if (!amount) return Promise.reject(new Error("Enter how many Ducats to add."));
+      var jam = findJam(jamId);
+      if (!jam) return Promise.reject(new Error("Jam not found."));
+      if (jam.hostUserId !== userId) return Promise.reject(new Error("Only the host can add to the prize pool."));
+      if (jam.status !== "published") return Promise.reject(new Error("Publish the jam before adding more Ducats."));
+      if (!jam.prizeEnabled) return Promise.reject(new Error("This jam does not have Ducat rewards enabled."));
+      if (jam.prize && jam.prize.paidOut) return Promise.reject(new Error("The prize has already been paid out."));
+
+      return checkWalletBalance(userId, amount).then(function () {
+        return walletSpend(userId, amount, jam.id);
+      }).then(function () {
+        jam.prize = jam.prize || { contributions: {} };
+        jam.prize.hostContribution = Math.max(0, parseInt(jam.prize.hostContribution, 10) || 0) + amount;
+        jam.hostContribution = jam.prize.hostContribution;
+        jam.prize.lastTopUpAt = new Date().toISOString();
         return saveJam(jam);
       });
     },
@@ -343,7 +527,11 @@
         likes: [],
       };
 
-      var chain = contribute > 0 ? walletSpend(userId, contribute) : Promise.resolve();
+      var chain = contribute > 0
+        ? checkWalletBalance(userId, contribute).then(function () {
+            return walletSpend(userId, contribute, jam.id);
+          })
+        : Promise.resolve();
       return chain.then(function () {
         if (contribute > 0) {
           jam.prize = jam.prize || { contributions: {} };
@@ -390,6 +578,56 @@
     formatDucats: formatDucats,
     validateJamSpec: validateJamSpec,
 
+    renderBrowse: function (jams, opts) {
+      opts = opts || {};
+      var genreChips = genreTagDefs().map(function (g) {
+        return '<button type="button" class="jam-filter-chip' +
+          (opts.genre === g.key ? " is-active" : "") +
+          '" data-jam-genre="' + escapeAttr(g.key) + '">' + escapeHtml(g.label) + "</button>";
+      }).join("");
+
+      var toolbar =
+        '<div class="jam-browse-toolbar">' +
+          '<div class="jam-browse-row">' +
+            '<input type="search" class="jam-browse-search" id="jamBrowseSearch" placeholder="Search title, theme, keywords…" value="' +
+              escapeAttr(opts.keyword || "") + '">' +
+            '<select class="jam-browse-sort" id="jamBrowseSort">' +
+              '<option value="date"' + ((opts.sort || "date") === "date" ? " selected" : "") + ">Newest sprint</option>" +
+              '<option value="prize"' + (opts.sort === "prize" ? " selected" : "") + ">Highest prize</option>" +
+              '<option value="title"' + (opts.sort === "title" ? " selected" : "") + ">Title A–Z</option>" +
+            "</select>" +
+            '<select class="jam-browse-phase" id="jamBrowsePhase">' +
+              '<option value="all"' + ((opts.phase || "all") === "all" ? " selected" : "") + ">All phases</option>" +
+              '<option value="upcoming"' + (opts.phase === "upcoming" ? " selected" : "") + ">Upcoming</option>" +
+              '<option value="submissions"' + (opts.phase === "submissions" ? " selected" : "") + ">Open submissions</option>" +
+              '<option value="judging"' + (opts.phase === "judging" ? " selected" : "") + ">Judging</option>" +
+              '<option value="closed"' + (opts.phase === "closed" ? " selected" : "") + ">Closed</option>" +
+            "</select>" +
+          "</div>" +
+          '<div class="jam-browse-genres">' +
+            '<button type="button" class="jam-filter-chip' + ((!opts.genre || opts.genre === "all") ? " is-active" : "") +
+              '" data-jam-genre="all">All genres</button>' +
+            genreChips +
+          "</div>" +
+        "</div>";
+
+      if (!jams.length) {
+        return toolbar + '<div class="jam-empty"><p>No jams match these filters.</p></div>';
+      }
+
+      var sprints = groupBySprint(jams);
+      var body = sprints.map(function (sprint) {
+        return (
+          '<section class="jam-sprint-section">' +
+            '<h2 class="jam-sprint-title">' + escapeHtml(sprint.label) + "</h2>" +
+            ScenaJams.renderList(sprint.jams, opts) +
+          "</section>"
+        );
+      }).join("");
+
+      return toolbar + '<div class="jam-sprint-list">' + body + "</div>";
+    },
+
     renderList: function (jams, opts) {
       opts = opts || {};
       if (!jams.length) {
@@ -402,6 +640,7 @@
         jams.map(function (jam) {
           var phase = jamPhase(jam);
           var pool = jam.prizeEnabled ? prizePoolTotal(jam) : 0;
+          var genreLine = jamGenreLabels(jam).slice(0, 3).join(" · ");
           return (
             '<a class="jam-card" href="#/jams/' + escapeAttr(jam.id) + '">' +
               '<div class="jam-card-head">' +
@@ -409,6 +648,7 @@
                 '<span class="jam-phase jam-phase--' + escapeAttr(phase) + '">' + escapeHtml(phase) + "</span>" +
               "</div>" +
               '<p class="jam-card-theme">' + escapeHtml(jam.theme) + "</p>" +
+              (genreLine ? '<p class="jam-card-genres">' + escapeHtml(genreLine) + "</p>" : "") +
               '<p class="jam-card-meta">Host: ' + escapeHtml(jam.hostName || "Creator") +
                 (jam.ageRestricted ? ' · <span class="jam-age">18+</span>' : "") +
               "</p>" +
@@ -425,12 +665,21 @@
     renderForm: function (draft, opts) {
       opts = opts || {};
       draft = draft || {};
-      var flags = contentFlags();
-      var flagChecks = flags.map(function (f) {
-        var on = (draft.contentFlags || []).indexOf(f.key) >= 0;
+      migrateJam(draft);
+      var genreChecks = genreTagDefs().map(function (f) {
+        var on = (draft.genres || []).indexOf(f.key) >= 0;
         return (
           '<label class="check-row">' +
-            '<input type="checkbox" data-jam-flag="' + escapeAttr(f.key) + '"' + (on ? " checked" : "") + ">" +
+            '<input type="checkbox" data-jam-genre="' + escapeAttr(f.key) + '"' + (on ? " checked" : "") + ">" +
+            escapeHtml(f.label) +
+          "</label>"
+        );
+      }).join("");
+      var matureChecks = contentFlags().map(function (f) {
+        var on = (draft.contentFlags || []).indexOf(f.key) >= 0;
+        return (
+          '<label class="check-row jam-mature-row">' +
+            '<input type="checkbox" data-jam-mature="' + escapeAttr(f.key) + '"' + (on ? " checked" : "") + ">" +
             escapeHtml(f.label) +
           "</label>"
         );
@@ -462,21 +711,32 @@
           "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
       }
 
+      var published = !!opts.published;
+      var funded = Math.max(0, parseInt((draft.prize && draft.prize.hostContribution) || draft.hostContribution, 10) || 0);
+      var hostContribField = published
+        ? '<div class="field"><label>Your contribution (locked)</label>' +
+            '<input type="number" name="hostContribution" min="' + escapeAttr(String(funded)) + '" value="' +
+            escapeAttr(String(funded)) + '" readonly>' +
+            '<p class="field-hint">Funded Ducats cannot be removed after publishing. Add more on the jam page.</p></div>'
+        : '<div class="field"><label>Your contribution (Ducats)</label><input type="number" name="hostContribution" min="0" max="99999" value="' +
+            escapeAttr(String(draft.hostContribution || 0)) + '"></div>';
       return (
         '<form class="jam-form" id="jamForm">' +
           '<div class="field"><label>Jam title</label><input type="text" name="title" maxlength="80" value="' +
             escapeAttr(draft.title || "") + '" required></div>' +
           '<div class="field"><label>Theme</label><input type="text" name="theme" maxlength="120" value="' +
             escapeAttr(draft.theme || "") + '" placeholder="What should entrants explore?" required></div>' +
+          '<div class="field"><label>Search keywords</label><input type="text" name="keywords" maxlength="200" value="' +
+            escapeAttr(draft.keywords || "") + '" placeholder="Optional — comma-separated tags for browse/search"></div>' +
           '<div class="field"><label>Rules</label><textarea name="rules" rows="4" maxlength="2000" required>' +
             escapeHtml(draft.rules || "") + "</textarea>" +
-            '<p class="field-hint">Stay within Arleco content guidelines. Adult jams must be labeled and age-restricted.</p></div>' +
-          '<section class="form-section"><h2>Content labels</h2><div class="check-grid">' + flagChecks + "</div>" +
-            '<label class="check-row jam-age-row">' +
-              '<input type="checkbox" name="ageRestricted" id="jamAgeRestricted"' +
-                ((draft.ageRestricted || (draft.contentFlags || []).indexOf("sexual_content") >= 0) ? " checked" : "") + ">" +
-              "Age-restricted (18+) — required for sexual content" +
-            "</label></section>" +
+            '<p class="field-hint">Stay within Arleco content guidelines.</p></div>' +
+          '<section class="form-section"><h2>Genres</h2><div class="check-grid">' + genreChecks + "</div></section>" +
+          '<section class="form-section"><h2>Mature content (18+)</h2>' +
+            '<p class="field-hint">Any mature label automatically marks this jam as 18+.</p>' +
+            '<div class="check-grid jam-mature-grid">' + matureChecks + "</div>" +
+            '<p class="field-hint jam-age-note"' + (jamHasMatureFlags(draft) ? "" : " hidden") +
+              ' id="jamAutoAgeNote">This jam will be shown as <strong>18+</strong>.</p></section>' +
           '<section class="form-section"><h2>Schedule</h2>' +
             '<div class="field-row">' +
               '<div class="field"><label>Submissions open</label><input type="datetime-local" name="submissionStart" value="' +
@@ -493,8 +753,7 @@
             '<label class="check-row"><input type="checkbox" name="prizeEnabled" id="jamPrizeEnabled"' +
               (draft.prizeEnabled ? " checked" : "") + "> Offer Ducat rewards</label>" +
             '<div class="jam-prize-fields" id="jamPrizeFields"' + (draft.prizeEnabled ? "" : " hidden") + ">" +
-              '<div class="field"><label>Your contribution (Ducats)</label><input type="number" name="hostContribution" min="0" max="99999" value="' +
-                escapeAttr(String(draft.hostContribution || 0)) + '"></div>' +
+              hostContribField +
               '<div class="field"><label>Participant contributions</label><select name="participantPrizeMode">' + partModes + "</select></div>" +
               '<div class="field"><label>Minimum per entrant (if required)</label><input type="number" name="participantMin" min="0" max="9999" value="' +
                 escapeAttr(String(draft.participantMin || 0)) + '"></div>' +
@@ -508,17 +767,22 @@
 
     readForm: function (form) {
       if (!form) return {};
-      var flags = [];
-      form.querySelectorAll("[data-jam-flag]").forEach(function (el) {
-        if (el.checked) flags.push(el.getAttribute("data-jam-flag"));
+      var genres = [];
+      form.querySelectorAll("[data-jam-genre]").forEach(function (el) {
+        if (el.checked) genres.push(el.getAttribute("data-jam-genre"));
       });
-      var sexual = flags.indexOf("sexual_content") >= 0;
+      var flags = [];
+      form.querySelectorAll("[data-jam-mature]").forEach(function (el) {
+        if (el.checked) flags.push(el.getAttribute("data-jam-mature"));
+      });
       return {
         title: form.title && form.title.value,
         theme: form.theme && form.theme.value,
         rules: form.rules && form.rules.value,
+        keywords: form.keywords && form.keywords.value,
+        genres: genres,
         contentFlags: flags,
-        ageRestricted: sexual || Boolean(form.ageRestricted && form.ageRestricted.checked),
+        ageRestricted: flags.length > 0,
         submissionStart: form.submissionStart && form.submissionStart.value,
         submissionEnd: form.submissionEnd && form.submissionEnd.value,
         judgingEnd: form.judgingEnd && form.judgingEnd.value,
@@ -571,6 +835,31 @@
           }).join("")
         : '<p class="field-hint">No submissions yet.</p>';
 
+      var hostActions = "";
+      if (isHost) {
+        if (jam.status === "draft") {
+          hostActions =
+            '<a class="btn btn-ghost" href="#/jams/' + escapeAttr(jam.id) + '/edit">Edit</a>' +
+            '<button type="button" class="btn btn-primary" id="jamPublishBtn">Publish jam</button>';
+        } else {
+          hostActions =
+            '<a class="btn btn-ghost" href="#/jams/' + escapeAttr(jam.id) + '/edit">Edit jam</a>';
+        }
+      }
+
+      var addPrizePanel = "";
+      if (isHost && jam.status === "published" && jam.prizeEnabled && !(jam.prize && jam.prize.paidOut)) {
+        addPrizePanel =
+          '<section class="form-section jam-add-prize-panel">' +
+            "<h2>Add to prize pool</h2>" +
+            '<p class="field-hint">You cannot remove funded Ducats, but you can add more anytime before payout.</p>' +
+            '<div class="field-row">' +
+              '<div class="field"><label>Additional Ducats</label><input type="number" id="jamAddPrizeAmount" min="1" max="99999" value="10"></div>' +
+              '<button type="button" class="btn btn-secondary" id="jamAddPrizeBtn">Add Ducats</button>' +
+            "</div>" +
+          "</section>";
+      }
+
       var submitPanel = "";
       if (phase === "submissions" && ctx.userId && jam.status === "published") {
         var seriesOpts = (ctx.seriesList || []).map(function (s) {
@@ -595,6 +884,14 @@
           "</section>";
       }
 
+      var buyPanel = "";
+      if (window.ScenaWallet && ScenaWallet.renderBuyDucatsPanel) {
+        buyPanel =
+          '<section class="form-section" id="jamBuyDucatsPanel" hidden>' +
+            ScenaWallet.renderBuyDucatsPanel({ message: "You need more Ducats to fund this jam." }) +
+          "</section>";
+      }
+
       return (
         '<div class="page jam-detail">' +
           '<div class="page-head">' +
@@ -604,10 +901,9 @@
                 " · " + escapeHtml(phase) +
                 (jam.ageRestricted ? ' · <span class="jam-age">18+</span>' : "") +
               "</p></div>" +
-            (isHost && jam.status === "draft"
-              ? '<button type="button" class="btn btn-primary" id="jamPublishBtn">Publish jam</button>'
-              : "") +
+            (isHost ? hostActions : "") +
           "</div>" +
+          buyPanel +
           '<section class="form-section"><h2>Rules</h2><div class="jam-rules">' +
             escapeHtml(jam.rules).replace(/\n/g, "<br>") + "</div></section>" +
           '<section class="form-section jam-schedule">' +
@@ -621,6 +917,7 @@
             ? '<section class="form-section"><h2>Prize</h2><p>' + escapeHtml(formatDucats(pool)) +
                 " total" + (winner ? " · Winner: " + escapeHtml(winner.userName) : "") + "</p></section>"
             : "") +
+          addPrizePanel +
           submitPanel +
           '<section class="form-section"><h2>Entries (' + subs.length + ")</h2>" + subsHtml + "</section>" +
         "</div>"

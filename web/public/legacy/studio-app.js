@@ -66,6 +66,7 @@
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
       if (parts[1] === "new") return { view: "jams", jamMode: "new" };
+      if (parts[2] === "edit" && parts[1]) return { view: "jams", jamMode: "edit", jamId: parts[1] };
       if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
       return { view: "jams", jamMode: "list" };
     }
@@ -1490,7 +1491,10 @@
       return;
     }
     var balancePromise = window.ScenaWallet
-      ? ScenaWallet.load(userId).then(function () { return ScenaWallet.getBalance(userId); })
+      ? ScenaWallet.load(userId).then(function (w) {
+          if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+          return ScenaWallet.getBalance(userId);
+        })
       : Promise.resolve(null);
 
     balancePromise.then(function (balance) {
@@ -1706,12 +1710,52 @@
       });
     });
     if (window.ScenaWallet) {
-      ScenaWallet.bindPackButtons(root, userId, function () {
+      ScenaWallet.bindPackButtons(root, userId, function (result) {
+        if (result && result.redirecting) return;
+        if (result && result.purchased) toast("Payment received — Ducats added to your wallet.");
         paintLibraryRoot();
       }, function (err) {
         toast((err && err.message) || "Could not buy Ducats.");
       });
+      root.querySelectorAll(".ducat-pack-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          toast("Opening Stripe checkout…");
+        }, { once: false });
+      });
     }
+  }
+
+  function handleJamNeedDucats(root, err, onRetry) {
+    if (!err || err.code !== "NEED_DUCATS") {
+      toast((err && err.message) || "Something went wrong.");
+      return false;
+    }
+    toast(err.message + " Buy Ducats below, then try again.");
+    var panel = root && $("#jamBuyDucatsPanel", root);
+    if (panel) {
+      panel.hidden = false;
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (window.ScenaWallet) {
+        ScenaWallet.bindPackButtons(panel, userId, function () {
+          toast("After payment completes, try again.");
+          if (onRetry) onRetry();
+        }, function (buyErr) {
+          toast((buyErr && buyErr.message) || "Purchase failed.");
+        });
+      }
+    } else {
+      navigate("/library/shop");
+    }
+    return true;
+  }
+
+  function loadJamFormBalance() {
+    return window.ScenaWallet
+      ? ScenaWallet.load(userId).then(function (w) {
+          if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
+          return ScenaWallet.getBalance(userId);
+        })
+      : Promise.resolve(null);
   }
 
   function renderJamsPage(main, route) {
@@ -1721,10 +1765,7 @@
     }
 
     if (route.jamMode === "new") {
-      var balancePromise = window.ScenaWallet
-        ? ScenaWallet.load(userId).then(function () { return ScenaWallet.getBalance(userId); })
-        : Promise.resolve(null);
-      balancePromise.then(function (balance) {
+      loadJamFormBalance().then(function (balance) {
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
@@ -1739,8 +1780,36 @@
       return;
     }
 
+    if (route.jamMode === "edit" && route.jamId) {
+      ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
+        if (!jam) {
+          main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
+          return;
+        }
+        if (jam.hostUserId !== userId) {
+          main.innerHTML = '<div class="page"><p class="field-hint">Only the host can edit this jam.</p></div>';
+          return;
+        }
+        loadJamFormBalance().then(function (balance) {
+          var published = jam.status === "published";
+          main.innerHTML =
+            '<div class="page page-jams">' +
+              '<div class="page-head">' +
+                '<div><h1>' + (published ? "Edit jam" : "Edit draft") + "</h1>" +
+                '<p>Update theme, rules, schedule, and entry settings.</p></div>' +
+                '<button type="button" class="btn btn-primary" id="jamSaveDraftBtn">Save changes</button>' +
+                ' <a class="btn btn-ghost" href="#/jams/' + escapeAttr(jam.id) + '">Back</a>' +
+              "</div>" +
+              ScenaJams.renderForm(jam, { balance: balance, published: published }) +
+            "</div>";
+          bindJamForm(main, jam);
+        });
+      });
+      return;
+    }
+
     if (route.jamMode === "detail" && route.jamId) {
-      ScenaJams.get(route.jamId).then(function (jam) {
+      ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
           return;
@@ -1788,7 +1857,7 @@
     });
   }
 
-  function bindJamForm(root) {
+  function bindJamForm(root, existingJam) {
     var form = $("#jamForm", root);
     if (!form) return;
     var prizeToggle = $("#jamPrizeEnabled", root);
@@ -1818,8 +1887,11 @@
           return;
         }
         saveBtn.disabled = true;
-        ScenaJams.createDraft(userId, userProfile, spec).then(function (jam) {
-          toast("Jam saved — publish when ready.");
+        var savePromise = existingJam
+          ? ScenaJams.updateJam(userId, existingJam.id, spec)
+          : ScenaJams.createDraft(userId, userProfile, spec);
+        savePromise.then(function (jam) {
+          toast(existingJam ? "Jam updated." : "Jam saved — publish when ready.");
           navigate("/jams/" + jam.id);
         }).catch(function (err) {
           saveBtn.disabled = false;
@@ -1839,8 +1911,39 @@
           render();
         }).catch(function (err) {
           publishBtn.disabled = false;
-          toast((err && err.message) || "Could not publish jam.");
+          if (!handleJamNeedDucats(root, err)) {
+            toast((err && err.message) || "Could not publish jam.");
+          }
         });
+      });
+    }
+
+    var addPrizeBtn = $("#jamAddPrizeBtn", root);
+    if (addPrizeBtn) {
+      addPrizeBtn.addEventListener("click", function () {
+        var amountEl = $("#jamAddPrizeAmount", root);
+        var amount = amountEl ? amountEl.value : 0;
+        addPrizeBtn.disabled = true;
+        ScenaJams.addHostPrize(userId, jam.id, amount).then(function () {
+          toast("Prize pool increased.");
+          render();
+        }).catch(function (err) {
+          addPrizeBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            addPrizeBtn.click();
+          })) {
+            toast((err && err.message) || "Could not add Ducats.");
+          }
+        });
+      });
+    }
+
+    var buyPanel = $("#jamBuyDucatsPanel", root);
+    if (buyPanel && window.ScenaWallet) {
+      ScenaWallet.bindPackButtons(buyPanel, userId, function () {
+        toast("After payment completes, try again.");
+      }, function (err) {
+        toast((err && err.message) || "Purchase failed.");
       });
     }
 
@@ -1886,7 +1989,11 @@
           render();
         }).catch(function (err) {
           submitBtn.disabled = false;
-          toast((err && err.message) || "Could not submit.");
+          if (!handleJamNeedDucats(root, err, function () {
+            submitBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit.");
+          }
         });
       });
     }

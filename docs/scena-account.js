@@ -64,13 +64,16 @@
               '<p class="field-hint">Shown in parentheses after your name on comments.</p></div>' +
           "</section>" +
           '<section class="form-section">' +
-            "<h2>Mature content</h2>" +
+            "<h2>Age &amp; mature content</h2>" +
+            '<div class="field"><label>Birth year</label>' +
+              '<input type="number" name="birthYear" min="1900" max="' + new Date().getFullYear() + '" value="' +
+              escapeAttr(profile.birthYear ? String(profile.birthYear) : "") + '" placeholder="e.g. 1998">' +
+              '<p class="field-hint">Used to confirm you are 18+ for age-restricted stories and jams.</p></div>' +
             '<label class="check-row">' +
               '<input type="checkbox" id="accountAdultVerify"' +
-                (profile.adultVerifiedAt ? " checked" : "") + ">" +
-              "I am 18 or older and may view age-restricted visual novels and game jams" +
+                (profile.adultVerifiedAt || (window.ScenaProfile && ScenaProfile.isAdultVerified(profile)) ? " checked" : "") + ">" +
+              "I confirm I am 18 or older and may view age-restricted visual novels and game jams" +
             "</label>" +
-            '<p class="field-hint">Required for stories and jams labeled with sexual content. We store your confirmation on this account.</p>' +
           "</section>" +
           '<section class="form-section">' +
             "<h2>Sign-in</h2>" +
@@ -130,11 +133,25 @@
       saveBtn.addEventListener("click", function () {
         if (!window.ScenaProfile) return;
         var adultEl = $("#accountAdultVerify");
+        var birthYearEl = form.querySelector('[name="birthYear"]');
+        var birthYear = birthYearEl ? parseInt(birthYearEl.value, 10) : null;
+        if (adultEl && adultEl.checked) {
+          if (!birthYear || birthYear < 1900) {
+            toast("Enter your birth year to confirm you are 18+.");
+            return;
+          }
+          var age = new Date().getFullYear() - birthYear;
+          if (age < 18) {
+            toast("You must be 18 or older for age-restricted content.");
+            return;
+          }
+        }
         var patch = {
           displayName: form.querySelector('[name="displayName"]').value,
           username: form.querySelector('[name="username"]').value,
           pronouns: form.querySelector('[name="pronouns"]').value,
           avatarUrl: draftAvatar,
+          birthYear: birthYear || null,
           adultVerifiedAt: adultEl && adultEl.checked ? new Date().toISOString() : "",
         };
         ScenaProfile.update(userId, patch, { user: { id: userId, email: userEmail } })

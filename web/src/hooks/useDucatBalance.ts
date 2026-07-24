@@ -1,31 +1,28 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
-let walletScriptPromise: Promise<void> | null = null;
-
-function loadWalletScript(): Promise<void> {
-  if (window.ScenaWallet) return Promise.resolve();
-  if (walletScriptPromise) return walletScriptPromise;
-  walletScriptPromise = new Promise((resolve, reject) => {
-    const src = "/legacy/scena-wallet.js";
-    if (document.querySelector(`script[data-legacy-src="${src}"]`)) {
-      resolve();
-      return;
-    }
-    const el = document.createElement("script");
-    el.src = src;
-    el.async = true;
-    el.dataset.legacySrc = src;
-    el.onload = () => resolve();
-    el.onerror = () => reject(new Error("Wallet failed to load"));
-    document.body.appendChild(el);
-  });
-  return walletScriptPromise;
-}
+import { loadWalletScript } from "./loadWalletScript";
 
 export function useDucatBalance() {
   const { userId } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
+
+  const refresh = useCallback(() => {
+    if (!userId) {
+      setBalance(null);
+      return Promise.resolve(null);
+    }
+    return loadWalletScript()
+      .then(() => window.ScenaWallet!.load(userId))
+      .then(() => {
+        const next = window.ScenaWallet!.getBalance(userId);
+        setBalance(next);
+        return next;
+      })
+      .catch(() => {
+        setBalance(null);
+        return null;
+      });
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -46,5 +43,5 @@ export function useDucatBalance() {
     };
   }, [userId]);
 
-  return { balance, userId };
+  return { balance, userId, refresh };
 }

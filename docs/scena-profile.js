@@ -55,8 +55,15 @@
       username: String(row.username || base.username || "").trim(),
       pronouns: String(row.pronouns || base.pronouns || "").trim(),
       avatarUrl: row.avatar_url || row.avatarUrl || base.avatarUrl || "",
+      birthYear: row.birth_year || row.birthYear || base.birthYear || null,
       adultVerifiedAt: row.adult_verified_at || row.adultVerifiedAt || base.adultVerifiedAt || "",
     };
+  }
+
+  function accountAge(profile) {
+    var year = parseInt(profile && profile.birthYear, 10);
+    if (!year || year < 1900) return null;
+    return new Date().getFullYear() - year;
   }
 
   function initials(profile) {
@@ -113,12 +120,20 @@
     sessionProfile: defaultFromSession,
 
     isAdultVerified: function (profile) {
-      return Boolean(profile && profile.adultVerifiedAt);
+      if (!profile) return false;
+      var age = accountAge(profile);
+      if (age != null && age >= 18) return true;
+      return Boolean(profile.adultVerifiedAt);
     },
+
+    accountAge: accountAge,
 
     seriesNeedsAgeGate: function (series) {
       if (!series) return false;
-      return (series.contentFlags || []).indexOf("sexual_content") >= 0;
+      if (window.ScenaStore && ScenaStore.seriesIsAgeRestricted) {
+        return ScenaStore.seriesIsAgeRestricted(series);
+      }
+      return (series.contentFlags || []).length > 0;
     },
 
     /** Public author block for comments UI */
@@ -166,15 +181,59 @@
       }
 
       return sb.from("profiles")
-        .select("id, email, display_name, username, pronouns, avatar_url")
+        .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at")
         .eq("id", userId)
         .maybeSingle()
         .then(function (r) {
+          if (!r.error && r.data) {
+            return finishProfile(r.data);
+          }
+          return sb.rpc("ensure_auth_profile").then(function (ensureRes) {
+            if (!ensureRes.error) {
+              return refetchProfile();
+            }
+            if (!/does not exist/i.test(ensureRes.error.message || "")) {
+              return finishProfile(null);
+            }
+            return insertProfileFallback().then(function () {
+              return refetchProfile();
+            });
+          });
+        })
+        .catch(function () {
+          cache[userId] = cache[userId] || fallback;
+          return cache[userId];
+        });
+
+      function refetchProfile() {
+        return sb.from("profiles")
+          .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at")
+          .eq("id", userId)
+          .maybeSingle()
+          .then(function (retry) {
+            return finishProfile(retry.error ? null : retry.data);
+          });
+      }
+
+      function insertProfileFallback() {
+        var email = (session && session.user && session.user.email) || "";
+        var displayName =
+          (session && session.user && session.user.user_metadata && session.user.user_metadata.display_name) ||
+          (email ? email.split("@")[0] : "Reader");
+        return sb.from("profiles").insert({
+          id: userId,
+          email: email || null,
+          display_name: displayName,
+          intended_role: "reader",
+        });
+      }
+
+      function finishProfile(row) {
           var profile;
-          if (r.error || !r.data) {
+          if (!row) {
             profile = cache[userId] || fallback;
           } else {
-            profile = normalize(r.data, fallback);
+            profile = normalize(row, fallback);
             if (local && local.avatarUrl && !profile.avatarUrl) {
               profile.avatarUrl = local.avatarUrl;
             }
@@ -182,11 +241,7 @@
           cache[userId] = profile;
           writeLocal(userId, profile);
           return profile;
-        })
-        .catch(function () {
-          cache[userId] = cache[userId] || fallback;
-          return cache[userId];
-        });
+      }
     },
 
     update: function (userId, patch, session) {
@@ -204,7 +259,17 @@
           adultVerifiedAt: patch.adultVerifiedAt != null
             ? String(patch.adultVerifiedAt || "")
             : current.adultVerifiedAt || "",
+          birthYear: patch.birthYear != null
+            ? parseInt(patch.birthYear, 10) || null
+            : current.birthYear || null,
         };
+
+        if (next.birthYear && (next.birthYear < 1900 || next.birthYear > new Date().getFullYear())) {
+          return Promise.reject(new Error("Enter a valid birth year."));
+        }
+        if (next.adultVerifiedAt && accountAge(next) != null && accountAge(next) < 18) {
+          return Promise.reject(new Error("You must be 18 or older to view age-restricted content."));
+        }
 
         if (!next.displayName) next.displayName = "Reader";
 
@@ -230,6 +295,10 @@
           } else {
             row.avatar_url = next.avatarUrl || null;
           }
+        }
+        if (patch.birthYear != null) row.birth_year = next.birthYear;
+        if (patch.adultVerifiedAt != null) {
+          row.adult_verified_at = next.adultVerifiedAt ? next.adultVerifiedAt : null;
         }
 
         return sb.from("profiles").update(row).eq("id", userId).then(function (r) {

@@ -256,6 +256,42 @@
 
   }
 
+  function ensureProfileRow(sb, scopeId) {
+    return sb.rpc("ensure_auth_profile").then(function (res) {
+      if (!res.error) return;
+      if (!/does not exist/i.test(res.error.message || "")) {
+        throw new Error(res.error.message || "Could not ensure profile.");
+      }
+      return sb.from("profiles").select("id").eq("id", scopeId).maybeSingle().then(function (row) {
+        if (row.data) return;
+        var email = "";
+        var displayName = "Reader";
+        if (window.ScenaAuth && ScenaAuth.getSession) {
+          return ScenaAuth.getSession().then(function (session) {
+            if (session && session.user) {
+              email = session.user.email || "";
+              displayName =
+                (session.user.user_metadata && session.user.user_metadata.display_name) ||
+                (email ? email.split("@")[0] : "Reader");
+            }
+            return sb.from("profiles").insert({
+              id: scopeId,
+              email: email || null,
+              display_name: displayName,
+              intended_role: "reader",
+            });
+          });
+        }
+        return sb.from("profiles").insert({
+          id: scopeId,
+          email: null,
+          display_name: displayName,
+          intended_role: "reader",
+        });
+      });
+    });
+  }
+
 
 
   function applySnapshot(scopeId, row) {
@@ -428,15 +464,19 @@
 
         var sb = supabaseClient();
 
-        return sb.rpc("wallet_snapshot").then(function (res) {
+        return ensureProfileRow(sb, scopeId).then(function () {
 
-          if (res.error) throw new Error(res.error.message || "Could not load wallet.");
+          return sb.rpc("wallet_snapshot").then(function (res) {
 
-          var wallet = applySnapshot(scopeId, res.data || {});
+            if (res.error) throw new Error(res.error.message || "Could not load wallet.");
 
-          if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+            var wallet = applySnapshot(scopeId, res.data || {});
 
-          return wallet;
+            if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+
+            return wallet;
+
+          });
 
         });
 
@@ -458,7 +498,9 @@
 
         var sb = supabaseClient();
 
-        return sb.functions.invoke("create-ducat-checkout", {
+        return ensureProfileRow(sb, scopeId).then(function () {
+
+          return sb.functions.invoke("create-ducat-checkout", {
 
           body: {
 
@@ -472,17 +514,39 @@
 
         }).then(function (res) {
 
-          if (res.error) throw new Error(res.error.message || "Checkout failed.");
+          var data = res.data;
 
-          var data = res.data || {};
+          if (typeof data === "string") {
 
-          if (data.error) throw new Error(data.error);
+            try { data = JSON.parse(data); } catch (e) { data = {}; }
 
-          if (!data.url) throw new Error("Checkout did not return a payment URL.");
+          }
 
-          window.location.href = data.url;
+          data = data || {};
+
+          if (data.error) throw new Error(String(data.error));
+
+          if (res.error) {
+
+            var msg = res.error.message || "Checkout failed.";
+
+            if (/not found|404|Failed to send/i.test(msg)) {
+
+              msg = "Ducat checkout is not deployed yet. Finish Stripe setup in docs/STRIPE_SETUP.md (Edge Function create-ducat-checkout).";
+
+            }
+
+            throw new Error(msg);
+
+          }
+
+          if (!data.url) throw new Error("Checkout did not return a payment URL. Is Stripe configured in Supabase secrets?");
+
+          window.location.assign(data.url);
 
           return { redirecting: true };
+
+        });
 
         });
 
@@ -554,7 +618,9 @@
 
         var sb = supabaseClient();
 
-        return sb.rpc("wallet_spend_balance", {
+        return ensureProfileRow(sb, scopeId).then(function () {
+
+          return sb.rpc("wallet_spend_balance", {
 
           p_amount: amount,
 
@@ -578,24 +644,68 @@
 
       });
 
+      });
+
     },
 
 
 
-    /** Prize payouts to other users require server-side jam settlement (not browser-callable). */
+    /** Prize payouts to jam winners (host only; pool tracked in ducat_ledger). */
+    jamPayoutWinner: function (hostUserId, jamId, winnerUserId, amount) {
+      amount = Math.max(0, parseInt(amount, 10) || 0);
+      if (!amount || !jamId || !winnerUserId) {
+        return Promise.reject(new Error("Missing jam payout details."));
+      }
+      return cloudRequired(hostUserId).then(function () {
+        var sb = supabaseClient();
+        return sb.rpc("jam_payout_winner", {
+          p_jam_id: String(jamId),
+          p_winner_user_id: winnerUserId,
+          p_amount: amount,
+        }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not pay jam prize.");
+          return res.data || {};
+        });
+      });
+    },
 
+    checkBalance: function (scopeId, needed) {
+      needed = Math.max(0, parseInt(needed, 10) || 0);
+      return ScenaWallet.load(scopeId).then(function () {
+        var have = ScenaWallet.getBalance(scopeId);
+        if (needed > have) {
+          var err = new Error(
+            "You need " + formatDucats(needed) + " but only have " + formatDucats(have) + "."
+          );
+          err.code = "NEED_DUCATS";
+          err.need = needed;
+          err.have = have;
+          throw err;
+        }
+        return { balance: have, ok: true };
+      });
+    },
+
+    renderBuyDucatsPanel: function (opts) {
+      opts = opts || {};
+      var hint = opts.message || "Buy Ducats to fund this jam prize.";
+      return (
+        '<div class="ducat-buy-panel">' +
+          '<p class="field-hint">' + hint + "</p>" +
+          ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) +
+          '<p class="field-hint"><a href="#/library/shop">Open Ducat shop</a></p>' +
+        "</div>"
+      );
+    },
+
+    /** Prize payouts to other users require server-side jam settlement (not browser-callable). */
     creditBalance: function (scopeId, amount, reason) {
 
       amount = Math.max(0, parseInt(amount, 10) || 0);
 
       if (!amount) return Promise.resolve({ balance: getWallet(scopeId).balance });
 
-      return Promise.reject(new Error(
-
-        "Crediting Ducats to accounts is server-only. Jam prizes will use Supabase settlement soon."
-
-      ));
-
+      return Promise.reject(new Error("Use jamPayoutWinner for prize payouts."));
     },
 
 
@@ -725,6 +835,7 @@
           var packId = btn.getAttribute("data-ducat-pack");
 
           btn.disabled = true;
+          btn.textContent = "Opening checkout…";
 
           ScenaWallet.purchasePack(scopeId, packId)
 

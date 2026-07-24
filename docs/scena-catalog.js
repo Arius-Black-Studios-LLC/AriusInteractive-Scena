@@ -12,15 +12,19 @@
 
   var DEMO_META = {
     "signal-lost": {
-      genres: "scifi",
+      genres: "scifi horror",
+      genreKeys: ["scifi", "horror"],
       cover: "d",
-      flags: ["Sci-fi", "Strong language"],
+      flags: ["Sci-fi", "Horror", "Strong language"],
+      matureFlags: ["strong_language"],
       description: "Sci-fi mystery aboard Kerberos-9 — long chapters, dead comms, and a signal from inside the hull.",
     },
     "cafe-at-sunset": {
-      genres: "romance",
+      genres: "romance slice_of_life",
+      genreKeys: ["romance", "slice_of_life"],
       cover: "b",
-      flags: ["Romance"],
+      flags: ["Romance", "Slice of life"],
+      matureFlags: [],
       description: "A cozy romance with two playable chapters and too much matcha.",
     },
   };
@@ -94,19 +98,42 @@
 
   function genreTags(series, demoMeta) {
     if (demoMeta && demoMeta.genres) return demoMeta.genres;
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genres = series.genres || [];
+    if (genres.length) return genres.join(" ");
     var flags = series.contentFlags || [];
     if (!flags.length) return "story";
     return flags.join(" ");
   }
 
+  function genreKeys(series, demoMeta) {
+    if (demoMeta && demoMeta.genreKeys) return demoMeta.genreKeys.slice();
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    return (series.genres || []).slice();
+  }
+
   function flagLabels(series, demoMeta) {
     if (demoMeta && demoMeta.flags) return demoMeta.flags;
-    var keys = series.contentFlags || [];
-    var defs = (window.ScenaStore && ScenaStore.CONTENT_FLAGS) || [];
-    return keys.map(function (key) {
-      var def = defs.find(function (item) { return item.key === key; });
-      return def ? def.label : key;
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genreLabels = (series.genres || []).map(function (key) {
+      return window.ScenaStore && ScenaStore.labelForGenre
+        ? ScenaStore.labelForGenre(key)
+        : key;
     });
+    var matureLabels = (series.contentFlags || []).map(function (key) {
+      return window.ScenaStore && ScenaStore.labelForMatureFlag
+        ? ScenaStore.labelForMatureFlag(key)
+        : key;
+    });
+    return genreLabels.concat(matureLabels);
+  }
+
+  function entryIsAgeRestricted(series, demoMeta) {
+    if (demoMeta && demoMeta.matureFlags) return demoMeta.matureFlags.length > 0;
+    if (window.ScenaStore && ScenaStore.seriesIsAgeRestricted) {
+      return ScenaStore.seriesIsAgeRestricted(series);
+    }
+    return (series.contentFlags || []).length > 0;
   }
 
   function coverKey(series, demoMeta, index) {
@@ -127,6 +154,7 @@
       title: series.title || "Untitled",
       description: desc,
       genres: genreTags(series, demoMeta),
+      genreKeys: genreKeys(series, demoMeta),
       epLabel: liveEpisodeLabel(series),
       liveCount: (window.ScenaStore ? ScenaStore.orderedEpisodes(series) : (series.episodes || []))
         .filter(function (ep) {
@@ -138,6 +166,7 @@
       cover: coverKey(series, demoMeta, opts.index || 0),
       thumbStyle: thumbStyle,
       flags: flagLabels(series, demoMeta),
+      isAgeRestricted: entryIsAgeRestricted(series, demoMeta),
       updatedAt: series.updatedAt || "",
       isDemo: !!opts.isDemo,
       ownerId: opts.ownerId || null,
