@@ -15,12 +15,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   process.exit(0);
 }
 
+const deployUrl =
+  process.env.DEPLOY_PRIME_URL ||
+  process.env.URL ||
+  process.env.DEPLOY_URL;
+
 const redirect =
   process.env.ARLECO_AUTH_REDIRECT_URL ||
   process.env.SCENA_AUTH_REDIRECT_URL ||
-  (process.env.URL
-    ? process.env.URL.replace(/\/$/, "") + "/"
-    : null);
+  (deployUrl ? deployUrl.replace(/\/$/, "") + "/" : null);
 
 function esc(value) {
   return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');

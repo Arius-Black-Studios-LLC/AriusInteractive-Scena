@@ -1,12 +1,13 @@
 [build]
   base = "web"
-  command = "npm ci && npm run build"
-  publish = "web/dist"
+  # publish is relative to base — dist ends up at repo/web/dist, not web/web/dist
+  command = "node ../scripts/write-scena-config.js && npm ci && npm run build"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# Auth on Netlify (including deploy previews): set in Site settings → Environment variables:
-#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_AUTH_REDIRECT_URL (optional; defaults to site origin)
-# Also add each preview URL to Supabase → Authentication → Redirect URLs.
-# docs/scena-config.js is local-only (gitignored); CI builds rely on those env vars.
+# Auth on Netlify: set SCENA_SUPABASE_URL, SCENA_SUPABASE_ANON_KEY (and optionally
+# SCENA_AUTH_REDIRECT_URL). write-scena-config.js generates docs/scena-config.js at build time.
+# Preview deploys use DEPLOY_PRIME_URL for auth redirect when SCENA_AUTH_REDIRECT_URL is unset.
+# Add each preview URL pattern to Supabase → Authentication → Redirect URLs.
