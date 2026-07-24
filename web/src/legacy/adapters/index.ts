@@ -1,9 +1,11 @@
 import type { LegacySession } from "../globals.d.ts";
 import { badgeAdapter } from "./badgeAdapter";
+import { graphEditorAdapter } from "./graphEditorAdapter";
 import { learnAdapter } from "./learnAdapter";
 import { studioAdapter } from "./studioAdapter";
 
 export { badgeAdapter } from "./badgeAdapter";
+export { graphEditorAdapter } from "./graphEditorAdapter";
 export { learnAdapter } from "./learnAdapter";
 export { studioAdapter } from "./studioAdapter";
 

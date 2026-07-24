@@ -1425,9 +1425,9 @@
       return;
     }
     if (target && target.closest && target.closest("#graphCanvasWrap")) {
-      var pt = this.clientToCanvas(e.clientX, e.clientY);
-      this.pendingSpawn = { x: pt.x, y: pt.y, screenX: e.clientX, screenY: e.clientY };
-      this.showSpawnMenu(e.clientX, e.clientY);
+      var pt = this.clientToCanvas(pointer.x, pointer.y);
+      this.pendingSpawn = { x: pt.x, y: pt.y, screenX: pointer.x, screenY: pointer.y };
+      this.showSpawnMenu(pointer.x, pointer.y);
       return;
     }
     this.cancelConnect();
@@ -1467,6 +1467,8 @@
     this.connectChoiceId = choiceId;
     this.completeConnect(newId);
     this.selectNode(newId);
+    var spawned = this.getNode(newId);
+    if (spawned) this.focusNodeInView(spawned);
   };
 
   ScenaGraphEditor.prototype.clientToCanvas = function (cx, cy) {

@@ -161,11 +161,25 @@
     return '<a class="sidebar-link' + (active ? " is-active" : "") + '" href="' + href + '">' + label + "</a>";
   }
 
+  function destroyGraphEditor() {
+    if (graphEditor && graphEditor.destroy) {
+      graphEditor.destroy();
+    }
+    graphEditor = null;
+  }
+
+  function mountGraphEditor(container, opts) {
+    if (window.ScenaGraphEditorBridge && window.ScenaGraphEditorBridge.create) {
+      return window.ScenaGraphEditorBridge.create(container, opts);
+    }
+    return new ScenaGraphEditor(container, opts);
+  }
+
   function render() {
     var route = parseRoute();
     var main = $("#studioMain");
     if (!main) return;
-    graphEditor = null;
+    destroyGraphEditor();
     updateTopbarForRoute(route);
 
     try {
@@ -272,7 +286,7 @@
       }
     } else if (route.view === "graph") {
       main.innerHTML = '<div class="page-wide" id="graphRoot"></div>';
-      graphEditor = new ScenaGraphEditor($("#graphRoot"), {
+      var graphOpts = {
         series: series,
         feedbackUserId: userId,
         feedbackProfile: userProfile,
@@ -291,7 +305,8 @@
             awardBadges(ScenaBadges.recordEpisodePublished(userId));
           }
         },
-      });
+      };
+      graphEditor = mountGraphEditor($("#graphRoot"), graphOpts);
       var openKey = "scena.openEpisode." + series.id;
       var openId = sessionStorage.getItem(openKey);
       if (openId) {

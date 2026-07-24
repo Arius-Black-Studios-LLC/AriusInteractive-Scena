@@ -10,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
-import { studioAdapter } from "../legacy/adapters";
+import { studioAdapter, graphEditorAdapter } from "../legacy/adapters";
 
 type StudioContextValue = {
   ready: boolean;
@@ -34,6 +34,14 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   ]);
   const [booted, setBooted] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bundleReady) return;
+    window.ScenaGraphEditorBridge = graphEditorAdapter;
+    return () => {
+      delete window.ScenaGraphEditorBridge;
+    };
+  }, [bundleReady]);
 
   useEffect(() => {
     if (authLoading) return;

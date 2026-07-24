@@ -14,6 +14,7 @@ export type CatalogEntry = {
   cover: string;
   flags: string[];
   readersLabel?: string;
+  readersThisWeekLabel?: string;
   chaptersReadThisWeekLabel?: string;
   thumbStyle?: string;
 };
@@ -110,6 +111,14 @@ declare global {
       navigate?: (hashPath: string) => void;
       toast?: (message: string) => void;
     };
+    ScenaGraphEditor?: new (
+      container: HTMLElement,
+      options: Record<string, unknown>,
+    ) => {
+      openEpisodeFromGraph?: (episodeId: string) => void;
+      selectNode?: (nodeId: string) => void;
+    };
+    ScenaGraphEditorBridge?: import("./ports/GraphEditorPort").GraphEditorPort;
     ScenaFeedback?: {
       mountHomepage: (id: string) => void;
       fetchPublicReviews: () => Promise<unknown[]>;

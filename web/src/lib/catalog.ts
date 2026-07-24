@@ -13,7 +13,6 @@ export const DEMO_SERIES: CatalogEntry[] = [
     href: "/series?series=signal-lost",
     cover: "c",
     flags: ["Sci-fi", "Strong language"],
-    readersLabel: "1.2k chapters read this week",
     isDemo: true,
   },
   {
@@ -25,7 +24,6 @@ export const DEMO_SERIES: CatalogEntry[] = [
     href: "/series?series=cafe-at-sunset",
     cover: "b",
     flags: ["Romance"],
-    readersLabel: "680 chapters read this week",
     isDemo: true,
   },
 ];

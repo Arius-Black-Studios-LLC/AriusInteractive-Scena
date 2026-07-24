@@ -82,7 +82,7 @@
     return [
       {
         rating: 5,
-        message: "The graph editor finally clicked for me — I shipped a playable chapter in a weekend.",
+        message: "Mapping branches on the graph before I write dialogue makes planning and plotting so much easier — I can see the whole story at once.",
         author_display_name: "Mira K.",
         context: "studio",
       },

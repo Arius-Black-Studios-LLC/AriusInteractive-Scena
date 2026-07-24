@@ -32,41 +32,23 @@ const HERO_WORDS = ["choose", "branch", "discover", "play"];
 
 
 type HeroStats = {
-
   liveSeries: number;
-
   episodes: number;
-
   chaptersRead: number;
-
-  chaptersSuffix: string;
-
 };
 
-
-
-function mapEntry(entry: CatalogEntry & { chaptersReadThisWeekLabel?: string; liveCount?: number }) {
-
-  return {
-
-    ...entry,
-
-    readersLabel: entry.chaptersReadThisWeekLabel || entry.readersLabel,
-
-    href: entry.href.startsWith("/") ? entry.href : `/series?series=${entry.id}`,
-
-  };
-
+function formatChaptersRead(count: number): string {
+  if (count <= 0) return "0";
+  if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(count);
 }
 
-
-
-function formatChaptersRead(count: number, suffix: string): string {
-
-  if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k${suffix}`;
-
-  return `${count}${suffix}`;
-
+function mapEntry(entry: CatalogEntry & { readersThisWeekLabel?: string; liveCount?: number }) {
+  return {
+    ...entry,
+    readersLabel: entry.readersThisWeekLabel || undefined,
+    href: entry.href.startsWith("/") ? entry.href : `/series?series=${entry.id}`,
+  };
 }
 
 
@@ -86,15 +68,9 @@ export function HomePage() {
   const [heroWordChanging, setHeroWordChanging] = useState(false);
 
   const [stats, setStats] = useState<HeroStats>({
-
     liveSeries: DEMO_SERIES.length,
-
     episodes: 4,
-
     chaptersRead: 0,
-
-    chaptersSuffix: "",
-
   });
 
   const { ready } = useLegacyBundle("reader", ["scena-logo.css", "arleco-theme.css"]);
@@ -148,9 +124,7 @@ export function HomePage() {
         };
 
         const rows = (readerBundle.entries || list || []).map((entry) =>
-
-          mapEntry(entry as CatalogEntry & { chaptersReadThisWeekLabel?: string; liveCount?: number }),
-
+          mapEntry(entry as CatalogEntry & { readersThisWeekLabel?: string; liveCount?: number }),
         );
 
         if (rows.length) setEntries(rows);
@@ -166,15 +140,9 @@ export function HomePage() {
         );
 
         setStats({
-
           liveSeries: list.length || DEMO_SERIES.length,
-
           episodes: episodeTotal || 4,
-
           chaptersRead: readerBundle.chaptersReadThisWeek || 0,
-
-          chaptersSuffix: readerBundle.readersSuffix || "",
-
         });
 
       })
@@ -278,7 +246,7 @@ export function HomePage() {
 
               <div className="hero-stat-num">
 
-                {formatChaptersRead(stats.chaptersRead, stats.chaptersSuffix)}
+                {formatChaptersRead(stats.chaptersRead)}
 
               </div>
 

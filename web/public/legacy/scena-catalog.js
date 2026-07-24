@@ -16,26 +16,14 @@
       cover: "d",
       flags: ["Sci-fi", "Strong language"],
       description: "Sci-fi mystery aboard Kerberos-9 — long chapters, dead comms, and a signal from inside the hull.",
-      readersWeek: 1240,
     },
     "cafe-at-sunset": {
       genres: "romance",
       cover: "b",
       flags: ["Romance"],
       description: "A cozy romance with two playable chapters and too much matcha.",
-      readersWeek: 680,
     },
   };
-
-  function stableHash(str) {
-    var hash = 0;
-    var s = String(str || "");
-    for (var i = 0; i < s.length; i++) {
-      hash = ((hash << 5) - hash) + s.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
-  }
 
   function formatReaderCount(n) {
     n = parseInt(n, 10) || 0;
@@ -45,41 +33,35 @@
     return String(n);
   }
 
-  function baselineReadersWeek(entry) {
-    var meta = DEMO_META[entry.id];
-    if (meta && meta.readersWeek) return meta.readersWeek;
-    return 60 + (stableHash(entry.id) % 220) + (entry.liveCount || 1) * 35;
+  function readerCountLabel(n) {
+    n = parseInt(n, 10) || 0;
+    if (n <= 0) return "";
+    return formatReaderCount(n);
   }
 
   function resolveReaderStats(entries, cloudStats) {
-    var bySeries = (cloudStats && (cloudStats.chaptersBySeries || cloudStats.readersBySeries)) || {};
+    var chaptersBySeries = (cloudStats && cloudStats.chaptersBySeries) || {};
+    var readersBySeries = (cloudStats && cloudStats.readersBySeries) || {};
     var enriched = (entries || []).map(function (entry) {
-      var real = parseInt(bySeries[entry.id], 10) || 0;
-      var display = real > 0 ? real : (entry.isDemo ? baselineReadersWeek(entry) : 0);
+      var chapters = parseInt(chaptersBySeries[entry.id], 10) || 0;
+      var readers = parseInt(readersBySeries[entry.id], 10) || 0;
       return Object.assign({}, entry, {
-        chaptersReadThisWeek: display,
-        chaptersReadThisWeekLabel: formatReaderCount(display),
-        readersThisWeek: display,
-        readersThisWeekLabel: formatReaderCount(display),
+        chaptersReadThisWeek: chapters,
+        chaptersReadThisWeekLabel: readerCountLabel(chapters),
+        readersThisWeek: readers,
+        readersThisWeekLabel: readerCountLabel(readers),
       });
     });
     var hasCloudStats = cloudStats != null;
-    var realWeekly = hasCloudStats
-      ? (parseInt(cloudStats.chaptersReadThisWeek, 10) ||
-         parseInt(cloudStats.readersThisWeek, 10) || 0)
-      : 0;
-    var displayWeekly = hasCloudStats
-      ? realWeekly
-      : enriched.reduce(function (sum, entry) {
-          return sum + (entry.chaptersReadThisWeek || entry.readersThisWeek || 0);
-        }, 0);
+    var weeklyChapters = hasCloudStats ? (parseInt(cloudStats.chaptersReadThisWeek, 10) || 0) : 0;
+    var weeklyReaders = hasCloudStats ? (parseInt(cloudStats.readersThisWeek, 10) || 0) : 0;
     return {
       entries: enriched,
-      chaptersReadThisWeek: displayWeekly,
-      chaptersReadThisWeekLabel: formatReaderCount(displayWeekly),
-      readersThisWeek: displayWeekly,
-      readersThisWeekLabel: formatReaderCount(displayWeekly),
-      readersSuffix: displayWeekly >= 1000 ? "+" : "",
+      chaptersReadThisWeek: weeklyChapters,
+      chaptersReadThisWeekLabel: readerCountLabel(weeklyChapters),
+      readersThisWeek: weeklyReaders,
+      readersThisWeekLabel: readerCountLabel(weeklyReaders),
+      readersSuffix: "",
     };
   }
 
@@ -166,8 +148,8 @@
     var flagsHtml = (entry.flags || []).map(function (label) {
       return '<span class="flag">' + escapeHtml(label) + "</span>";
     }).join("");
-    var readersHtml = (entry.chaptersReadThisWeekLabel || entry.readersThisWeekLabel)
-      ? ('<div class="card-readers">' + escapeHtml(entry.chaptersReadThisWeekLabel || entry.readersThisWeekLabel) + " chapters read this week</div>")
+    var readersHtml = entry.readersThisWeekLabel
+      ? ('<div class="card-readers">' + escapeHtml(entry.readersThisWeekLabel) + " readers this week</div>")
       : "";
     return (
       '<div class="card-wrap">' +

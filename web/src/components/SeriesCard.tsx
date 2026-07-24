@@ -16,7 +16,7 @@ export function SeriesCard({ entry }: Props) {
         <div className="series-card-title">{entry.title}</div>
         <div className="series-card-desc">{entry.description}</div>
         {entry.readersLabel ? (
-          <div className="series-card-readers">{entry.readersLabel}</div>
+          <div className="series-card-readers">{entry.readersLabel} readers this week</div>
         ) : null}
         {entry.flags.length > 0 ? (
           <div className="series-card-flags">

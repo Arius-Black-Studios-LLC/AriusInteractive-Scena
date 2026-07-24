@@ -2046,8 +2046,11 @@ body.is-resizing-center {
 .graph-edges {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   overflow: visible;
+  z-index: 1;
 }
 
 .graph-edges path {

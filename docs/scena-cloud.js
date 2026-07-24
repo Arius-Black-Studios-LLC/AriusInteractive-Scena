@@ -734,21 +734,19 @@
 
         var data = result.data || {};
 
-        var bySeries = data.chapters_by_series || data.readers_by_series || {};
+        var chaptersBySeries = data.chapters_by_series || {};
 
-        var weekly = parseInt(data.chapters_read_this_week, 10) ||
-
-          parseInt(data.readers_this_week, 10) || 0;
+        var readersBySeries = data.readers_by_series || {};
 
         return {
 
-          chaptersReadThisWeek: weekly,
+          chaptersReadThisWeek: parseInt(data.chapters_read_this_week, 10) || 0,
 
-          chaptersBySeries: bySeries,
+          chaptersBySeries: chaptersBySeries,
 
-          readersThisWeek: weekly,
+          readersThisWeek: parseInt(data.readers_this_week, 10) || 0,
 
-          readersBySeries: bySeries,
+          readersBySeries: readersBySeries,
 
         };
 
