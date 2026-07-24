@@ -1,4 +1,24 @@
-/* Arleco blog — listing + article pages */
+/* Arleco blog — listing + article pages + home preview */
+.home-blog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.section-intro {
+  max-width: 42rem;
+  margin: -8px 0 24px;
+  color: var(--scena-text-muted, #6B6B6B);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 960px) {
+  .home-blog-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .scena-blog-main {
   max-width: 820px;
 }
@@ -36,7 +56,7 @@
 }
 
 .scena-blog-card-tag {
-  color: var(--scena-accent, #ff8c00);
+  color: var(--scena-accent, #7c1128);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -98,14 +118,14 @@
 }
 
 .scena-article-body a {
-  color: var(--scena-accent, #ff8c00);
+  color: var(--scena-accent, #7c1128);
 }
 
 .scena-article-cta {
   margin-top: 36px;
   padding: 20px 22px;
-  background: var(--scena-accent-soft, #fff4e6);
-  border: 1px solid rgba(255, 140, 0, 0.2);
+  background: var(--scena-accent-soft, #f9ecef);
+  border: 1px solid rgba(124, 17, 40, 0.18);
   border-radius: 10px;
 }
 
@@ -126,5 +146,5 @@
 }
 
 .scena-breadcrumb a:hover {
-  color: var(--scena-accent, #ff8c00);
+  color: var(--scena-accent, #7c1128);
 }

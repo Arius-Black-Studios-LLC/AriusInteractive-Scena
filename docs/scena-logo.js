@@ -1,30 +1,16 @@
 /**
- * Arleco — inject logo mark (stage arch + branching story paths)
+ * Arleco — inject app icon into logo marks site-wide
  */
 (function () {
-  var SVG =
-    '<svg class="logo-svg" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-      '<ellipse class="logo-glow" cx="16" cy="24.2" rx="7.2" ry="2.6" fill="#C9A84C" opacity="0.16"/>' +
-      '<g class="logo-curtain-left">' +
-        '<path d="M8.2 17.4L8.2 25.8L11.8 25.2Q10.4 21.2 10.4 17.4Z" fill="#8B1530"/>' +
-      '</g>' +
-      '<g class="logo-curtain-right">' +
-        '<path d="M23.8 17.4L23.8 25.8L20.2 25.2Q21.6 21.2 21.6 17.4Z" fill="#8B1530"/>' +
-      '</g>' +
-      '<path d="M7.2 26.2V16.4Q16 6.8 24.8 16.4V26.2" fill="#1A0A0E"/>' +
-      '<path class="logo-stem" d="M16 23.8V18.2" stroke="#C9A84C" stroke-width="1.35" stroke-linecap="round"/>' +
-      '<path class="logo-branch-left" d="M16 18.6L11.4 13.2" stroke="#D4AF37" stroke-width="1.25" stroke-linecap="round"/>' +
-      '<path class="logo-branch-right" d="M16 18.6L20.6 13.2" stroke="#D4AF37" stroke-width="1.25" stroke-linecap="round"/>' +
-      '<path class="logo-choice" d="M16 17.4L17.15 18.55L16 19.7L14.85 18.55Z" fill="#D4AF37"/>' +
-      '<path d="M4.8 26.6V15.2Q16 4.6 27.2 15.2V26.6" stroke="#7C1128" stroke-width="2.15" stroke-linecap="round"/>' +
-      '<path d="M5.4 26V15.8Q16 6.2 26.6 15.8V26" stroke="#C9A84C" stroke-width="0.55" stroke-linecap="round" opacity="0.32"/>' +
-      '<circle class="logo-star" cx="16" cy="9.2" r="1" fill="#F0D78C"/>' +
-    '</svg>';
+  var ICON_SRC = "/arleco-icon.png";
 
   function mount() {
     document.querySelectorAll(".logo-mark").forEach(function (el) {
-      if (el.querySelector("svg")) return;
-      el.innerHTML = SVG;
+      if (el.querySelector("img.logo-img")) return;
+      el.innerHTML =
+        '<img class="logo-img" src="' +
+        ICON_SRC +
+        '" alt="" width="32" height="32" decoding="async" />';
     });
   }
 

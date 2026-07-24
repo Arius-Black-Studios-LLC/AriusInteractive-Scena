@@ -3,19 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Arleco — Stories you choose</title>
-  <meta name="description" content="Arleco — creator-made episodic visual novels. Read free in your browser or publish branching stories from the studio." />
+  <title>Arleco — Human-made stories you choose</title>
+  <meta name="description" content="Arleco — an indie visual novel platform in early beta. Human-written, creator-made branching stories. Read free in your browser." />
   <link rel="canonical" href="https://arleco.app/" />
   <meta property="og:site_name" content="Arleco" />
-  <meta property="og:title" content="Arleco — Stories you choose" />
-  <meta property="og:description" content="Creator-made episodic visual novels. Read free in your browser — not AI-generated." />
+  <meta property="og:title" content="Arleco — Human-made stories you choose" />
+  <meta property="og:description" content="Indie platform in early beta. Every story is human-written by independent creators — not AI-generated." />
   <meta property="og:url" content="https://arleco.app/" />
   <meta property="og:type" content="website" />
-  <link rel="icon" href="scena-logo.svg" type="image/svg+xml" />
+  <meta property="og:image" content="https://arleco.app/arleco-icon.png" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Arleco — Human-made stories you choose" />
+  <meta name="twitter:description" content="Indie visual novel platform in early beta. Human-written branching stories — not AI-generated." />
+  <meta name="twitter:image" content="https://arleco.app/arleco-icon.png" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Arleco",
+    "url": "https://arleco.app/",
+    "description": "Indie visual novel platform for human-written, creator-made branching stories.",
+    "publisher": { "@type": "Organization", "name": "Arius Interactive" }
+  }
+  </script>
+  <link rel="icon" href="arleco-icon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="arleco-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="scena-logo.css?v=2" />
+  <link rel="stylesheet" href="scena-logo.css?v=3" />
+  <link rel="stylesheet" href="arleco-theme.css?v=1" />
+  <link rel="stylesheet" href="blog.css?v=2" />
   <style>
     :root {
       --scena-bg: #F7F6F3;
@@ -26,19 +44,19 @@
       --scena-text-faint: #9A9893;
       --scena-border: #E5E3DE;
       --scena-border-strong: #C9C6BE;
-      /* ABS studio palette — orange / yellow accent on neutral Arleco chrome */
-      --abs-black: #000000;
-      --abs-white: #ffffff;
-      --abs-yellow: #ffd700;
-      --abs-orange: #ff8c00;
-      --abs-orange-deep: #ff6600;
-      --abs-red: #e63946;
-      --abs-grey: #c8c8c8;
-      --scena-accent: var(--abs-orange);
-      --scena-accent-hover: var(--abs-orange-deep);
-      --scena-accent-soft: #fff4e6;
-      --scena-accent-glow: rgba(255, 140, 0, 0.35);
-      --scena-accent-yellow: var(--abs-yellow);
+      /* Arleco — deep red + gold */
+      --arleco-red: #7C1128;
+      --arleco-red-deep: #5A0C1E;
+      --arleco-red-soft: #8B1530;
+      --arleco-gold: #D4AF37;
+      --arleco-gold-light: #F0D78C;
+      --arleco-gold-muted: #C9A84C;
+      --arleco-ink: #1A0A0E;
+      --scena-accent: var(--arleco-red);
+      --scena-accent-hover: var(--arleco-red-deep);
+      --scena-accent-soft: #F9ECEF;
+      --scena-accent-glow: rgba(124, 17, 40, 0.28);
+      --scena-accent-yellow: var(--arleco-gold);
       --font-display: "Fraunces", Georgia, serif;
       --font-ui: "DM Sans", system-ui, sans-serif;
       --radius: 8px;
@@ -186,7 +204,7 @@
 
     .search-wrap:focus-within .search-input {
       border-color: var(--scena-accent);
-      box-shadow: 0 0 0 3px var(--scena-accent-soft), 0 4px 16px rgba(255, 140, 0, 0.12);
+      box-shadow: 0 0 0 3px var(--scena-accent-soft), 0 4px 16px rgba(124, 17, 40, 0.12);
       background: #fff;
       transform: translateY(-1px);
     }
@@ -355,7 +373,7 @@
     .hero-blob--1 {
       width: 480px;
       height: 480px;
-      background: radial-gradient(circle, rgba(255, 140, 0, 0.28) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(124, 17, 40, 0.22) 0%, transparent 70%);
       top: -120px;
       right: -80px;
     }
@@ -363,7 +381,7 @@
     .hero-blob--2 {
       width: 360px;
       height: 360px;
-      background: radial-gradient(circle, rgba(255, 215, 0, 0.18) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, transparent 70%);
       bottom: 0;
       left: -100px;
       animation-delay: -6s;
@@ -373,8 +391,8 @@
       position: absolute;
       inset: 0;
       background-image:
-        linear-gradient(rgba(255, 140, 0, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 140, 0, 0.04) 1px, transparent 1px);
+        linear-gradient(rgba(124, 17, 40, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124, 17, 40, 0.04) 1px, transparent 1px);
       background-size: 48px 48px;
       mask-image: linear-gradient(to bottom, black 0%, transparent 85%);
     }
@@ -389,6 +407,49 @@
       position: relative;
       padding: 88px 0 56px;
       text-align: center;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .hero-badge {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--scena-border);
+      background: var(--scena-surface);
+    }
+
+    .hero-badge--beta {
+      background: var(--scena-accent-soft);
+      color: var(--scena-accent);
+      border-color: rgba(124, 17, 40, 0.22);
+    }
+
+    .hero-badge--human {
+      color: var(--arleco-red-deep);
+      border-color: rgba(212, 175, 55, 0.4);
+      background: rgba(212, 175, 55, 0.12);
+    }
+
+    .hero-trust {
+      max-width: 36rem;
+      margin: 0 auto 28px;
+      font-size: 0.9375rem;
+      color: var(--scena-text-muted);
+      line-height: 1.65;
+    }
+
+    .hero-trust strong {
+      color: var(--scena-text);
+      font-weight: 600;
     }
 
     .hero-accent-line {
@@ -892,8 +953,8 @@
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(255, 140, 0, 0.4) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 80% at 80% 50%, rgba(255, 215, 0, 0.22) 0%, transparent 60%);
+        radial-gradient(ellipse 80% 60% at 20% 50%, rgba(124, 17, 40, 0.45) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 80% at 80% 50%, rgba(212, 175, 55, 0.25) 0%, transparent 60%);
       animation: band-shift 12s ease-in-out infinite alternate;
     }
 
@@ -1405,6 +1466,7 @@
         <a href="#discover" class="is-active" data-nav>Discover</a>
         <a href="#featured" data-nav>Featured</a>
         <a href="#creators" data-nav>For creators</a>
+        <a href="/blog">Blog</a>
         <a href="/learn">Conservatory</a>
       </nav>
       <div class="search-wrap">
@@ -1443,6 +1505,7 @@
     <a href="#discover">Discover</a>
     <a href="#featured">Featured</a>
     <a href="#creators">For creators</a>
+    <a href="/blog">Blog</a>
     <a href="/learn">Conservatory</a>
     <div id="mobileLoggedOut">
       <button type="button" data-open-login="reader">Log in</button>
@@ -1471,12 +1534,17 @@
       </div>
       <section class="hero container">
         <div class="hero-accent-line" aria-hidden="true"></div>
+        <div class="hero-badges">
+          <span class="hero-badge hero-badge--beta">Early beta</span>
+          <span class="hero-badge hero-badge--human">Human-made stories only</span>
+        </div>
         <h1>
           <span class="word">Stories</span>
           <span class="word">you</span>
           <span class="word"><span class="hero-rotate" id="heroRotate">choose</span>.</span>
         </h1>
-        <p class="hero-lede">Episodic visual novels from independent creators. Read free in your browser — new chapters every week.</p>
+        <p class="hero-lede">An indie platform for episodic visual novels — built for readers and independent creators, not algorithms.</p>
+        <p class="hero-trust"><strong>No AI-generated fiction.</strong> Every chapter is written, edited, and published by real people. We're in early beta — the platform is still growing, but the stories are already here.</p>
         <div class="hero-stats">
           <div class="hero-stat">
             <div class="hero-stat-num" id="heroReaderCount" data-count="0">0</div>
@@ -1532,7 +1600,7 @@
     <section class="section container reveal" id="discover">
       <div class="section-head">
         <h2>Discover</h2>
-        <a href="#" class="section-head-link">View all →</a>
+        <span class="section-head-meta">Human-written · Indie creators</span>
       </div>
       <div class="filter-bar" id="filterBar">
         <button type="button" class="filter-chip is-active" data-filter="all">All</button>
@@ -1570,17 +1638,51 @@
       </div>
     </section>
 
+    <section class="section container reveal" id="blog">
+      <div class="section-head">
+        <h2>From the blog</h2>
+        <a href="/blog" class="section-head-link">All posts →</a>
+      </div>
+      <p class="section-intro">Guides on human-made visual novels — for readers discovering the format and indie creators learning to publish.</p>
+      <div class="home-blog-grid reveal-stagger">
+        <a class="scena-blog-card" href="/blog/what-is-a-visual-novel.html">
+          <div class="scena-blog-card-meta">
+            <span class="scena-blog-card-tag">For readers</span>
+            <time datetime="2026-07-24">Jul 24, 2026</time>
+          </div>
+          <h2>What is a visual novel?</h2>
+          <p>Dialogue, choices, and chapters — how browser visual novels work and why they beat AI choose-your-adventure apps.</p>
+        </a>
+        <a class="scena-blog-card" href="/blog/how-to-write-branching-story.html">
+          <div class="scena-blog-card-meta">
+            <span class="scena-blog-card-tag">For creators</span>
+            <time datetime="2026-07-24">Jul 24, 2026</time>
+          </div>
+          <h2>How to write a branching story</h2>
+          <p>Plot nodes, meaningful choices, and episode structure for interactive fiction writers.</p>
+        </a>
+        <a class="scena-blog-card" href="/blog/publish-interactive-fiction-online.html">
+          <div class="scena-blog-card-meta">
+            <span class="scena-blog-card-tag">For creators</span>
+            <time datetime="2026-07-24">Jul 24, 2026</time>
+          </div>
+          <h2>Publish interactive fiction online</h2>
+          <p>From first draft to live chapter — preview, validate, schedule releases, and grow a readership.</p>
+        </a>
+      </div>
+    </section>
+
     <section class="creator-band reveal" id="creators">
       <div class="creator-band-bg" aria-hidden="true"></div>
       <div class="container creator-band-inner">
         <div>
-          <h2>Build your story. Publish weekly.</h2>
-          <p>Graph editor, project assets, branching routes, and one-click publish — free for creators on Arleco.</p>
+          <h2>Indie creators welcome — we're building in public.</h2>
+          <p>Arleco is a small platform in early beta. Publish human-written branching stories with our graph editor — free while we grow the community.</p>
         </div>
         <div class="creator-band-actions">
           <button type="button" class="btn btn-primary" data-open-login="creator">Open creator studio</button>
           <a href="/learn" class="btn btn-secondary">Enter the Conservatory</a>
-          <span class="creator-band-note">Free to publish · No credit card</span>
+          <span class="creator-band-note">Early beta · Free to publish · No credit card</span>
         </div>
       </div>
     </section>
@@ -1594,14 +1696,15 @@
             <span class="logo-mark" aria-hidden="true"></span>
             <span class="logo-text">Arleco</span>
           </a>
-          <p>Episodic visual novels you read in the browser.</p>
-          <p class="footer-operator"><a href="../index.html">Arius Interactive</a></p>
+          <p>Human-made visual novels in your browser. Indie platform · early beta.</p>
+          <p class="footer-operator"><a href="/">Arius Interactive</a></p>
         </div>
         <div class="footer-col">
           <h4>Read</h4>
           <ul>
             <li><a href="#discover">Discover</a></li>
             <li><a href="#featured">Featured</a></li>
+            <li><a href="/blog">Blog</a></li>
             <li><a href="#discover">New releases</a></li>
             <li><a href="#discover">Genres</a></li>
           </ul>
@@ -2120,6 +2223,6 @@
       }
     })();
   </script>
-  <script src="scena-logo.js?v=2"></script>
+  <script src="scena-logo.js?v=3"></script>
 </body>
 </html>

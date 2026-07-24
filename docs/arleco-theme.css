@@ -1,0 +1,29 @@
+/* Arleco brand palette — deep red + gold */
+:root {
+  --arleco-red: #7c1128;
+  --arleco-red-deep: #5a0c1e;
+  --arleco-red-soft: #8b1530;
+  --arleco-gold: #d4af37;
+  --arleco-gold-light: #f0d78c;
+  --arleco-gold-muted: #c9a84c;
+  --arleco-ink: #1a0a0e;
+
+  --scena-accent: var(--arleco-red);
+  --scena-accent-hover: var(--arleco-red-deep);
+  --scena-accent-soft: #f9ecef;
+  --scena-accent-glow: rgba(124, 17, 40, 0.28);
+  --scena-accent-yellow: var(--arleco-gold);
+  --scena-accent-gold: var(--arleco-gold);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --scena-accent-soft: rgba(212, 175, 55, 0.12);
+    --scena-accent-glow: rgba(212, 175, 55, 0.2);
+  }
+}
+
+[data-theme="dark"] {
+  --scena-accent-soft: rgba(212, 175, 55, 0.12);
+  --scena-accent-glow: rgba(212, 175, 55, 0.2);
+}
