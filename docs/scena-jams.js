@@ -52,13 +52,12 @@
     jam.contentFlags = (jam.contentFlags || []).filter(function (key) {
       return matureKeys.indexOf(key) >= 0;
     });
-    if (jamHasMatureFlags(jam)) jam.ageRestricted = true;
+    jam.ageRestricted = !!(jam.ageRestricted || (jam.contentFlags || []).length > 0);
     return jam;
   }
 
   function jamHasMatureFlags(jam) {
     if (!jam) return false;
-    migrateJam(jam);
     return (jam.contentFlags || []).length > 0;
   }
 
@@ -210,8 +209,7 @@
   function requiresAgeGate(jam) {
     if (!jam) return false;
     migrateJam(jam);
-    if (jam.ageRestricted) return true;
-    return jamHasMatureFlags(jam);
+    return !!jam.ageRestricted;
   }
 
   function validateJamSpec(spec) {
