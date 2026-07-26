@@ -4,7 +4,7 @@
 create or replace function public._ducat_pack_price_cents(p_pack_id text)
 returns int language sql immutable as $$
   select case p_pack_id
-    when 'ducat_10' then 50
+    when 'ducat_10' then 99
     when 'ducat_55' then 499
     when 'ducat_120' then 999
     when 'ducat_500' then 2499

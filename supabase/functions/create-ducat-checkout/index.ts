@@ -6,9 +6,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** Put ?query before #hash so browsers expose params in location.search */
+function buildReturnUrl(siteUrl: string, returnPath: string, query: string): string {
+  const hashIdx = returnPath.indexOf("#");
+  if (hashIdx >= 0) {
+    const path = returnPath.slice(0, hashIdx) || "/";
+    const hash = returnPath.slice(hashIdx);
+    const sep = path.includes("?") ? "&" : "?";
+    return `${siteUrl}${path}${sep}${query}${hash}`;
+  }
+  const sep = returnPath.includes("?") ? "&" : "?";
+  return `${siteUrl}${returnPath}${sep}${query}`;
+}
+
 /** Must match docs/scena-wallet.js and supabase-wallet.sql */
 const PACKS: Record<string, { ducats: number; priceCents: number; label: string }> = {
-  ducat_10: { ducats: 10, priceCents: 50, label: "10 Ducats" },
+  ducat_10: { ducats: 10, priceCents: 99, label: "10 Ducats" },
   ducat_55: { ducats: 55, priceCents: 499, label: "55 Ducats" },
   ducat_120: { ducats: 120, priceCents: 999, label: "120 Ducats" },
   ducat_500: { ducats: 500, priceCents: 2499, label: "500 Ducats" },
@@ -76,8 +89,12 @@ Deno.serve(async (req) => {
         ducats: String(pack.ducats),
       },
       client_reference_id: userData.user.id,
-      success_url: `${siteUrl}${returnPath}${returnPath.includes("?") ? "&" : "?"}ducat_purchase=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}${returnPath}${returnPath.includes("?") ? "&" : "?"}ducat_purchase=cancelled`,
+      success_url: buildReturnUrl(
+        siteUrl,
+        returnPath,
+        "ducat_purchase=success&session_id={CHECKOUT_SESSION_ID}",
+      ),
+      cancel_url: buildReturnUrl(siteUrl, returnPath, "ducat_purchase=cancelled"),
     });
 
     if (!session.url) {

@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       return json({ error: "Payment not completed yet." }, 409);
     }
 
-    const metaUserId = session.metadata?.user_id;
+    const metaUserId = session.metadata?.user_id || session.client_reference_id;
     if (!metaUserId || metaUserId !== userData.user.id) {
       return json({ error: "This checkout session does not belong to your account." }, 403);
     }

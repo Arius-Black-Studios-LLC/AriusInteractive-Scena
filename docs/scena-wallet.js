@@ -41,7 +41,7 @@
 
   var DUCAT_PACKS = [
 
-    { id: "ducat_10", ducats: 10, priceCents: 50, priceLabel: "$0.50", note: "Try a chapter (Stripe minimum)" },
+    { id: "ducat_10", ducats: 10, priceCents: 99, priceLabel: "$0.99", note: "Try a chapter" },
 
     { id: "ducat_55", ducats: 55, priceCents: 499, priceLabel: "$4.99", note: "50 + 5 bonus Ducats" },
 
@@ -348,11 +348,47 @@
 
 
 
+  function purchaseReturnQuery() {
+
+    var searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get("ducat_purchase")) {
+
+      return { params: searchParams, inHash: false };
+
+    }
+
+    var hash = window.location.hash || "";
+
+    var qIdx = hash.indexOf("?");
+
+    if (qIdx >= 0) {
+
+      return {
+
+        params: new URLSearchParams(hash.slice(qIdx + 1)),
+
+        inHash: true,
+
+        hashBeforeQuery: hash.slice(0, qIdx),
+
+      };
+
+    }
+
+    return { params: new URLSearchParams(), inHash: false };
+
+  }
+
+
+
   function handlePurchaseReturn(scopeId) {
 
     try {
 
-      var params = new URLSearchParams(window.location.search);
+      var parsed = purchaseReturnQuery();
+
+      var params = parsed.params;
 
       if (params.get("ducat_purchase") === "success") {
 
@@ -364,9 +400,19 @@
 
         var qs = params.toString();
 
-        var next = window.location.pathname + (qs ? "?" + qs : "") + (window.location.hash || "");
+        if (parsed.inHash) {
 
-        window.history.replaceState({}, "", next);
+          var nextHash = parsed.hashBeforeQuery + (qs ? "?" + qs : "");
+
+          window.history.replaceState({}, "", window.location.pathname + window.location.search + nextHash);
+
+        } else {
+
+          var next = window.location.pathname + (qs ? "?" + qs : "") + (window.location.hash || "");
+
+          window.history.replaceState({}, "", next);
+
+        }
 
         return Promise.resolve({ purchased: true, sessionId: sessionId });
 
@@ -378,7 +424,15 @@
 
         var qs2 = params.toString();
 
-        window.history.replaceState({}, "", window.location.pathname + (qs2 ? "?" + qs2 : "") + (window.location.hash || ""));
+        if (parsed.inHash) {
+
+          window.history.replaceState({}, "", window.location.pathname + window.location.search + parsed.hashBeforeQuery + (qs2 ? "?" + qs2 : ""));
+
+        } else {
+
+          window.history.replaceState({}, "", window.location.pathname + (qs2 ? "?" + qs2 : "") + (window.location.hash || ""));
+
+        }
 
       }
 
