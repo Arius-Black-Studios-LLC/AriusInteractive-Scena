@@ -26,6 +26,11 @@
     }
   }
 
+  function rpcMissingError(msg) {
+    msg = String(msg || "");
+    return /does not exist|could not find the function|schema cache|PGRST202/i.test(msg);
+  }
+
   function oauthAvatarFromUser(user) {
     var meta = (user && user.user_metadata) || {};
     return meta.avatar_url || meta.picture || meta.photo || "";
@@ -192,7 +197,7 @@
             if (!ensureRes.error) {
               return refetchProfile();
             }
-            if (!/does not exist/i.test(ensureRes.error.message || "")) {
+            if (!rpcMissingError(ensureRes.error.message)) {
               return finishProfile(null);
             }
             return insertProfileFallback().then(function () {

@@ -256,10 +256,15 @@
 
   }
 
+  function rpcMissingError(msg) {
+    msg = String(msg || "");
+    return /does not exist|could not find the function|schema cache|PGRST202/i.test(msg);
+  }
+
   function ensureProfileRow(sb, scopeId) {
     return sb.rpc("ensure_auth_profile").then(function (res) {
       if (!res.error) return;
-      if (!/does not exist/i.test(res.error.message || "")) {
+      if (!rpcMissingError(res.error.message)) {
         throw new Error(res.error.message || "Could not ensure profile.");
       }
       return sb.from("profiles").select("id").eq("id", scopeId).maybeSingle().then(function (row) {
