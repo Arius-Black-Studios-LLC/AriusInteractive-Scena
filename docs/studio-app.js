@@ -68,7 +68,9 @@
     if (parts[0] === "library") return { view: "library", libraryTab: parts[1] === "shop" ? "shop" : "assets" };
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
-      if (parts[1] === "new") return { view: "jams", jamMode: "new" };
+      if (parts[1] === "new") {
+        return { view: "jams", jamMode: "new", jamType: parts[2] === "asset" ? "asset" : "game" };
+      }
       if (parts[2] === "edit" && parts[1]) return { view: "jams", jamMode: "edit", jamId: parts[1] };
       if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
       return { view: "jams", jamMode: "list" };
@@ -175,7 +177,7 @@
       '<div class="sidebar-section-label">Creator</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
       sidebarLink("#/library", "My assets", activeView === "library") +
-      sidebarLink("#/jams", "Game jams", activeView === "jams") +
+      sidebarLink("#/jams", "Jams", activeView === "jams") +
       nav;
 
     sidebar.querySelectorAll(".sidebar-link").forEach(function (a) {
@@ -1424,7 +1426,7 @@
   }
 
   var libraryUiState = { tab: "assets", category: "", query: "", selectedId: "", shopCategory: "", shopQuery: "", shopSelectedId: "" };
-  var jamBrowseState = { genre: "all", keyword: "", sort: "date", phase: "all" };
+  var jamBrowseState = { genre: "all", keyword: "", sort: "date", phase: "all", jamType: "all" };
 
   function listUserSeries() {
     return ScenaStore.listSeries(userId).filter(function (s) { return !s.templateSource; });
@@ -1792,13 +1794,14 @@
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
-              '<div><h1>Host a game jam</h1>' +
+              '<div><h1>' + (route.jamType === "asset" ? "Host an asset jam" : "Host a game jam") + "</h1>" +
               '<p>Set theme, rules, schedule, entry requirements, and optional Ducat prizes.</p></div>' +
               '<button type="button" class="btn btn-primary" id="jamSaveDraftBtn">Save &amp; continue</button>' +
             "</div>" +
-            ScenaJams.renderForm({}, { balance: balance }) +
+            ScenaJams.renderForm({}, { balance: balance, jamType: route.jamType || "game" }) +
           "</div>";
         bindJamForm(main);
+        if (window.ScenaJams && ScenaJams.bindCoverStyleEditor) ScenaJams.bindCoverStyleEditor(main);
       }).catch(function (err) {
         main.innerHTML =
           '<div class="page"><p class="field-hint">' +
@@ -1833,6 +1836,9 @@
               ScenaJams.renderForm(jam, { balance: balance, published: published }) +
             "</div>";
           bindJamForm(main, jam);
+          if (window.ScenaJams && ScenaJams.bindCoverStyleEditor) {
+            ScenaJams.bindCoverStyleEditor(main, { coverStyle: jam.coverStyle });
+          }
         });
       }).catch(function (err) {
         main.innerHTML =
@@ -1857,12 +1863,34 @@
           return;
         }
         var seriesList = listUserSeries();
-        main.innerHTML = ScenaJams.renderDetail(jam, {
+        var detailCtx = {
           userId: userId,
           adultVerified: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
           seriesList: seriesList,
+          libraryEntries: [],
+          sellerListings: [],
+        };
+        var assetLoads = [];
+        if (window.ScenaJams && ScenaJams.isAssetJam(jam)) {
+          if (window.ScenaAssetLibrary) {
+            assetLoads.push(
+              ScenaAssetLibrary.list(userId, { source: "made" }).then(function (rows) {
+                detailCtx.libraryEntries = rows || [];
+              })
+            );
+          }
+          if (window.ScenaMarketplace && ScenaMarketplace.listSellerListings) {
+            assetLoads.push(
+              ScenaMarketplace.listSellerListings(userId).then(function (rows) {
+                detailCtx.sellerListings = rows || [];
+              })
+            );
+          }
+        }
+        Promise.all(assetLoads).then(function () {
+          main.innerHTML = ScenaJams.renderDetail(jam, detailCtx);
+          bindJamDetail(main, jam, seriesList, detailCtx);
         });
-        bindJamDetail(main, jam, seriesList);
       }).catch(function (err) {
         main.innerHTML =
           '<div class="page"><p class="field-hint">' +
@@ -1878,6 +1906,7 @@
       keyword: jamBrowseState.keyword,
       sort: jamBrowseState.sort,
       phase: jamBrowseState.phase,
+      jamType: jamBrowseState.jamType,
       hideAdult: true,
       viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
     }).then(function (published) {
@@ -1887,13 +1916,17 @@
           keyword: jamBrowseState.keyword,
           sort: jamBrowseState.sort,
           phase: jamBrowseState.phase,
+          jamType: jamBrowseState.jamType,
           canHost: true,
         };
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
-              '<div><h1>Game jams</h1><p>Browse by sprint week — filter by genre, prize pool, or keywords.</p></div>' +
-              '<a class="btn btn-primary" href="#/jams/new">Host a jam</a>' +
+              '<div><h1>Jams</h1><p>Browse game jams and asset jams — filter by type, genre, prize pool, or keywords.</p></div>' +
+              '<div class="page-head-actions">' +
+                '<a class="btn btn-secondary" href="#/jams/new/asset">Host asset jam</a>' +
+                '<a class="btn btn-primary" href="#/jams/new">Host game jam</a>' +
+              "</div>" +
             "</div>" +
             (mine.filter(function (j) { return j.status === "draft"; }).length
               ? '<section class="form-section"><h2>Your drafts</h2>' +
@@ -1913,6 +1946,12 @@
     function repaint() {
       render();
     }
+    root.querySelectorAll("[data-jam-type]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        jamBrowseState.jamType = btn.getAttribute("data-jam-type") || "all";
+        repaint();
+      });
+    });
     root.querySelectorAll("[data-jam-genre]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         jamBrowseState.genre = btn.getAttribute("data-jam-genre") || "all";
@@ -2003,7 +2042,8 @@
     bindStudioHashLinks(root);
   }
 
-  function bindJamDetail(root, jam, seriesList) {
+  function bindJamDetail(root, jam, seriesList, detailCtx) {
+    detailCtx = detailCtx || {};
     var publishBtn = $("#jamPublishBtn", root);
     if (publishBtn) {
       publishBtn.addEventListener("click", function () {
@@ -2099,6 +2139,75 @@
             toast((err && err.message) || "Could not submit.");
           }
         });
+      });
+    }
+
+    var libSel = $("#jamSubmitLibrary", root);
+    var libTitle = $("#jamSubmitAssetTitle", root);
+    var publishAssetBtn = $("#jamSubmitAssetPublishBtn", root);
+    if (publishAssetBtn) {
+      publishAssetBtn.addEventListener("click", function () {
+        var entryId = libSel && libSel.value;
+        if (!entryId) {
+          toast("Pick a library asset first.");
+          return;
+        }
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === entryId; });
+        var contribEl = $("#jamSubmitContrib", root);
+        publishAssetBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          libraryEntryId: entryId,
+          title: (libTitle && libTitle.value.trim()) || (entry && entry.title) || "Jam entry",
+          description: ($("#jamSubmitAssetDesc", root) || {}).value || "",
+          category: entry && entry.category,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Asset published and submitted!");
+          render();
+        }).catch(function (err) {
+          publishAssetBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            publishAssetBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit asset.");
+          }
+        });
+      });
+    }
+
+    var listingBtn = $("#jamSubmitAssetListingBtn", root);
+    var listingSel = $("#jamSubmitListing", root);
+    if (listingBtn) {
+      listingBtn.addEventListener("click", function () {
+        var listingId = listingSel && listingSel.value;
+        var listing = (detailCtx.sellerListings || []).find(function (l) { return l.id === listingId; });
+        if (!listing) {
+          toast("Pick one of your live listings.");
+          return;
+        }
+        var contribEl = $("#jamSubmitContrib", root);
+        listingBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          listing: listing,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Listing submitted!");
+          render();
+        }).catch(function (err) {
+          listingBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            listingBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit listing.");
+          }
+        });
+      });
+    }
+
+    if (libSel && libTitle) {
+      libSel.addEventListener("change", function () {
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === libSel.value; });
+        if (entry && !libTitle.value.trim()) libTitle.value = entry.title || "";
       });
     }
 

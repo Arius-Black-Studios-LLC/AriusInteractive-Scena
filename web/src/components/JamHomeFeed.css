@@ -9,8 +9,13 @@
 .jam-home-featured {
   border: 1px solid var(--border, #e5e2dc);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(124, 17, 40, 0.06) 0%, var(--surface, #fff) 120px);
+  background: var(--surface, #fff);
   overflow: hidden;
+}
+
+.jam-home-featured-cover {
+  height: 88px;
+  background: linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%);
 }
 
 .jam-home-featured-head {
@@ -25,6 +30,7 @@
   content: "Most active";
   display: inline-block;
   margin-bottom: 8px;
+  margin-right: 8px;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: 0.6875rem;
@@ -33,6 +39,26 @@
   text-transform: uppercase;
   color: var(--accent, #7c1128);
   background: rgba(124, 17, 40, 0.1);
+}
+
+.jam-type-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jam-type-badge--game {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.12);
+}
+
+.jam-type-badge--asset {
+  color: #6a1b9a;
+  background: rgba(106, 27, 154, 0.12);
 }
 
 .jam-home-featured-title {
@@ -175,16 +201,18 @@
   font-size: 0.875rem;
   font-weight: 800;
   letter-spacing: 0.03em;
-  color: var(--accent, #7c1128);
-  background: rgba(124, 17, 40, 0.08);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%);
   border: 2px solid transparent;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .jam-home-menu-icon:hover .jam-home-menu-glyph,
 .jam-home-menu-icon--active .jam-home-menu-glyph {
-  border-color: rgba(124, 17, 40, 0.35);
-  background: rgba(124, 17, 40, 0.14);
+  border-color: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
 }
 
 .jam-home-menu-name {
@@ -205,17 +233,38 @@
 
 .jam-home-preview {
   margin-top: 16px;
-  padding: 16px 18px;
+  padding: 0;
   border: 1px solid var(--border, #e5e2dc);
   border-radius: 14px;
   background: var(--surface, #fff);
+  overflow: hidden;
+}
+
+.jam-home-preview-cover {
+  display: grid;
+  place-items: center;
+  height: 72px;
+  background: linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%);
+}
+
+.jam-home-preview-cover-glyph {
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.jam-home-preview-head,
+.jam-home-preview-copy,
+.jam-home-preview-theme,
+.jam-home-preview-actions {
+  margin-left: 18px;
+  margin-right: 18px;
 }
 
 .jam-home-preview-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  margin-top: 16px;
 }
 
 .jam-home-preview-head h4 {
@@ -240,6 +289,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding-bottom: 16px;
+}
+
+.jam-home-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 @media (max-width: 640px) {

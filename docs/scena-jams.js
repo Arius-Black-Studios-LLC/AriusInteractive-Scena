@@ -22,6 +22,319 @@
     { id: "required", label: "Participants must add Ducats" },
   ];
 
+  var ASSET_SUBMISSION_MODES = [
+    { id: "new_listing", label: "Publish from library only", hint: "Entrants list a new free asset pack created during the jam." },
+    { id: "existing_listing", label: "Existing marketplace listing", hint: "Entrants submit a live listing they already published." },
+    { id: "either", label: "New listing or existing", hint: "Either publish from library or link an existing listing." },
+  ];
+
+  var ASSET_CATEGORIES = [
+    { id: "character", label: "Characters" },
+    { id: "stage", label: "Stages" },
+    { id: "item", label: "Items" },
+    { id: "audio", label: "Audio" },
+    { id: "pack", label: "Packs" },
+  ];
+
+  function jamTypeLabel(jamType) {
+    return jamType === "asset" ? "Asset jam" : "Game jam";
+  }
+
+  function isAssetJam(jam) {
+    migrateJam(jam);
+    return jam.jamType === "asset";
+  }
+
+  function isGameJam(jam) {
+    return !isAssetJam(jam);
+  }
+
+  function submissionEntryType(sub) {
+    if (!sub) return "game";
+    if (sub.entryType === "asset" || sub.listingId) return "asset";
+    return "game";
+  }
+
+  var JAM_COVER_PRESETS = [
+    { id: "a", label: "Rose", css: "linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%)" },
+    { id: "b", label: "Amber", css: "linear-gradient(135deg, #fff3e0 0%, #ffd59a 100%)" },
+    { id: "c", label: "Lilac", css: "linear-gradient(135deg, #e8eaf6 0%, #9fa8da 100%)" },
+    { id: "d", label: "Sea", css: "linear-gradient(135deg, #e0f2f1 0%, #80cbc4 100%)" },
+    { id: "e", label: "Berry", css: "linear-gradient(135deg, #fce4ec 0%, #f48fb1 100%)" },
+    { id: "f", label: "Grape", css: "linear-gradient(135deg, #ede7f6 0%, #b39ddb 100%)" },
+    { id: "g", label: "Sunset", css: "linear-gradient(145deg, #ff6b6b 0%, #feca57 100%)" },
+    { id: "h", label: "Forest", css: "linear-gradient(145deg, #2d6a4f 0%, #95d5b2 100%)" },
+  ];
+
+  function defaultCoverStyle() {
+    return {
+      mode: "preset",
+      preset: "a",
+      color: "#7c1128",
+      gradientFrom: "#7c1128",
+      gradientTo: "#f5c2d4",
+      angle: 135,
+      imageDataUrl: "",
+    };
+  }
+
+  function jamMenuIconLabel(title) {
+    var words = String(title || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return "?";
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  function normalizeCoverStyle(raw) {
+    var style = defaultCoverStyle();
+    raw = raw || {};
+    if (raw.mode && ["preset", "solid", "gradient", "photo"].indexOf(raw.mode) >= 0) {
+      style.mode = raw.mode;
+    }
+    if (raw.preset && JAM_COVER_PRESETS.some(function (p) { return p.id === raw.preset; })) {
+      style.preset = raw.preset;
+    }
+    if (raw.color && /^#[0-9a-fA-F]{6}$/.test(raw.color)) style.color = raw.color;
+    if (raw.gradientFrom && /^#[0-9a-fA-F]{6}$/.test(raw.gradientFrom)) style.gradientFrom = raw.gradientFrom;
+    if (raw.gradientTo && /^#[0-9a-fA-F]{6}$/.test(raw.gradientTo)) style.gradientTo = raw.gradientTo;
+    style.angle = Math.max(0, Math.min(360, parseInt(raw.angle, 10) || style.angle));
+    if (raw.imageDataUrl && String(raw.imageDataUrl).indexOf("data:image/") === 0) {
+      style.imageDataUrl = String(raw.imageDataUrl);
+    }
+    if (style.mode === "photo" && !style.imageDataUrl) style.mode = "preset";
+    return style;
+  }
+
+  function coverStyleInlineStyle(style) {
+    style = normalizeCoverStyle(style);
+    if (style.mode === "photo" && style.imageDataUrl) {
+      return "background-image:url(" + style.imageDataUrl + ");background-size:cover;background-position:center;";
+    }
+    if (style.mode === "solid") {
+      return "background:" + style.color + ";";
+    }
+    if (style.mode === "gradient") {
+      return "background:linear-gradient(" + style.angle + "deg," + style.gradientFrom + "," + style.gradientTo + ");";
+    }
+    var preset = JAM_COVER_PRESETS.find(function (p) { return p.id === style.preset; }) || JAM_COVER_PRESETS[0];
+    return "background:" + preset.css + ";";
+  }
+
+  function renderJamCover(style, opts) {
+    opts = opts || {};
+    style = normalizeCoverStyle(style);
+    var classes = "jam-cover";
+    if (opts.compact) classes += " jam-cover--compact";
+    if (opts.menu) classes += " jam-cover--menu";
+    if (opts.featured) classes += " jam-cover--featured";
+    if (opts.detail) classes += " jam-cover--detail";
+    if (style.mode === "preset") classes += " jam-cover--preset-" + style.preset;
+    var inline = style.mode !== "preset" ? ' style="' + escapeAttr(coverStyleInlineStyle(style)) + '"' : "";
+    var glyph = opts.hideGlyph
+      ? ""
+      : '<span class="jam-cover-glyph">' + escapeHtml(opts.glyph || jamMenuIconLabel(opts.title || "")) + "</span>";
+    return '<div class="' + classes + '"' + inline + ">" + glyph + "</div>";
+  }
+
+  function readCoverStyleFromForm(form) {
+    if (!form) return defaultCoverStyle();
+    var modeEl = form.querySelector("[name=coverMode]");
+    var mode = modeEl ? modeEl.value : "preset";
+    return normalizeCoverStyle({
+      mode: mode,
+      preset: form.coverPreset && form.coverPreset.value,
+      color: form.coverColor && form.coverColor.value,
+      gradientFrom: form.coverGradientFrom && form.coverGradientFrom.value,
+      gradientTo: form.coverGradientTo && form.coverGradientTo.value,
+      angle: form.coverGradientAngle && form.coverGradientAngle.value,
+      imageDataUrl: form.coverImageData && form.coverImageData.value,
+    });
+  }
+
+  function updateJamCoverPreview(root, title) {
+    var form = root && root.querySelector ? root.querySelector("#jamForm") : null;
+    var preview = root && root.querySelector ? root.querySelector("#jamCoverPreview") : null;
+    if (!form || !preview) return;
+    var style = readCoverStyleFromForm(form);
+    preview.innerHTML = renderJamCover(style, { menu: true, title: title || "Jam title" });
+    root.querySelectorAll("[data-jam-cover-mode]").forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-jam-cover-mode") === style.mode);
+    });
+    root.querySelectorAll(".jam-cover-panel").forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-panel") !== style.mode;
+    });
+    root.querySelectorAll("[data-jam-cover-preset]").forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-jam-cover-preset") === style.preset);
+    });
+  }
+
+  function compressCoverImage(file, maxW, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width;
+        var h = img.height;
+        if (w > maxW) {
+          h = Math.round(h * maxW / w);
+          w = maxW;
+        }
+        var canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        cb(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = function () { cb(null); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { cb(null); };
+    reader.readAsDataURL(file);
+  }
+
+  function bindCoverStyleEditor(root, opts) {
+    opts = opts || {};
+    var form = root && root.querySelector("#jamForm");
+    if (!form) return;
+    if (opts.coverStyle && form.coverImageData && opts.coverStyle.imageDataUrl) {
+      form.coverImageData.value = opts.coverStyle.imageDataUrl;
+    }
+    var titleInput = form.querySelector("[name=title]");
+
+    function refreshPreview() {
+      updateJamCoverPreview(root, titleInput && titleInput.value);
+    }
+
+    root.querySelectorAll("[data-jam-cover-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var mode = btn.getAttribute("data-jam-cover-mode");
+        var modeEl = form.querySelector("[name=coverMode]");
+        if (modeEl) modeEl.value = mode;
+        refreshPreview();
+      });
+    });
+
+    root.querySelectorAll("[data-jam-cover-preset]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var preset = btn.getAttribute("data-jam-cover-preset");
+        if (form.coverPreset) form.coverPreset.value = preset;
+        if (form.coverMode) form.coverMode.value = "preset";
+        refreshPreview();
+      });
+    });
+
+    ["coverColor", "coverGradientFrom", "coverGradientTo", "coverGradientAngle"].forEach(function (name) {
+      var el = form[name];
+      if (!el) return;
+      el.addEventListener("input", function () {
+        if (form.coverMode) form.coverMode.value = name === "coverColor" ? "solid" : "gradient";
+        refreshPreview();
+      });
+    });
+
+    var photoInput = form.querySelector("#jamCoverPhoto");
+    if (photoInput) {
+      photoInput.addEventListener("change", function () {
+        var file = photoInput.files && photoInput.files[0];
+        if (!file) return;
+        if (file.size > 8 * 1024 * 1024) {
+          if (window.alert) window.alert("Photo must be under 8 MB.");
+          photoInput.value = "";
+          return;
+        }
+        compressCoverImage(file, 960, function (dataUrl) {
+          if (!dataUrl) {
+            if (window.alert) window.alert("Could not read that image.");
+            return;
+          }
+          if (dataUrl.length > 280000) {
+            if (window.alert) window.alert("Image is still too large — try a smaller photo.");
+            return;
+          }
+          if (form.coverImageData) form.coverImageData.value = dataUrl;
+          if (form.coverMode) form.coverMode.value = "photo";
+          refreshPreview();
+        });
+      });
+    }
+
+    var clearPhotoBtn = root.querySelector("#jamCoverPhotoClear");
+    if (clearPhotoBtn) {
+      clearPhotoBtn.addEventListener("click", function () {
+        if (form.coverImageData) form.coverImageData.value = "";
+        if (photoInput) photoInput.value = "";
+        if (form.coverMode) form.coverMode.value = "preset";
+        refreshPreview();
+      });
+    }
+
+    if (titleInput) titleInput.addEventListener("input", refreshPreview);
+    refreshPreview();
+  }
+
+  function renderCoverStyleEditor(draft) {
+    draft = migrateJam(draft || {});
+    var style = normalizeCoverStyle(draft.coverStyle);
+    var presetSwatches = JAM_COVER_PRESETS.map(function (p) {
+      return (
+        '<button type="button" class="jam-cover-swatch jam-cover--preset-' + escapeAttr(p.id) +
+          (style.preset === p.id && style.mode === "preset" ? " is-active" : "") +
+          '" data-jam-cover-preset="' + escapeAttr(p.id) + '" title="' + escapeAttr(p.label) + '">' +
+          "</button>"
+      );
+    }).join("");
+
+    var modeBtn = function (mode, label) {
+      return (
+        '<button type="button" class="jam-cover-mode-btn' + (style.mode === mode ? " is-active" : "") +
+          '" data-jam-cover-mode="' + escapeAttr(mode) + '">' + escapeHtml(label) + "</button>"
+      );
+    };
+
+    return (
+      '<section class="form-section jam-cover-section">' +
+        "<h2>Jam look</h2>" +
+        '<p class="field-hint">Customize the icon and banner readers see on Discover and the jam browse list.</p>' +
+        '<div class="jam-cover-editor">' +
+          '<div class="jam-cover-preview-wrap">' +
+            '<span class="field-hint">Home page icon preview</span>' +
+            '<div id="jamCoverPreview"></div>' +
+          "</div>" +
+          '<div class="jam-cover-controls">' +
+            '<input type="hidden" name="coverMode" value="' + escapeAttr(style.mode) + '">' +
+            '<input type="hidden" name="coverPreset" value="' + escapeAttr(style.preset) + '">' +
+            '<input type="hidden" name="coverImageData" value="">' +
+            '<div class="jam-cover-mode-tabs">' +
+              modeBtn("preset", "Presets") +
+              modeBtn("solid", "Color") +
+              modeBtn("gradient", "Gradient") +
+              modeBtn("photo", "Photo") +
+            "</div>" +
+            '<div class="jam-cover-panel" data-panel="preset"' + (style.mode === "preset" ? "" : " hidden") + ">" +
+              '<div class="jam-cover-swatches">' + presetSwatches + "</div></div>" +
+            '<div class="jam-cover-panel" data-panel="solid"' + (style.mode === "solid" ? "" : " hidden") + ">" +
+              '<label class="jam-cover-color-field"><span>Background color</span>' +
+              '<input type="color" name="coverColor" value="' + escapeAttr(style.color) + '"></label></div>' +
+            '<div class="jam-cover-panel" data-panel="gradient"' + (style.mode === "gradient" ? "" : " hidden") + ">" +
+              '<div class="jam-cover-gradient-fields">' +
+                '<label class="jam-cover-color-field"><span>From</span>' +
+                '<input type="color" name="coverGradientFrom" value="' + escapeAttr(style.gradientFrom) + '"></label>' +
+                '<label class="jam-cover-color-field"><span>To</span>' +
+                '<input type="color" name="coverGradientTo" value="' + escapeAttr(style.gradientTo) + '"></label>' +
+                '<label class="jam-cover-angle-field"><span>Angle</span>' +
+                '<input type="range" name="coverGradientAngle" min="0" max="360" value="' +
+                  escapeAttr(String(style.angle)) + '"></label>' +
+              "</div></div>" +
+            '<div class="jam-cover-panel" data-panel="photo"' + (style.mode === "photo" ? "" : " hidden") + ">" +
+              '<input type="file" id="jamCoverPhoto" accept="image/png,image/jpeg,image/webp">' +
+              '<button type="button" class="btn btn-ghost btn-sm" id="jamCoverPhotoClear">Remove photo</button>' +
+              '<p class="field-hint">Photos are resized for storage. Use a wide image for best results.</p></div>' +
+          "</div>" +
+        "</div>" +
+      "</section>"
+    );
+  }
+
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -53,6 +366,15 @@
       return matureKeys.indexOf(key) >= 0;
     });
     jam.ageRestricted = !!(jam.ageRestricted || (jam.contentFlags || []).length > 0);
+    if (!jam.jamType) jam.jamType = "game";
+    if (!jam.assetSubmissionMode) jam.assetSubmissionMode = "either";
+    if (!Array.isArray(jam.allowedCategories)) jam.allowedCategories = [];
+    if (jam.requireFreeListing == null) jam.requireFreeListing = jam.jamType === "asset";
+    if (!jam.coverStyle) jam.coverStyle = defaultCoverStyle();
+    else jam.coverStyle = normalizeCoverStyle(jam.coverStyle);
+    (jam.submissions || []).forEach(function (s) {
+      if (!s.entryType) s.entryType = s.listingId ? "asset" : "game";
+    });
     return jam;
   }
 
@@ -119,6 +441,9 @@
     }
     if (opts.phase && opts.phase !== "all") {
       rows = rows.filter(function (j) { return jamPhase(j) === opts.phase; });
+    }
+    if (opts.jamType && opts.jamType !== "all") {
+      rows = rows.filter(function (j) { return (j.jamType || "game") === opts.jamType; });
     }
     if (opts.hideAdult && !opts.viewerIsAdult) {
       rows = rows.filter(function (j) { return !requiresAgeGate(j); });
@@ -239,6 +564,21 @@
       throw new Error("Set a minimum Ducat contribution when participation is required.");
     }
 
+    var coverStyle = normalizeCoverStyle(spec.coverStyle);
+    if (coverStyle.mode === "photo" && coverStyle.imageDataUrl.length > 280000) {
+      throw new Error("Cover photo is too large — use a smaller image.");
+    }
+
+    var jamType = spec.jamType === "asset" ? "asset" : "game";
+    var assetSubmissionMode = spec.assetSubmissionMode || "either";
+    if (ASSET_SUBMISSION_MODES.every(function (m) { return m.id !== assetSubmissionMode; })) {
+      assetSubmissionMode = "either";
+    }
+    var allowedCategories = Array.isArray(spec.allowedCategories) ? spec.allowedCategories.slice() : [];
+    allowedCategories = allowedCategories.filter(function (id) {
+      return ASSET_CATEGORIES.some(function (c) { return c.id === id; });
+    });
+
     return {
       title: title,
       tagline: tagline,
@@ -248,6 +588,12 @@
       genres: genres,
       contentFlags: flags,
       ageRestricted: ageRestricted,
+      jamType: jamType,
+      assetSubmissionMode: assetSubmissionMode,
+      allowedCategories: allowedCategories,
+      requireFreeListing: jamType === "asset" ? !!spec.requireFreeListing : false,
+      coverStyle: coverStyle,
+      coverStyle: coverStyle,
       submissionStart: subStart.toISOString(),
       submissionEnd: subEnd.toISOString(),
       judgingEnd: judgeEnd.toISOString(),
@@ -294,6 +640,7 @@
 
   function validateSubmission(jam, userId, series, episode) {
     if (!jam || jam.status !== "published") throw new Error("This jam is not accepting entries.");
+    if (!isGameJam(jam)) throw new Error("This is an asset jam — submit a marketplace listing instead.");
     if (jamPhase(jam) !== "submissions") throw new Error("Submissions are closed for this jam.");
     if (!series || !episode) throw new Error("Pick a live episode to submit.");
     if (!window.ScenaStore) throw new Error("Studio data unavailable.");
@@ -327,6 +674,57 @@
     })) {
       throw new Error("You already submitted this episode.");
     }
+  }
+
+  function validateAssetListing(jam, userId, listing, opts) {
+    opts = opts || {};
+    if (!jam || jam.status !== "published") throw new Error("This jam is not accepting entries.");
+    if (!isAssetJam(jam)) throw new Error("This is a game jam — submit a published episode instead.");
+    if (jamPhase(jam) !== "submissions") throw new Error("Submissions are closed for this jam.");
+    if (!listing || !listing.id) throw new Error("Pick a marketplace listing to submit.");
+    if (listing.seller_id && listing.seller_id !== userId) {
+      throw new Error("You can only submit listings you published.");
+    }
+    if (jam.requireFreeListing && Math.max(0, parseInt(listing.price_ducats, 10) || 0) > 0) {
+      throw new Error("This asset jam requires free listings (0 Ducats).");
+    }
+    var cats = jam.allowedCategories || [];
+    if (cats.length && cats.indexOf(listing.category) < 0) {
+      throw new Error("This jam only accepts: " + cats.join(", ") + ".");
+    }
+    var mode = jam.assetSubmissionMode || "either";
+    if (mode === "new_listing" && opts.viaExisting) {
+      throw new Error("This jam only accepts newly published listings from your library.");
+    }
+    if (mode === "existing_listing" && opts.viaNewPublish) {
+      throw new Error("This jam only accepts listings you already had live before submitting.");
+    }
+    if ((jam.submissions || []).some(function (s) {
+      return s.listingId === listing.id || (s.userId === userId && s.listingId === listing.id);
+    })) {
+      throw new Error("This listing is already submitted to this jam.");
+    }
+    if ((jam.submissions || []).some(function (s) {
+      return s.userId === userId && s.listingId === listing.id;
+    })) {
+      throw new Error("You already submitted this listing.");
+    }
+  }
+
+  function listingToAssetEntry(userId, profile, listing, libraryEntryId) {
+    return {
+      id: "sub_" + Date.now().toString(36),
+      entryType: "asset",
+      userId: userId,
+      userName: (profile && profile.displayName) || "Creator",
+      listingId: listing.id,
+      libraryEntryId: libraryEntryId || null,
+      listingTitle: listing.title || "Untitled asset",
+      category: listing.category || "pack",
+      preview_data_url: listing.preview_data_url || "",
+      submittedAt: new Date().toISOString(),
+      likes: [],
+    };
   }
 
   function autoPickWinner(jam) {
@@ -376,8 +774,13 @@
 
   window.ScenaJams = {
     SUBMISSION_MODES: SUBMISSION_MODES,
+    ASSET_SUBMISSION_MODES: ASSET_SUBMISSION_MODES,
+    ASSET_CATEGORIES: ASSET_CATEGORIES,
     WINNER_MODES: WINNER_MODES,
     PARTICIPANT_PRIZE_MODES: PARTICIPANT_PRIZE_MODES,
+    jamTypeLabel: jamTypeLabel,
+    isAssetJam: isAssetJam,
+    isGameJam: isGameJam,
 
     list: function (opts) {
       opts = opts || {};
@@ -421,8 +824,22 @@
 
       function mapSubmissionPreview(jam, subs) {
         return subs.slice(0, perJam).map(function (s) {
+          if (submissionEntryType(s) === "asset") {
+            return {
+              id: s.id,
+              entryType: "asset",
+              listingTitle: s.listingTitle || "Asset",
+              category: s.category || "",
+              userName: s.userName,
+              submittedAt: s.submittedAt,
+              previewDataUrl: s.preview_data_url || "",
+              viewHref: "/studio#/library/shop",
+              likes: (s.likes || []).length,
+            };
+          }
           return {
             id: s.id,
+            entryType: "game",
             seriesTitle: s.seriesTitle,
             episodeTitle: s.episodeTitle,
             userName: s.userName,
@@ -447,8 +864,10 @@
         return {
           jamId: jam.id,
           jamTitle: jam.title,
+          jamType: jam.jamType || "game",
           tagline: String(jam.tagline || jam.theme || "").trim(),
           theme: jam.theme,
+          coverStyle: normalizeCoverStyle(jam.coverStyle),
           phase: phase,
           prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
           ageRestricted: requiresAgeGate(jam),
@@ -463,9 +882,11 @@
         return {
           jamId: jam.id,
           jamTitle: jam.title,
+          jamType: jam.jamType || "game",
           tagline: tagline,
           taglinePreview: tagline.length > 120 ? tagline.slice(0, 117) + "…" : tagline,
           theme: jam.theme,
+          coverStyle: normalizeCoverStyle(jam.coverStyle),
           phase: jamPhase(jam),
           prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
           ageRestricted: requiresAgeGate(jam),
@@ -617,6 +1038,7 @@
 
       var entry = {
         id: "sub_" + Date.now().toString(36),
+        entryType: "game",
         userId: userId,
         userName: (profile && profile.displayName) || "Creator",
         seriesId: series.id,
@@ -640,6 +1062,79 @@
         jam.submissions = jam.submissions || [];
         jam.submissions.push(entry);
         return saveJam(jam);
+      });
+    },
+
+    submitAssetEntry: function (userId, profile, jamId, pick) {
+      if (!userId) return Promise.reject(new Error("Sign in to submit to a jam."));
+      pick = pick || {};
+      var jam = findJam(jamId);
+      if (!jam) return Promise.reject(new Error("Jam not found."));
+      migrateJam(jam);
+      if (requiresAgeGate(jam) && window.ScenaProfile && !ScenaProfile.isAdultVerified(profile)) {
+        return Promise.reject(new Error("Confirm you are 18+ on your account before joining age-restricted jams."));
+      }
+
+      var participantMode = jam.participantPrizeMode || "none";
+      var min = Math.max(0, parseInt(jam.participantMin, 10) || 0);
+      var contribute = Math.max(0, parseInt(pick.contribution, 10) || 0);
+      if (jam.prizeEnabled && participantMode === "required" && contribute < min) {
+        return Promise.reject(new Error("This jam requires at least " + formatDucats(min) + " toward the prize pool."));
+      }
+      if (jam.prizeEnabled && participantMode === "none") contribute = 0;
+
+      var chain = Promise.resolve(null);
+
+      if (pick.listing) {
+        validateAssetListing(jam, userId, pick.listing, { viaExisting: true });
+        chain = Promise.resolve(pick.listing);
+      } else if (pick.libraryEntryId) {
+        if (!window.ScenaAssetLibrary || !ScenaAssetLibrary.publishFromLibrary) {
+          return Promise.reject(new Error("Asset library unavailable."));
+        }
+        chain = ScenaAssetLibrary.publishFromLibrary(userId, pick.libraryEntryId, {
+          title: pick.title,
+          description: pick.description || "",
+          category: pick.category,
+          priceDucats: jam.requireFreeListing ? 0 : Math.max(0, parseInt(pick.priceDucats, 10) || 0),
+        }).then(function (result) {
+          return ScenaMarketplace.getListing(result.id, userId).then(function (listing) {
+            if (!listing) {
+              listing = {
+                id: result.id,
+                seller_id: userId,
+                title: pick.title || "Jam entry",
+                category: pick.category || "pack",
+                price_ducats: jam.requireFreeListing ? 0 : 0,
+                preview_data_url: pick.previewDataUrl || "",
+              };
+            } else if (!listing.seller_id) {
+              listing.seller_id = userId;
+            }
+            validateAssetListing(jam, userId, listing, { viaNewPublish: true });
+            return listing;
+          });
+        });
+      } else {
+        return Promise.reject(new Error("Pick a library asset to publish or an existing listing."));
+      }
+
+      return chain.then(function (listing) {
+        var entry = listingToAssetEntry(userId, profile, listing, pick.libraryEntryId || null);
+        var payChain = contribute > 0
+          ? checkWalletBalance(userId, contribute).then(function () {
+              return walletSpend(userId, contribute, jam.id);
+            })
+          : Promise.resolve();
+        return payChain.then(function () {
+          if (contribute > 0) {
+            jam.prize = jam.prize || { contributions: {} };
+            jam.prize.contributions[userId] = (parseInt(jam.prize.contributions[userId], 10) || 0) + contribute;
+          }
+          jam.submissions = jam.submissions || [];
+          jam.submissions.push(entry);
+          return saveJam(jam);
+        });
       });
     },
 
@@ -677,6 +1172,8 @@
     formatWhen: formatWhen,
     formatDucats: formatDucats,
     validateJamSpec: validateJamSpec,
+    bindCoverStyleEditor: bindCoverStyleEditor,
+    normalizeCoverStyle: normalizeCoverStyle,
 
     renderBrowse: function (jams, opts) {
       opts = opts || {};
@@ -688,6 +1185,14 @@
 
       var toolbar =
         '<div class="jam-browse-toolbar">' +
+          '<div class="jam-browse-type">' +
+            '<button type="button" class="jam-filter-chip' + ((!opts.jamType || opts.jamType === "all") ? " is-active" : "") +
+              '" data-jam-type="all">All jams</button>' +
+            '<button type="button" class="jam-filter-chip' + (opts.jamType === "game" ? " is-active" : "") +
+              '" data-jam-type="game">Game jams</button>' +
+            '<button type="button" class="jam-filter-chip' + (opts.jamType === "asset" ? " is-active" : "") +
+              '" data-jam-type="asset">Asset jams</button>' +
+          "</div>" +
           '<div class="jam-browse-row">' +
             '<input type="search" class="jam-browse-search" id="jamBrowseSearch" placeholder="Search title, theme, keywords…" value="' +
               escapeAttr(opts.keyword || "") + '">' +
@@ -743,10 +1248,13 @@
           var genreLine = jamGenreLabels(jam).slice(0, 3).join(" · ");
           return (
             '<a class="jam-card" href="#/jams/' + escapeAttr(jam.id) + '">' +
+              renderJamCover(jam.coverStyle, { compact: true, title: jam.title }) +
+              '<div class="jam-card-body">' +
               '<div class="jam-card-head">' +
                 '<h3>' + escapeHtml(jam.title) + "</h3>" +
                 '<span class="jam-phase jam-phase--' + escapeAttr(phase) + '">' + escapeHtml(phase) + "</span>" +
               "</div>" +
+              '<p class="jam-card-type">' + escapeHtml(jamTypeLabel(jam.jamType)) + "</p>" +
               '<p class="jam-card-theme">' + escapeHtml(jam.tagline || jam.theme) + "</p>" +
               (jam.tagline && jam.tagline !== jam.theme
                 ? '<p class="jam-card-theme-sub field-hint">Theme: ' + escapeHtml(jam.theme) + "</p>"
@@ -758,6 +1266,7 @@
               (pool > 0
                 ? '<p class="jam-card-prize">' + escapeHtml(formatDucats(pool)) + " prize pool</p>"
                 : '<p class="jam-card-prize jam-card-prize--none">No Ducat prize</p>') +
+              "</div>" +
             "</a>"
           );
         }).join("") +
@@ -794,11 +1303,46 @@
           escapeHtml(m.label) + "</option>";
       }).join("");
 
+      var assetSubModes = ASSET_SUBMISSION_MODES.map(function (m) {
+        return '<option value="' + escapeAttr(m.id) + '"' +
+          ((draft.assetSubmissionMode || "either") === m.id ? " selected" : "") + ">" +
+          escapeHtml(m.label) + "</option>";
+      }).join("");
+
+      var assetCatChecks = ASSET_CATEGORIES.map(function (c) {
+        var on = (draft.allowedCategories || []).indexOf(c.id) >= 0;
+        return (
+          '<label class="check-row">' +
+            '<input type="checkbox" data-jam-asset-cat="' + escapeAttr(c.id) + '"' + (on ? " checked" : "") + ">" +
+            escapeHtml(c.label) +
+          "</label>"
+        );
+      }).join("");
+
       var winModes = WINNER_MODES.map(function (m) {
         return '<option value="' + escapeAttr(m.id) + '"' +
           ((draft.winnerMode || "auto_likes") === m.id ? " selected" : "") + ">" +
           escapeHtml(m.label) + "</option>";
       }).join("");
+
+      var jamType = draft.jamType || opts.jamType || "game";
+      var isAsset = jamType === "asset";
+      var entryRequirements = isAsset
+        ? (
+          '<section class="form-section"><h2>Asset entry requirements</h2>' +
+            '<p class="field-hint">Entrants submit marketplace asset packs — characters, stages, items, audio, or bundles.</p>' +
+            '<div class="field"><label>What can entrants submit?</label><select name="assetSubmissionMode">' + assetSubModes + "</select></div>" +
+            '<div class="field"><label>Allowed categories</label><div class="check-grid">' + assetCatChecks +
+              '</div><p class="field-hint">Leave all unchecked to allow every category.</p></div>' +
+            '<label class="check-row"><input type="checkbox" name="requireFreeListing"' +
+              (draft.requireFreeListing !== false ? " checked" : "") + "> Require free listings (0 Ducats)</label>" +
+            '<div class="field"><label>Winner selection</label><select name="winnerMode">' + winModes + "</select></div></section>"
+        )
+        : (
+          '<section class="form-section"><h2>Entry requirements</h2>' +
+            '<div class="field"><label>What can entrants submit?</label><select name="submissionMode">' + subModes + "</select></div>" +
+            '<div class="field"><label>Winner selection</label><select name="winnerMode">' + winModes + "</select></div></section>"
+        );
 
       var partModes = PARTICIPANT_PRIZE_MODES.map(function (m) {
         return '<option value="' + escapeAttr(m.id) + '"' +
@@ -825,11 +1369,14 @@
             escapeAttr(String(draft.hostContribution || 0)) + '"></div>';
       return (
         '<form class="jam-form" id="jamForm">' +
+          '<input type="hidden" name="jamType" value="' + escapeAttr(jamType) + '">' +
+          '<p class="jam-type-badge jam-type-badge--' + escapeAttr(jamType) + '">' + escapeHtml(jamTypeLabel(jamType)) + "</p>" +
           '<div class="field"><label>Jam title</label><input type="text" name="title" maxlength="80" value="' +
             escapeAttr(draft.title || "") + '" required></div>' +
           '<div class="field"><label>Home page tagline</label><input type="text" name="tagline" maxlength="140" value="' +
             escapeAttr(draft.tagline || "") + '" placeholder="One line for readers on Discover — what is this jam about?">' +
             '<p class="field-hint">Shown on the home page with recent entries. Required before you publish (10–140 characters).</p></div>' +
+          renderCoverStyleEditor(draft) +
           '<div class="field"><label>Theme</label><input type="text" name="theme" maxlength="120" value="' +
             escapeAttr(draft.theme || "") + '" placeholder="What should entrants explore?" required></div>' +
           '<div class="field"><label>Search keywords</label><input type="text" name="keywords" maxlength="200" value="' +
@@ -852,9 +1399,7 @@
             "</div>" +
             '<div class="field"><label>Judging ends</label><input type="datetime-local" name="judgingEnd" value="' +
               escapeAttr(dtLocal(draft.judgingEnd)) + '" required></div></section>' +
-          '<section class="form-section"><h2>Entry requirements</h2>' +
-            '<div class="field"><label>What can entrants submit?</label><select name="submissionMode">' + subModes + "</select></div>" +
-            '<div class="field"><label>Winner selection</label><select name="winnerMode">' + winModes + "</select></div></section>" +
+          entryRequirements +
           '<section class="form-section"><h2>Prize pool (optional)</h2>' +
             '<label class="check-row"><input type="checkbox" name="prizeEnabled" id="jamPrizeEnabled"' +
               (draft.prizeEnabled ? " checked" : "") + "> Offer Ducat rewards</label>" +
@@ -881,6 +1426,10 @@
       form.querySelectorAll("[data-jam-mature]").forEach(function (el) {
         if (el.checked) flags.push(el.getAttribute("data-jam-mature"));
       });
+      var assetCats = [];
+      form.querySelectorAll("[data-jam-asset-cat]").forEach(function (el) {
+        if (el.checked) assetCats.push(el.getAttribute("data-jam-asset-cat"));
+      });
       return {
         title: form.title && form.title.value,
         tagline: form.tagline && form.tagline.value,
@@ -890,6 +1439,10 @@
         genres: genres,
         contentFlags: flags,
         ageRestricted: flags.length > 0,
+        jamType: form.jamType && form.jamType.value,
+        assetSubmissionMode: form.assetSubmissionMode && form.assetSubmissionMode.value,
+        allowedCategories: assetCats,
+        requireFreeListing: Boolean(form.requireFreeListing && form.requireFreeListing.checked),
         submissionStart: form.submissionStart && form.submissionStart.value,
         submissionEnd: form.submissionEnd && form.submissionEnd.value,
         judgingEnd: form.judgingEnd && form.judgingEnd.value,
@@ -899,6 +1452,7 @@
         hostContribution: form.hostContribution && form.hostContribution.value,
         participantPrizeMode: form.participantPrizeMode && form.participantPrizeMode.value,
         participantMin: form.participantMin && form.participantMin.value,
+        coverStyle: readCoverStyleFromForm(form),
       };
     },
 
@@ -918,6 +1472,32 @@
             var likes = (s.likes || []).length;
             var liked = ctx.userId && (s.likes || []).indexOf(ctx.userId) >= 0;
             var isWinner = jam.winnerSubmissionId === s.id;
+            if (submissionEntryType(s) === "asset") {
+              var thumb = s.preview_data_url
+                ? 'style="background-image:url(' + s.preview_data_url + ')"'
+                : 'data-category="' + escapeAttr(s.category || "pack") + '"';
+              return (
+                '<div class="jam-entry jam-entry--asset' + (isWinner ? " jam-entry--winner" : "") + '">' +
+                  '<span class="jam-entry-thumb" ' + thumb + "></span>" +
+                  '<div class="jam-entry-head">' +
+                    '<strong>' + escapeHtml(s.listingTitle || "Asset") + "</strong>" +
+                    '<span class="field-hint">' + escapeHtml(s.category || "asset") + " · " + escapeHtml(s.userName) + "</span>" +
+                  "</div>" +
+                  '<div class="jam-entry-actions">' +
+                    '<span class="jam-likes">' + likes + " ♥</span>" +
+                    (phase === "judging" && ctx.userId
+                      ? '<button type="button" class="btn btn-sm btn-ghost jam-like-btn" data-like-sub="' +
+                          escapeAttr(s.id) + '">' + (liked ? "Unlike" : "Like") + "</button>"
+                      : "") +
+                    (isHost && jam.winnerMode === "host_picks" && phase !== "submissions"
+                      ? '<button type="button" class="btn btn-sm btn-primary jam-pick-btn" data-pick-sub="' +
+                          escapeAttr(s.id) + '">Pick winner</button>'
+                      : "") +
+                    '<a class="btn btn-sm" href="/studio#/library/shop">View shop</a>' +
+                  "</div>" +
+                "</div>"
+              );
+            }
             return (
               '<div class="jam-entry' + (isWinner ? " jam-entry--winner" : "") + '">' +
                 '<div class="jam-entry-head">' +
@@ -969,26 +1549,71 @@
 
       var submitPanel = "";
       if (phase === "submissions" && ctx.userId && jam.status === "published") {
-        var seriesOpts = (ctx.seriesList || []).map(function (s) {
-          return '<option value="' + escapeAttr(s.id) + '">' + escapeHtml(s.title || "Untitled") + "</option>";
-        }).join("");
         var needContrib = jam.prizeEnabled && jam.participantPrizeMode === "required";
-        submitPanel =
-          '<section class="form-section jam-submit-panel">' +
-            "<h2>Submit your entry</h2>" +
-            (requiresAgeGate(jam) && !ctx.adultVerified
-              ? '<p class="field-hint jam-age-warning">This jam is 18+. Confirm your age on <a href="/account">Account</a> before submitting.</p>'
-              : "") +
-            '<div class="field"><label>Series</label><select id="jamSubmitSeries">' + seriesOpts + "</select></div>" +
-            '<div class="field"><label>Episode</label><select id="jamSubmitEpisode"></select></div>' +
-            (jam.prizeEnabled && jam.participantPrizeMode !== "none"
-              ? '<div class="field"><label>Add to prize pool (Ducats)' +
-                  (needContrib ? " — required" : "") + '</label><input type="number" id="jamSubmitContrib" min="' +
-                  (needContrib ? String(jam.participantMin || 0) : "0") + '" value="' +
-                  (needContrib ? String(jam.participantMin || 0) : "0") + '"></div>'
-              : "") +
-            '<button type="button" class="btn btn-primary" id="jamSubmitBtn">Submit entry</button>' +
-          "</section>";
+        var contribField = jam.prizeEnabled && jam.participantPrizeMode !== "none"
+          ? '<div class="field"><label>Add to prize pool (Ducats)' +
+              (needContrib ? " — required" : "") + '</label><input type="number" id="jamSubmitContrib" min="' +
+              (needContrib ? String(jam.participantMin || 0) : "0") + '" value="' +
+              (needContrib ? String(jam.participantMin || 0) : "0") + '"></div>'
+          : "";
+        var ageWarn = requiresAgeGate(jam) && !ctx.adultVerified
+          ? '<p class="field-hint jam-age-warning">This jam is 18+. Confirm your age on <a href="/account">Account</a> before submitting.</p>'
+          : "";
+
+        if (isAssetJam(jam)) {
+          var libOpts = (ctx.libraryEntries || []).map(function (e) {
+            return '<option value="' + escapeAttr(e.id) + '">' + escapeHtml(e.title || "Untitled") + "</option>";
+          }).join("");
+          var listOpts = (ctx.sellerListings || []).map(function (l) {
+            return '<option value="' + escapeAttr(l.id) + '">' + escapeHtml(l.title || "Listing") + "</option>";
+          }).join("");
+          var mode = jam.assetSubmissionMode || "either";
+          var showPublish = mode !== "existing_listing";
+          var showExisting = mode !== "new_listing";
+          submitPanel =
+            '<section class="form-section jam-submit-panel jam-submit-panel--asset">' +
+              "<h2>Submit your asset</h2>" +
+              ageWarn +
+              '<p class="field-hint">Publish an asset from your library or link an existing marketplace listing.</p>' +
+              (showPublish
+                ? '<div class="jam-asset-submit-block" id="jamAssetPublishBlock">' +
+                    '<h3 class="jam-asset-submit-subhead">Publish from library</h3>' +
+                    '<div class="field"><label>Library asset</label><select id="jamSubmitLibrary">' +
+                      (libOpts || '<option value="">No made assets in library</option>') +
+                    "</select></div>" +
+                    '<div class="field"><label>Listing title</label><input type="text" id="jamSubmitAssetTitle" maxlength="80" placeholder="Title for the shop listing"></div>' +
+                    '<div class="field"><label>Description</label><textarea id="jamSubmitAssetDesc" rows="2" maxlength="400" placeholder="What buyers get…"></textarea></div>' +
+                    (jam.requireFreeListing
+                      ? '<p class="field-hint">This jam requires free listings (0 Ducats).</p>'
+                      : "") +
+                    '<button type="button" class="btn btn-primary" id="jamSubmitAssetPublishBtn">Publish &amp; submit</button>' +
+                  "</div>"
+                : "") +
+              (showExisting
+                ? '<div class="jam-asset-submit-block" id="jamAssetExistingBlock">' +
+                    '<h3 class="jam-asset-submit-subhead">Existing listing</h3>' +
+                    '<div class="field"><label>Your live listing</label><select id="jamSubmitListing">' +
+                      (listOpts || '<option value="">No listings yet</option>') +
+                    "</select></div>" +
+                    '<button type="button" class="btn btn-secondary" id="jamSubmitAssetListingBtn">Submit listing</button>' +
+                  "</div>"
+                : "") +
+              contribField +
+            "</section>";
+        } else {
+          var seriesOpts = (ctx.seriesList || []).map(function (s) {
+            return '<option value="' + escapeAttr(s.id) + '">' + escapeHtml(s.title || "Untitled") + "</option>";
+          }).join("");
+          submitPanel =
+            '<section class="form-section jam-submit-panel">' +
+              "<h2>Submit your entry</h2>" +
+              ageWarn +
+              '<div class="field"><label>Series</label><select id="jamSubmitSeries">' + seriesOpts + "</select></div>" +
+              '<div class="field"><label>Episode</label><select id="jamSubmitEpisode"></select></div>' +
+              contribField +
+              '<button type="button" class="btn btn-primary" id="jamSubmitBtn">Submit entry</button>' +
+            "</section>";
+        }
       }
 
       var buyPanel = "";
@@ -1001,8 +1626,10 @@
 
       return (
         '<div class="page jam-detail">' +
-          '<div class="page-head">' +
-            "<div><h1>" + escapeHtml(jam.title) + "</h1>" +
+          renderJamCover(jam.coverStyle, { featured: true, detail: true, title: jam.title, hideGlyph: true }) +
+          '<div class="page-head jam-detail-head">' +
+            "<div><p class=\"jam-type-badge jam-type-badge--" + escapeAttr(jam.jamType || "game") + "\">" +
+              escapeHtml(jamTypeLabel(jam.jamType)) + "</p><h1>" + escapeHtml(jam.title) + "</h1>" +
               '<p class="jam-detail-tagline">' + escapeHtml(jam.tagline || jam.theme) + "</p>" +
               '<p class="field-hint jam-detail-theme-label">Theme: ' + escapeHtml(jam.theme) + "</p>" +
               '<p class="field-hint">Host: ' + escapeHtml(jam.hostName) +

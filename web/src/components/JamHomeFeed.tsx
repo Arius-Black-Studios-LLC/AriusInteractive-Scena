@@ -4,7 +4,10 @@ import type { JamHomeMenuItem, JamHomeSpotlight } from "../lib/jams";
 import {
   formatJamPhase,
   formatSubmittedWhen,
+  isAssetSubmission,
+  jamCoverBackground,
   jamMenuIconLabel,
+  jamTypeLabel,
 } from "../lib/jams";
 import "./JamHomeFeed.css";
 
@@ -19,13 +22,14 @@ export function JamHomeFeed({ spotlight }: Props) {
   if (!featured) return null;
 
   const previewJam = others.find((item) => item.jamId === previewId) || null;
+  const featuredCoverStyle = jamCoverBackground(featured.coverStyle);
 
   return (
     <section className="section container jam-home-section" id="jam-entries">
       <div className="section-head">
         <div>
-          <h2>Game jams</h2>
-          <span className="section-meta">Play entries from active jams</span>
+          <h2>Jams</h2>
+          <span className="section-meta">Game jams and asset jams with live entries</span>
         </div>
         <a className="btn btn-ghost btn-sm" href="/studio#/jams">
           Browse all jams
@@ -33,11 +37,17 @@ export function JamHomeFeed({ spotlight }: Props) {
       </div>
 
       <article className="jam-home-featured">
+        <div className="jam-home-featured-cover" style={featuredCoverStyle} aria-hidden="true" />
         <header className="jam-home-featured-head">
           <div>
             <a className="jam-home-featured-title" href={featured.href}>
               {featured.jamTitle}
             </a>
+            <p className="jam-home-meta">
+              <span className={"jam-type-badge jam-type-badge--" + (featured.jamType || "game")}>
+                {jamTypeLabel(featured.jamType)}
+              </span>
+            </p>
             <p className="jam-home-tagline">{featured.tagline}</p>
             <p className="jam-home-meta">
               <span className={"jam-home-phase jam-home-phase--" + featured.phase}>
@@ -62,9 +72,11 @@ export function JamHomeFeed({ spotlight }: Props) {
           {featured.submissions.map((sub) => (
             <li className="jam-home-entry" key={sub.id}>
               <div className="jam-home-entry-body">
-                <strong>{sub.seriesTitle}</strong>
+                <strong>{isAssetSubmission(sub) ? sub.listingTitle : sub.seriesTitle}</strong>
                 <span className="jam-home-entry-meta">
-                  {sub.episodeTitle} · {sub.userName}
+                  {isAssetSubmission(sub)
+                    ? sub.category + " · " + sub.userName
+                    : sub.episodeTitle + " · " + sub.userName}
                   {sub.submittedAt ? " · " + formatSubmittedWhen(sub.submittedAt) : ""}
                 </span>
               </div>
@@ -72,9 +84,15 @@ export function JamHomeFeed({ spotlight }: Props) {
                 {featured.phase === "judging" && sub.likes > 0 ? (
                   <span className="jam-home-likes">{sub.likes} ♥</span>
                 ) : null}
-                <Link className="btn btn-sm btn-primary" to={sub.playHref}>
-                  Play
-                </Link>
+                {isAssetSubmission(sub) ? (
+                  <a className="btn btn-sm btn-primary" href={sub.viewHref}>
+                    View
+                  </a>
+                ) : (
+                  <Link className="btn btn-sm btn-primary" to={sub.playHref}>
+                    Play
+                  </Link>
+                )}
               </div>
             </li>
           ))}
@@ -104,9 +122,7 @@ export function JamHomeFeed({ spotlight }: Props) {
                 aria-expanded={previewId === item.jamId}
                 onClick={() => setPreviewId(previewId === item.jamId ? null : item.jamId)}
               >
-                <span className="jam-home-menu-glyph" aria-hidden="true">
-                  {jamMenuIconLabel(item.jamTitle)}
-                </span>
+                <JamCoverGlyph title={item.jamTitle} coverStyle={item.coverStyle} />
                 <span className="jam-home-menu-name">{item.jamTitle}</span>
               </button>
             ))}
@@ -123,6 +139,27 @@ export function JamHomeFeed({ spotlight }: Props) {
   );
 }
 
+function JamCoverGlyph({
+  title,
+  coverStyle,
+  className,
+}: {
+  title: string;
+  coverStyle?: JamHomeMenuItem["coverStyle"];
+  className?: string;
+}) {
+  const style = jamCoverBackground(coverStyle);
+  return (
+    <span
+      className={"jam-home-menu-glyph" + (className ? ` ${className}` : "")}
+      style={style}
+      aria-hidden="true"
+    >
+      {jamMenuIconLabel(title)}
+    </span>
+  );
+}
+
 function JamPreviewPanel({
   jam,
   onClose,
@@ -130,12 +167,20 @@ function JamPreviewPanel({
   jam: JamHomeMenuItem;
   onClose: () => void;
 }) {
+  const coverStyle = jamCoverBackground(jam.coverStyle);
+
   return (
     <article className="jam-home-preview">
+      <div className="jam-home-preview-cover" style={coverStyle} aria-hidden="true">
+        <span className="jam-home-preview-cover-glyph">{jamMenuIconLabel(jam.jamTitle)}</span>
+      </div>
       <header className="jam-home-preview-head">
         <div>
           <h4>{jam.jamTitle}</h4>
           <p className="jam-home-meta">
+            <span className={"jam-type-badge jam-type-badge--" + (jam.jamType || "game")}>
+              {jamTypeLabel(jam.jamType)}
+            </span>
             <span className={"jam-home-phase jam-home-phase--" + jam.phase}>
               {formatJamPhase(jam.phase)}
             </span>

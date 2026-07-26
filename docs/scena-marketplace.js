@@ -301,6 +301,14 @@
       });
     },
 
+    listSellerListings: function (userId) {
+      if (!userId) return Promise.resolve([]);
+      var local = readLocalListings().filter(function (l) {
+        return l.seller_id === userId && l.status !== "removed";
+      });
+      return Promise.resolve(local);
+    },
+
     publishListing: function (userId, spec) {
       spec = spec || {};
       if (!userId) return Promise.reject(new Error("Sign in to sell on the marketplace."));

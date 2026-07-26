@@ -4420,12 +4420,17 @@ body.is-resizing-center {
 
 .jam-card {
   display: block;
-  padding: 16px;
+  padding: 0;
   border-radius: 12px;
   border: 1px solid var(--scena-border);
   background: var(--scena-surface-2);
   text-decoration: none;
   color: inherit;
+  overflow: hidden;
+}
+
+.jam-card-body {
+  padding: 14px 16px 16px;
 }
 
 .jam-card:hover {
@@ -4494,6 +4499,77 @@ body.is-resizing-center {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.jam-browse-type {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jam-type-badge {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.jam-type-badge--game {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.12);
+}
+
+.jam-type-badge--asset {
+  color: #6a1b9a;
+  background: rgba(106, 27, 154, 0.12);
+}
+
+.jam-card-type {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--scena-text-muted);
+}
+
+.jam-entry--asset {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.jam-entry-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ede7f6, #b39ddb);
+  background-size: cover;
+  background-position: center;
+}
+
+.jam-asset-submit-block {
+  padding: 12px 0;
+  border-top: 1px solid var(--scena-border);
+}
+
+.jam-asset-submit-block:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.jam-asset-submit-subhead {
+  margin: 0 0 10px;
+  font-size: 0.9375rem;
+}
+
+.page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .jam-browse-row {
@@ -4591,6 +4667,144 @@ body.is-resizing-center {
 
 @media (max-width: 700px) {
   .jam-form .field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Jam cover art */
+.jam-cover {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%);
+}
+
+.jam-cover--compact {
+  height: 72px;
+}
+
+.jam-cover--menu,
+.jam-cover-preview-wrap .jam-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.jam-cover--featured {
+  height: 120px;
+}
+
+.jam-cover--detail {
+  height: 160px;
+  border-radius: 16px 16px 0 0;
+  margin: -1rem -1rem 0;
+}
+
+.jam-cover-glyph {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.875rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+.jam-cover--preset-a { background: linear-gradient(135deg, #fde8ef 0%, #f5c2d4 100%); }
+.jam-cover--preset-b { background: linear-gradient(135deg, #fff3e0 0%, #ffd59a 100%); }
+.jam-cover--preset-c { background: linear-gradient(135deg, #e8eaf6 0%, #9fa8da 100%); }
+.jam-cover--preset-d { background: linear-gradient(135deg, #e0f2f1 0%, #80cbc4 100%); }
+.jam-cover--preset-e { background: linear-gradient(135deg, #fce4ec 0%, #f48fb1 100%); }
+.jam-cover--preset-f { background: linear-gradient(135deg, #ede7f6 0%, #b39ddb 100%); }
+.jam-cover--preset-g { background: linear-gradient(145deg, #ff6b6b 0%, #feca57 100%); }
+.jam-cover--preset-h { background: linear-gradient(145deg, #2d6a4f 0%, #95d5b2 100%); }
+
+.jam-cover-editor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.jam-cover-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.jam-cover-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.jam-cover-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jam-cover-mode-btn {
+  border: 1px solid var(--scena-border);
+  background: var(--scena-surface);
+  color: inherit;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.jam-cover-mode-btn.is-active {
+  border-color: var(--scena-accent);
+  background: rgba(124, 17, 40, 0.08);
+  color: var(--scena-accent);
+  font-weight: 600;
+}
+
+.jam-cover-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.jam-cover-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.jam-cover-swatch.is-active {
+  border-color: var(--scena-accent);
+  box-shadow: 0 0 0 2px rgba(124, 17, 40, 0.15);
+}
+
+.jam-cover-color-field,
+.jam-cover-angle-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.8125rem;
+}
+
+.jam-cover-gradient-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.jam-detail .page-head.jam-detail-head {
+  padding-top: 16px;
+}
+
+@media (max-width: 700px) {
+  .jam-cover-editor {
     grid-template-columns: 1fr;
   }
 }
