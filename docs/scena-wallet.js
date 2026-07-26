@@ -41,7 +41,7 @@
 
   var DUCAT_PACKS = [
 
-    { id: "ducat_10", ducats: 10, priceCents: 99, priceLabel: "$0.99", note: "Try a chapter" },
+    { id: "ducat_10", ducats: 10, priceCents: 50, priceLabel: "$0.50", note: "Try a chapter (Stripe minimum)" },
 
     { id: "ducat_55", ducats: 55, priceCents: 499, priceLabel: "$4.99", note: "50 + 5 bonus Ducats" },
 

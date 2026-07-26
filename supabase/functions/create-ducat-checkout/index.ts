@@ -8,7 +8,7 @@ const corsHeaders = {
 
 /** Must match docs/scena-wallet.js and supabase-wallet.sql */
 const PACKS: Record<string, { ducats: number; priceCents: number; label: string }> = {
-  ducat_10: { ducats: 10, priceCents: 99, label: "10 Ducats" },
+  ducat_10: { ducats: 10, priceCents: 50, label: "10 Ducats" },
   ducat_55: { ducats: 55, priceCents: 499, label: "55 Ducats" },
   ducat_120: { ducats: 120, priceCents: 999, label: "120 Ducats" },
   ducat_500: { ducats: 500, priceCents: 2499, label: "500 Ducats" },
