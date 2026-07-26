@@ -537,9 +537,29 @@
 
             var msg = res.error.message || "Checkout failed.";
 
+            if (res.error.context && res.error.context.body) {
+
+              try {
+
+                var errBody = typeof res.error.context.body === "string"
+
+                  ? JSON.parse(res.error.context.body)
+
+                  : res.error.context.body;
+
+                if (errBody && errBody.error) msg = String(errBody.error);
+
+              } catch (parseErr) { /* keep msg */ }
+
+            }
+
             if (/not found|404|Failed to send/i.test(msg)) {
 
               msg = "Ducat checkout is not deployed yet. Finish Stripe setup in docs/STRIPE_SETUP.md (Edge Function create-ducat-checkout).";
+
+            } else if (/non-2xx/i.test(msg)) {
+
+              msg = "Checkout server error. In Supabase → Edge Functions → create-ducat-checkout → Logs. Usually: STRIPE_SECRET_KEY secret missing/wrong (use sk_live_… for live), or function needs redeploy after adding secrets.";
 
             }
 
