@@ -289,7 +289,14 @@
       return sb.rpc("purchase_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
         if (res.error) throw new Error(res.error.message || "Purchase failed.");
         var row = res.data || {};
-        if (window.ScenaWallet) ScenaWallet.load(userId);
+        if (window.ScenaWallet && row.balance != null) {
+          ScenaWallet.syncBalance(userId, row.balance);
+        }
+        if (window.ScenaWallet) {
+          return ScenaWallet.load(userId).then(function () {
+            return row;
+          });
+        }
         return row;
       });
     },

@@ -169,6 +169,7 @@ declare global {
     ScenaWallet?: {
       load: (userId: string) => Promise<{ balance?: number; purchased?: boolean }>;
       getBalance: (userId: string) => number;
+      syncBalance: (userId: string, balance: number, creatorEarned?: number) => void;
       getCreatorEarned: (userId: string) => number;
       formatDucats: (n: number) => string;
       renderPackGrid: (opts?: { buttonClass?: string }) => string;

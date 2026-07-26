@@ -167,6 +167,58 @@
 
     cache[scopeKey(scopeId)] = wallet;
 
+    notifyWalletChange(scopeId);
+
+  }
+
+
+
+  function notifyWalletChange(scopeId) {
+
+    if (typeof window === "undefined" || !scopeId) return;
+
+    var wallet = cache[scopeKey(scopeId)];
+
+    if (!wallet) return;
+
+    try {
+
+      window.dispatchEvent(new CustomEvent("scena-wallet-change", {
+
+        detail: {
+
+          userId: scopeId,
+
+          balance: wallet.balance,
+
+          creatorEarned: wallet.creatorEarned,
+
+        },
+
+      }));
+
+    } catch (e) { /* ignore */ }
+
+  }
+
+
+
+  function patchWalletFromRow(scopeId, row) {
+
+    if (!row || row.balance == null) return;
+
+    var wallet = getWallet(scopeId);
+
+    wallet.balance = Math.max(0, parseInt(row.balance, 10) || 0);
+
+    if (row.creator_earned != null) {
+
+      wallet.creatorEarned = Math.max(0, parseInt(row.creator_earned, 10) || 0);
+
+    }
+
+    setCache(scopeId, wallet);
+
   }
 
 
@@ -486,6 +538,20 @@
 
 
 
+    syncBalance: function (scopeId, balance, creatorEarned) {
+
+      var wallet = getWallet(scopeId);
+
+      if (balance != null) wallet.balance = Math.max(0, parseInt(balance, 10) || 0);
+
+      if (creatorEarned != null) wallet.creatorEarned = Math.max(0, parseInt(creatorEarned, 10) || 0);
+
+      setCache(scopeId, wallet);
+
+    },
+
+
+
     getCreatorEarned: function (scopeId) {
 
       return getWallet(scopeId).creatorEarned;
@@ -712,6 +778,8 @@
 
           if (res.error) throw new Error(res.error.message || "Unlock failed.");
 
+          patchWalletFromRow(scopeId, res.data || {});
+
           return ScenaWallet.load(scopeId).then(function (w) {
 
             return { ok: true, balance: w.balance };
@@ -750,11 +818,13 @@
 
           if (res.error) throw new Error(res.error.message || "Could not spend Ducats.");
 
+          patchWalletFromRow(scopeId, res.data || {});
+
           return ScenaWallet.load(scopeId).then(function () {
 
             var row = res.data || {};
 
-            return { balance: row.balance, spent: amount };
+            return { balance: row.balance != null ? row.balance : getWallet(scopeId).balance, spent: amount };
 
           });
 

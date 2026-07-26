@@ -101,13 +101,6 @@ export function DucatBalance({ className }: Props) {
               <strong>{displayEarned.toLocaleString()}</strong>
             </div>
           </div>
-          <p className="ducat-shop-hint">
-            Spending Ducats unlock chapters and shop items. Earned Ducats (80% of sales) cash out at $0.05 each on{" "}
-            <Link to="/account" onClick={() => setOpen(false)}>
-              Account
-            </Link>
-            .
-          </p>
           <p className="ducat-shop-hint ducat-shop-hint--buy">Buy more with card via Stripe:</p>
           <div ref={packRootRef} className="ducat-shop-packs" />
           {shopError ? <p className="ducat-shop-error">{shopError}</p> : null}

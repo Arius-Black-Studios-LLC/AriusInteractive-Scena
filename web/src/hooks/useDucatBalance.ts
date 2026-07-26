@@ -68,5 +68,16 @@ export function useDucatBalance() {
     };
   }, [userId, applyWallet]);
 
+  useEffect(() => {
+    function onWalletChange(e: Event) {
+      const detail = (e as CustomEvent<{ userId?: string; balance?: number; creatorEarned?: number }>).detail;
+      if (!userId || detail?.userId !== userId) return;
+      if (detail.balance != null) setBalance(detail.balance);
+      if (detail.creatorEarned != null) setCreatorEarned(detail.creatorEarned);
+    }
+    window.addEventListener("scena-wallet-change", onWalletChange);
+    return () => window.removeEventListener("scena-wallet-change", onWalletChange);
+  }, [userId]);
+
   return { balance, creatorEarned, userId, loading, refresh };
 }
