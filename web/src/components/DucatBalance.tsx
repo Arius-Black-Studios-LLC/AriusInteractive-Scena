@@ -9,7 +9,7 @@ type Props = {
 };
 
 export function DucatBalance({ className }: Props) {
-  const { balance, userId, loading, refresh } = useDucatBalance();
+  const { balance, creatorEarned, userId, loading, refresh } = useDucatBalance();
   const [open, setOpen] = useState(false);
   const [shopError, setShopError] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -64,6 +64,7 @@ export function DucatBalance({ className }: Props) {
   if (!userId) return null;
 
   const displayBalance = balance ?? 0;
+  const displayEarned = creatorEarned ?? 0;
   const label =
     displayBalance === 1 ? "1 Ducat" : `${displayBalance.toLocaleString()} Ducats`;
 
@@ -88,10 +89,26 @@ export function DucatBalance({ className }: Props) {
       {open ? (
         <div className="ducat-shop-popover" role="dialog" aria-label="Buy Ducats">
           <div className="ducat-shop-popover-head">
-            <strong>Buy Ducats</strong>
-            <span className="ducat-shop-balance">{label}</span>
+            <strong>Your Ducats</strong>
           </div>
-          <p className="ducat-shop-hint">Pay with card via Stripe. Ducats credit after payment confirms.</p>
+          <div className="ducat-wallet-rows">
+            <div className="ducat-wallet-row">
+              <span>Spending</span>
+              <strong>{displayBalance.toLocaleString()}</strong>
+            </div>
+            <div className="ducat-wallet-row ducat-wallet-row--earned">
+              <span>Earned</span>
+              <strong>{displayEarned.toLocaleString()}</strong>
+            </div>
+          </div>
+          <p className="ducat-shop-hint">
+            Spending Ducats unlock chapters and shop items. Earned Ducats (80% of sales) cash out at $0.05 each on{" "}
+            <Link to="/account" onClick={() => setOpen(false)}>
+              Account
+            </Link>
+            .
+          </p>
+          <p className="ducat-shop-hint ducat-shop-hint--buy">Buy more with card via Stripe:</p>
           <div ref={packRootRef} className="ducat-shop-packs" />
           {shopError ? <p className="ducat-shop-error">{shopError}</p> : null}
           <div className="ducat-shop-links">

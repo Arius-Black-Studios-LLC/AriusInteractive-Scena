@@ -5,39 +5,44 @@ import { loadWalletScript } from "./loadWalletScript";
 export function useDucatBalance() {
   const { userId } = useAuth();
   const [balance, setBalance] = useState<number | null>(null);
+  const [creatorEarned, setCreatorEarned] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const applyWallet = useCallback((uid: string) => {
+    setBalance(window.ScenaWallet!.getBalance(uid));
+    setCreatorEarned(window.ScenaWallet!.getCreatorEarned(uid));
+  }, []);
 
   const refresh = useCallback(() => {
     if (!userId) {
       setBalance(null);
+      setCreatorEarned(null);
       setLoading(false);
       return Promise.resolve(null);
     }
     setLoading(true);
     return loadWalletScript()
       .then(() => {
-        const cached = window.ScenaWallet!.getBalance(userId);
-        setBalance(cached);
+        applyWallet(userId);
         return window.ScenaWallet!.load(userId);
       })
       .then(() => {
-        const next = window.ScenaWallet!.getBalance(userId);
-        setBalance(next);
-        return next;
+        applyWallet(userId);
+        return window.ScenaWallet!.getBalance(userId);
       })
       .catch(() => {
-        const fallback = window.ScenaWallet ? window.ScenaWallet.getBalance(userId) : 0;
-        setBalance(fallback);
-        return fallback;
+        if (window.ScenaWallet) applyWallet(userId);
+        return window.ScenaWallet ? window.ScenaWallet.getBalance(userId) : 0;
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [userId]);
+  }, [userId, applyWallet]);
 
   useEffect(() => {
     if (!userId) {
       setBalance(null);
+      setCreatorEarned(null);
       setLoading(false);
       return;
     }
@@ -46,16 +51,14 @@ export function useDucatBalance() {
     loadWalletScript()
       .then(() => {
         if (cancelled) return;
-        setBalance(window.ScenaWallet!.getBalance(userId));
+        applyWallet(userId);
         return window.ScenaWallet!.load(userId);
       })
       .then(() => {
-        if (!cancelled) setBalance(window.ScenaWallet!.getBalance(userId));
+        if (!cancelled) applyWallet(userId);
       })
       .catch(() => {
-        if (!cancelled) {
-          setBalance(window.ScenaWallet ? window.ScenaWallet.getBalance(userId) : 0);
-        }
+        if (!cancelled && window.ScenaWallet) applyWallet(userId);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -63,7 +66,7 @@ export function useDucatBalance() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, applyWallet]);
 
-  return { balance, userId, loading, refresh };
+  return { balance, creatorEarned, userId, loading, refresh };
 }

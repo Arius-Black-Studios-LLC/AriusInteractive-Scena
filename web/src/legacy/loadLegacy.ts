@@ -109,7 +109,7 @@ export const LEGACY_BUNDLES = {
     "scena-reader-menu.js",
     "scena-player.js",
   ],
-  account: ["scena-profile.js", "scena-account.js"],
+  account: ["scena-profile.js", "scena-wallet.js", "scena-account.js"],
   studio: [
     "scena-cloud.js",
     "studio-store.js",

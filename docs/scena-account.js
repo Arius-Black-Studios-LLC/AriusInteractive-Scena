@@ -80,6 +80,9 @@
             '<div class="field"><label>Email</label><input type="email" name="email" value="' +
               escapeAttr(profile.email || userEmail) + '" readonly><p class="field-hint">Used for magic-link login — not shown on comments.</p></div>' +
           "</section>" +
+          (window.ScenaWallet
+            ? ScenaWallet.renderWalletPanel(ctx.userId || "")
+            : "") +
         "</form>" +
       "</div>"
     );
@@ -129,6 +132,33 @@
     }
 
     var saveBtn = $("#saveAccountBtn");
+
+    function refreshWalletPanel(message) {
+      if (!userId || !window.ScenaWallet) return;
+      ScenaWallet.load(userId).then(function () {
+        var panel = $("#accountWalletPanel");
+        if (!panel || !panel.parentNode) return;
+        var fresh = ScenaWallet.renderWalletPanel(userId);
+        var wrap = document.createElement("div");
+        wrap.innerHTML = fresh;
+        var next = wrap.firstElementChild;
+        if (next) {
+          panel.replaceWith(next);
+          ScenaWallet.bindWalletPanel(next, userId, function (msg) {
+            if (msg) toast(msg);
+            refreshWalletPanel();
+          });
+        }
+        if (message) toast(message);
+      }).catch(function () {
+        if (message) toast(message);
+      });
+    }
+
+    if (window.ScenaWallet && userId) {
+      refreshWalletPanel();
+    }
+
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
         if (!window.ScenaProfile) return;

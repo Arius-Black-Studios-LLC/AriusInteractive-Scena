@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       String(body.returnUrl || Deno.env.get("SITE_URL") || "https://arleco.app").replace(/\/$/, "");
     const returnPath = String(body.returnPath || "/studio#/library/shop");
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-03-31.basil" });
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
             product_data: {
               name: `Arleco ${pack.label}`,
               description: `${pack.ducats} Ducats for chapters, marketplace, and jams`,
+              tax_code: "txcd_10000000",
             },
           },
         },

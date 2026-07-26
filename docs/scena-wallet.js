@@ -22,11 +22,14 @@
 
   var ECONOMICS = {
 
-    CREATOR_SHARE: 0.7,
+    /** Share of each Ducat spend credited to the creator (80% — platform keeps 20%). */
+    CREATOR_SHARE: 0.8,
 
-    REFERENCE_RETAIL_CENTS_PER_DUCAT: 4,
+    /** Reference buy rate from the $0.99 / 10 loss-leader pack (~$0.09/Ducat). */
+    MARKET_RATE_CENTS_PER_DUCAT: 9,
 
-    CASHOUT_RATIO: 0.7,
+    /** USD paid per earned Ducat at cash-out (only earned Ducats convert). */
+    CASHOUT_CENTS_PER_DUCAT: 5,
 
     MIN_CASHOUT_DUCATS: 500,
 
@@ -210,7 +213,7 @@
 
   function payoutCentsPerDucat() {
 
-    return ECONOMICS.REFERENCE_RETAIL_CENTS_PER_DUCAT * ECONOMICS.CASHOUT_RATIO;
+    return ECONOMICS.CASHOUT_CENTS_PER_DUCAT;
 
   }
 
@@ -353,6 +356,8 @@
 
       if (params.get("ducat_purchase") === "success") {
 
+        var sessionId = params.get("session_id") || "";
+
         params.delete("ducat_purchase");
 
         params.delete("session_id");
@@ -363,7 +368,7 @@
 
         window.history.replaceState({}, "", next);
 
-        return Promise.resolve({ purchased: true });
+        return Promise.resolve({ purchased: true, sessionId: sessionId });
 
       }
 
@@ -413,7 +418,7 @@
 
     referenceRetailCentsPerDucat: function () {
 
-      return ECONOMICS.REFERENCE_RETAIL_CENTS_PER_DUCAT;
+      return ECONOMICS.MARKET_RATE_CENTS_PER_DUCAT;
 
     },
 
@@ -465,17 +470,49 @@
 
         var sb = supabaseClient();
 
-        return ensureProfileRow(sb, scopeId).then(function () {
+        var confirmPromise = Promise.resolve(null);
 
-          return sb.rpc("wallet_snapshot").then(function (res) {
+        if (purchaseMeta && purchaseMeta.sessionId && sb && sb.functions && sb.functions.invoke) {
 
-            if (res.error) throw new Error(res.error.message || "Could not load wallet.");
+          confirmPromise = sb.functions.invoke("confirm-ducat-checkout", {
 
-            var wallet = applySnapshot(scopeId, res.data || {});
+            body: { sessionId: purchaseMeta.sessionId },
 
-            if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+          }).then(function (res) {
 
-            return wallet;
+            if (res.error) {
+
+              console.warn("confirm-ducat-checkout:", res.error.message || res.error);
+
+            }
+
+            return res.data;
+
+          }).catch(function (err) {
+
+            console.warn("confirm-ducat-checkout:", err && err.message ? err.message : err);
+
+            return null;
+
+          });
+
+        }
+
+        return confirmPromise.then(function () {
+
+          return ensureProfileRow(sb, scopeId).then(function () {
+
+            return sb.rpc("wallet_snapshot").then(function (res) {
+
+              if (res.error) throw new Error(res.error.message || "Could not load wallet.");
+
+              var wallet = applySnapshot(scopeId, res.data || {});
+
+              if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+
+              return wallet;
+
+            });
 
           });
 
@@ -823,29 +860,153 @@
 
     renderEconomicsHint: function () {
 
-      var payoutPer = payoutCentsPerDucat();
-
-      var payoutLabel = "$" + (payoutPer / 100).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+      var marketPer = ECONOMICS.MARKET_RATE_CENTS_PER_DUCAT / 100;
+      var payoutPer = payoutCentsPerDucat() / 100;
+      var marketLabel = "$" + marketPer.toFixed(2);
+      var payoutLabel = "$" + payoutPer.toFixed(2);
+      var platformPct = Math.round((1 - ECONOMICS.CREATOR_SHARE) * 100);
+      var creatorPct = Math.round(ECONOMICS.CREATOR_SHARE * 100);
 
       return (
 
         '<p class="field-hint wallet-economics-hint">' +
 
-        "Ducats are purchased securely via Stripe. When readers spend on your work, you earn " +
-
-        Math.round(ECONOMICS.CREATOR_SHARE * 100) +
-
-        "% as earned Ducats. Cash out at " + payoutLabel + " each (min " +
+        "When readers spend Ducats on your chapters or marketplace listings, you earn " +
+        creatorPct + "% as <strong>earned Ducats</strong> (" + platformPct + "% stays with " +
+        ECONOMICS.PLATFORM_NAME + " as platform share). Earned Ducats cash out at " +
+        payoutLabel + " each (reference buy rate ~" + marketLabel + " via packs). Minimum cash-out: " +
 
         formatDucats(ECONOMICS.MIN_CASHOUT_DUCATS) + " = " +
 
-        formatUsdFromCents(cashoutUsdCents(ECONOMICS.MIN_CASHOUT_DUCATS)) + "). " +
+        formatUsdFromCents(cashoutUsdCents(ECONOMICS.MIN_CASHOUT_DUCATS)) + ". " +
 
-        "Purchased balance cannot be sold back for USD." +
+        "Purchased wallet balance cannot be exchanged for USD." +
 
         "</p>"
 
       );
+
+    },
+
+    renderWalletPanel: function (scopeId) {
+
+      var balance = ScenaWallet.getBalance(scopeId);
+
+      var earned = ScenaWallet.getCreatorEarned(scopeId);
+
+      var payoutPer = payoutCentsPerDucat();
+
+      var payoutLabel = "$" + (payoutPer / 100).toFixed(2);
+
+      var earnedUsd = formatUsdFromCents(cashoutUsdCents(earned));
+
+      var canCashout = earned >= ECONOMICS.MIN_CASHOUT_DUCATS;
+
+      return (
+
+        '<section class="form-section wallet-panel" id="accountWalletPanel">' +
+
+          "<h2>Ducats</h2>" +
+
+          '<div class="wallet-balances">' +
+
+            '<div class="wallet-balance-card">' +
+
+              "<span class=\"wallet-balance-label\">Spending balance</span>" +
+
+              '<strong class="wallet-balance-value">' + balance.toLocaleString() + "</strong>" +
+
+              "<span class=\"field-hint\">For chapters, marketplace, and jam entries</span>" +
+
+            "</div>" +
+
+            '<div class="wallet-balance-card wallet-balance-card--earned">' +
+
+              "<span class=\"wallet-balance-label\">Earned Ducats</span>" +
+
+              '<strong class="wallet-balance-value">' + earned.toLocaleString() + "</strong>" +
+
+              '<span class="field-hint">Cash-out eligible · ~' + earnedUsd + " at " + payoutLabel + "/Ducat</span>" +
+
+            "</div>" +
+
+          "</div>" +
+
+          ScenaWallet.renderEconomicsHint() +
+
+          '<div class="wallet-actions">' +
+
+            '<div class="field"><label>Cash out earned Ducats</label>' +
+
+              '<input type="number" id="walletCashoutAmount" min="' + ECONOMICS.MIN_CASHOUT_DUCATS +
+
+              '" step="1" value="' + (canCashout ? String(ECONOMICS.MIN_CASHOUT_DUCATS) : "") +
+
+              '" placeholder="Min ' + ECONOMICS.MIN_CASHOUT_DUCATS + '"' +
+
+              (canCashout ? "" : " disabled") + ">" +
+
+              '<p class="field-hint">Only earned Ducats convert to USD — not your spending balance.</p></div>' +
+
+            '<button type="button" class="btn btn-secondary" id="walletCashoutBtn"' +
+
+              (canCashout ? "" : " disabled") + ">Request cash-out</button>" +
+
+          "</div>" +
+
+          "<h3 class=\"wallet-buy-heading\">Buy more Ducats</h3>" +
+
+          ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) +
+
+        "</section>"
+
+      );
+
+    },
+
+    bindWalletPanel: function (root, scopeId, onChange) {
+
+      if (!root || !scopeId) return;
+
+      ScenaWallet.bindPackButtons(root, scopeId, function () {
+
+        if (onChange) onChange();
+
+      }, function (err) {
+
+        if (onChange) onChange(err && err.message);
+
+      });
+
+      var cashoutBtn = root.querySelector("#walletCashoutBtn");
+
+      var cashoutInput = root.querySelector("#walletCashoutAmount");
+
+      if (cashoutBtn) {
+
+        cashoutBtn.addEventListener("click", function () {
+
+          var amount = cashoutInput ? parseInt(cashoutInput.value, 10) : ECONOMICS.MIN_CASHOUT_DUCATS;
+
+          cashoutBtn.disabled = true;
+
+          ScenaWallet.requestCashout(scopeId, amount).then(function () {
+
+            if (onChange) onChange("Cash-out request submitted.");
+
+          }).catch(function (err) {
+
+            if (onChange) onChange((err && err.message) || "Cash-out failed.");
+
+          }).finally(function () {
+
+            cashoutBtn.disabled = false;
+
+          });
+
+        });
+
+      }
 
     },
 

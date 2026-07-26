@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
     return new Response("Server misconfigured", { status: 503 });
   }
 
-  const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
+  const stripe = new Stripe(stripeKey, { apiVersion: "2025-03-31.basil" });
   const signature = req.headers.get("stripe-signature");
   if (!signature) {
     return new Response("Missing signature", { status: 400 });

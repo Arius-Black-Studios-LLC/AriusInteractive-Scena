@@ -4,5 +4,8 @@
 [functions.create-ducat-checkout]
 verify_jwt = true
 
+[functions.confirm-ducat-checkout]
+verify_jwt = true
+
 [functions.stripe-webhook]
 verify_jwt = false

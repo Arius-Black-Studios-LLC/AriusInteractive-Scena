@@ -66,11 +66,14 @@ Deploy:
 
 ```bash
 supabase functions deploy create-ducat-checkout
+supabase functions deploy confirm-ducat-checkout
 supabase functions deploy stripe-webhook
 ```
 
-`create-ducat-checkout` requires a logged-in user JWT (`verify_jwt = true`).  
+`create-ducat-checkout` and `confirm-ducat-checkout` require a logged-in user JWT (`verify_jwt = true`).  
 `stripe-webhook` is called by Stripe only (`verify_jwt = false`).
+
+If a card is charged but balance stays **0**, run `docs/supabase-stripe-wallet-fix.sql` in SQL Editor (fixes profile + tax amount checks), deploy `confirm-ducat-checkout`, then reload the site after checkout — the return URL confirms the session even if the webhook failed.
 
 ---
 
@@ -107,7 +110,7 @@ Redeploy the site after SQL + functions are live.
 2. Open **Studio → My assets → Get Ducats** (or marketplace upsell).
 3. Click a pack → redirect to Stripe Checkout.
 4. Pay with test card **`4242 4242 4242 4242`**, any future expiry, any CVC.
-5. Return to the site with `?ducat_purchase=success` — balance should update after webhook (usually within seconds).
+5. Return to the site with `?ducat_purchase=success&session_id=cs_...` — balance should update via webhook or return-path confirm (usually within seconds).
 6. Verify in Supabase:
 
 ```sql
@@ -137,7 +140,8 @@ await supabase.from('profiles').update({ ducat_balance: 999999 }).eq('id', userI
 | Symptom | Check |
 |---------|--------|
 | “Stripe is not configured” | `STRIPE_SECRET_KEY` on Supabase function secrets |
-| Payment succeeds, no Ducats | Webhook URL, `STRIPE_WEBHOOK_SECRET`, function logs in Supabase |
+| Payment succeeds, no Ducats | Run `supabase-stripe-wallet-fix.sql`; deploy `confirm-ducat-checkout`; check webhook URL + `STRIPE_WEBHOOK_SECRET`; Stripe → Webhooks → event delivery errors; Supabase function logs |
+| “Profile not found” on grant | Run `supabase-stripe-wallet-fix.sql` (auto-creates profile) or `supabase-profile-ensure.sql` |
 | “Payment amount mismatch” | Pack prices match in `scena-wallet.js`, SQL `_ducat_pack_price_cents`, and Edge Function `PACKS` |
 | Checkout 401 | User must be signed in; JWT passed to `functions.invoke` |
 | Old free grants still work | Re-run `supabase-stripe-wallet.sql` to drop `purchase_ducat_pack` |

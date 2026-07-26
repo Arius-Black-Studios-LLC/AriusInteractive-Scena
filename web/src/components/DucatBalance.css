@@ -109,6 +109,41 @@
   color: #b42318;
 }
 
+.ducat-shop-hint--buy {
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.ducat-wallet-rows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ducat-wallet-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--scena-surface-2, #fafafa);
+  border: 1px solid var(--scena-border, #eee);
+  font-size: 0.6875rem;
+  color: var(--scena-muted, #666);
+}
+
+.ducat-wallet-row strong {
+  font-size: 1rem;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.ducat-wallet-row--earned {
+  border-color: rgba(124, 17, 40, 0.2);
+  background: rgba(124, 17, 40, 0.04);
+}
+
 .ducat-shop-links {
   margin-top: 10px;
   padding-top: 10px;

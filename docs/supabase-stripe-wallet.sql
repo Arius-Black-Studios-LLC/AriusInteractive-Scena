@@ -85,9 +85,19 @@ begin
   if v_ducats is null or v_expected_cents is null then
     raise exception 'Unknown Ducat pack';
   end if;
-  if p_amount_cents is null or p_amount_cents <> v_expected_cents then
+  if p_amount_cents is null or p_amount_cents < v_expected_cents then
     raise exception 'Payment amount mismatch';
   end if;
+
+  insert into public.profiles (id, email, display_name, intended_role)
+  select
+    u.id,
+    u.email,
+    coalesce(u.raw_user_meta_data->>'display_name', split_part(coalesce(u.email, ''), '@', 1), 'Reader'),
+    coalesce(u.raw_user_meta_data->>'intended_role', 'reader')
+  from auth.users u
+  where u.id = p_user_id
+  on conflict (id) do nothing;
 
   update public.profiles
   set ducat_balance = ducat_balance + v_ducats

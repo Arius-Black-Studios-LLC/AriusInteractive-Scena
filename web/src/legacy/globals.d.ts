@@ -169,14 +169,23 @@ declare global {
     ScenaWallet?: {
       load: (userId: string) => Promise<{ balance?: number; purchased?: boolean }>;
       getBalance: (userId: string) => number;
+      getCreatorEarned: (userId: string) => number;
       formatDucats: (n: number) => string;
       renderPackGrid: (opts?: { buttonClass?: string }) => string;
+      renderWalletPanel: (scopeId: string) => string;
+      renderEconomicsHint: () => string;
+      bindWalletPanel: (
+        root: HTMLElement | null,
+        scopeId: string,
+        onChange?: (message?: string) => void,
+      ) => void;
       bindPackButtons: (
         root: HTMLElement | null,
         scopeId: string,
         onSuccess?: (result?: { redirecting?: boolean; purchased?: boolean }) => void,
         onError?: (err: Error) => void,
       ) => void;
+      requestCashout?: (scopeId: string, ducats: number) => Promise<{ ok?: boolean }>;
       purchasePack?: (
         scopeId: string,
         packId: string,
