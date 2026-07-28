@@ -857,6 +857,30 @@
       });
     },
 
+    /** Empty jam (no eligible entries): refund each contributor their own stake. */
+    jamRefundEmptyPrizePool: function (userId, jamId) {
+      if (!jamId || !userId) {
+        return Promise.reject(new Error("Missing jam refund details."));
+      }
+      return cloudRequired(userId).then(function () {
+        var sb = supabaseClient();
+        return sb.rpc("jam_refund_empty_prize_pool", {
+          p_jam_id: String(jamId),
+        }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not refund jam prize pool.");
+          var row = res.data || {};
+          return ScenaWallet.load(userId).then(function () {
+            return row;
+          });
+        });
+      });
+    },
+
+    /** @deprecated use jamRefundEmptyPrizePool — kept for older jam client code */
+    jamRefundPrizeToHost: function (hostUserId, jamId) {
+      return ScenaWallet.jamRefundEmptyPrizePool(hostUserId, jamId);
+    },
+
     checkBalance: function (scopeId, needed) {
       needed = Math.max(0, parseInt(needed, 10) || 0);
       return ScenaWallet.load(scopeId).then(function () {

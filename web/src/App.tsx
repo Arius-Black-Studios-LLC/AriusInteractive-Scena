@@ -15,6 +15,8 @@ import { AdminFeaturedPage } from "./pages/AdminFeaturedPage";
 import { AdminModerationPage } from "./pages/AdminModerationPage";
 import { AccountPage } from "./pages/AccountPage";
 import { BlogPage } from "./pages/BlogPage";
+import { ForumsPage } from "./pages/ForumsPage";
+import { ForumTopicPage } from "./pages/ForumTopicPage";
 import { HomePage } from "./pages/HomePage";
 import { LearnLayout } from "./pages/learn/LearnLayout";
 import { LearnCatalogPage } from "./pages/learn/LearnCatalogPage";
@@ -71,6 +73,8 @@ function AppRoutes() {
         <Route path="/terms" element={<StaticPage page="terms" />} />
         <Route path="/content-guidelines" element={<StaticPage page="content-guidelines" />} />
         <Route path="/series" element={<SeriesPage />} />
+        <Route path="/forums" element={<ForumsPage />} />
+        <Route path="/forums/:topicId" element={<ForumTopicPage />} />
       </Route>
       <Route path="/play" element={<PlayPage />} />
       <Route path="/studio/*" element={<StudioLayout />} />

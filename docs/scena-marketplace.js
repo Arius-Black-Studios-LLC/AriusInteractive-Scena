@@ -181,6 +181,74 @@
     return n + " Ducats";
   }
 
+  function isJamFreeListing(listing) {
+    if (!listing) return false;
+    if (listing.jam_free === true) return true;
+    var until = listing.jam_free_until;
+    if (!until) return false;
+    var t = new Date(until).getTime();
+    return !isNaN(t) && t > Date.now();
+  }
+
+  function listPriceDucats(listing) {
+    return Math.max(0, parseInt(listing && listing.price_ducats, 10) || 0);
+  }
+
+  function effectivePriceDucats(listing) {
+    if (listing && listing.effective_price_ducats != null && !isNaN(Number(listing.effective_price_ducats))) {
+      return Math.max(0, parseInt(listing.effective_price_ducats, 10) || 0);
+    }
+    if (isJamFreeListing(listing)) return 0;
+    return listPriceDucats(listing);
+  }
+
+  /** Strikethrough list price when a jam promo is active. */
+  function renderPriceHtml(listing) {
+    var list = listPriceDucats(listing);
+    var effective = effectivePriceDucats(listing);
+    if (isJamFreeListing(listing) && list > 0) {
+      return (
+        '<span class="mp-price mp-price--jam-free">' +
+          '<s class="mp-price-was">' + escapeHtml(formatPrice(list)) + "</s> " +
+          '<span class="mp-price-now">Free</span>' +
+          '<span class="mp-price-jam-tag"> during jam</span>' +
+        "</span>"
+      );
+    }
+    return '<span class="mp-price">' + escapeHtml(formatPrice(effective)) + "</span>";
+  }
+
+  function enrichListingsWithJamFree(listings) {
+    listings = (listings || []).slice();
+    if (!window.ScenaJams || !ScenaJams.jamFreeUntilByListingId) {
+      return Promise.resolve(listings.map(normalizeJamFreeFields));
+    }
+    return Promise.resolve(ScenaJams.jamFreeUntilByListingId()).then(function (map) {
+      map = map || {};
+      return listings.map(function (item) {
+        var row = Object.assign({}, item);
+        var fromJam = map[row.id];
+        if (fromJam) {
+          var existing = row.jam_free_until ? new Date(row.jam_free_until).getTime() : 0;
+          var next = new Date(fromJam).getTime();
+          if (!existing || next > existing) row.jam_free_until = fromJam;
+        }
+        return normalizeJamFreeFields(row);
+      });
+    }).catch(function () {
+      return listings.map(normalizeJamFreeFields);
+    });
+  }
+
+  function normalizeJamFreeFields(listing) {
+    if (!listing) return listing;
+    var row = Object.assign({}, listing);
+    var jamFree = isJamFreeListing(row);
+    row.jam_free = jamFree;
+    row.effective_price_ducats = jamFree ? 0 : listPriceDucats(row);
+    return row;
+  }
+
   function categoryLabel(id) {
     var cat = CATEGORIES.find(function (c) { return c.id === id; });
     return cat ? cat.label : id;
@@ -310,8 +378,9 @@
       var query = opts.query || "";
 
       var sb = getClient();
+      var chain;
       if (useCloud() && sb) {
-        return sb.rpc("browse_marketplace_listings", {
+        chain = sb.rpc("browse_marketplace_listings", {
           p_category: category || null,
           p_query: query || null,
           p_limit: opts.limit || 48,
@@ -325,14 +394,17 @@
         }).catch(function () {
           return filterLocalListings(category, query);
         });
+      } else {
+        chain = Promise.resolve(filterLocalListings(category, query));
       }
-      return Promise.resolve(filterLocalListings(category, query));
+      return chain.then(enrichListingsWithJamFree);
     },
 
     getListing: function (listingId, userId) {
       var sb = getClient();
+      var chain;
       if (useCloud() && sb && listingId && String(listingId).indexOf("demo_") !== 0) {
-        return sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
+        chain = sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
           if (res.error || !res.data) return findLocalListing(listingId, userId);
           var row = res.data;
           row.owned = row.owned || Boolean(readPurchases(userId)[listingId]);
@@ -340,52 +412,113 @@
         }).catch(function () {
           return findLocalListing(listingId, userId);
         });
+      } else {
+        chain = Promise.resolve(findLocalListing(listingId, userId));
       }
-      return Promise.resolve(findLocalListing(listingId, userId));
+      return chain.then(function (listing) {
+        if (!listing) return null;
+        return enrichListingsWithJamFree([listing]).then(function (rows) {
+          return rows[0] || listing;
+        });
+      });
     },
 
     purchase: function (userId, listingId) {
       if (!userId) return Promise.reject(new Error("Sign in to get marketplace assets."));
-      var local = findLocalListing(listingId, userId);
-      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      return ScenaMarketplace.getListing(listingId, userId).then(function (local) {
+        var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
 
-      if (local && local.seller_id === userId) {
-        return Promise.reject(new Error("You cannot buy your own listing — it is already in your library."));
-      }
-
-      if (local && isLocalId) {
-        var price = local.price_ducats || 0;
-        var finish = function () {
-          var purchases = readPurchases(userId);
-          purchases[listingId] = true;
-          writePurchases(userId, purchases);
-          return { bundle: local.bundle, free: !price, balance: window.ScenaWallet ? ScenaWallet.getBalance(userId) : null };
-        };
-        if (price <= 0) return Promise.resolve(finish());
-        if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
-        return ScenaWallet.spendBalance(userId, price, "marketplace_demo", listingId).then(function () {
-          return finish();
-        });
-      }
-
-      var sb = getClient();
-      if (!sb) {
-        return Promise.reject(new Error("Marketplace requires sign-in."));
-      }
-
-      return sb.rpc("purchase_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
-        if (res.error) throw new Error(res.error.message || "Purchase failed.");
-        var row = res.data || {};
-        if (window.ScenaWallet && row.balance != null) {
-          ScenaWallet.syncBalance(userId, row.balance);
+        if (local && (local.is_seller || local.isSeller || local.seller_id === userId)) {
+          return Promise.reject(new Error("You cannot buy your own listing — it is already in your library."));
         }
-        if (window.ScenaWallet) {
-          return ScenaWallet.load(userId).then(function () {
-            return row;
+
+        if (local && isLocalId) {
+          var price = effectivePriceDucats(local);
+          var finish = function () {
+            var purchases = readPurchases(userId);
+            purchases[listingId] = true;
+            writePurchases(userId, purchases);
+            return {
+              bundle: local.bundle,
+              free: !price,
+              jam_free: isJamFreeListing(local),
+              balance: window.ScenaWallet ? ScenaWallet.getBalance(userId) : null,
+            };
+          };
+          if (price <= 0) return Promise.resolve(finish());
+          if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
+          return ScenaWallet.spendBalance(userId, price, "marketplace_demo", listingId).then(function () {
+            return finish();
           });
         }
-        return row;
+
+        var sb = getClient();
+        if (!sb) {
+          return Promise.reject(new Error("Marketplace requires sign-in."));
+        }
+
+        return sb.rpc("purchase_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Purchase failed.");
+          var row = res.data || {};
+          if (window.ScenaWallet && row.balance != null) {
+            ScenaWallet.syncBalance(userId, row.balance);
+          }
+          if (window.ScenaWallet) {
+            return ScenaWallet.load(userId).then(function () {
+              return row;
+            });
+          }
+          return row;
+        });
       });
+    },
+
+    /** Extend jam-free window through judging end (seller only). */
+    setJamFreeUntil: function (userId, listingId, untilIso) {
+      if (!userId || !listingId || !untilIso) {
+        return Promise.reject(new Error("Missing jam free details."));
+      }
+      var sb = getClient();
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      if (useCloud() && sb && !isLocalId) {
+        return sb.rpc("set_listing_jam_free_until", {
+          p_listing_id: listingId,
+          p_until: untilIso,
+        }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not apply jam free pricing.");
+          // Mirror locally for UI enrichment
+          var list = readLocalListings();
+          var idx = list.findIndex(function (l) { return l.id === listingId; });
+          if (idx >= 0) {
+            var prev = list[idx].jam_free_until ? new Date(list[idx].jam_free_until).getTime() : 0;
+            var next = new Date(untilIso).getTime();
+            if (!prev || next > prev) list[idx].jam_free_until = untilIso;
+            writeLocalListings(list);
+          }
+          return res.data || { jam_free_until: untilIso };
+        });
+      }
+      var list = readLocalListings();
+      var idx = list.findIndex(function (l) { return l.id === listingId; });
+      if (idx < 0) {
+        // Still record on a side map for demo listings
+        try {
+          var side = JSON.parse(localStorage.getItem("arleco_marketplace_jam_free") || "{}");
+          var prevSide = side[listingId] ? new Date(side[listingId]).getTime() : 0;
+          var nextSide = new Date(untilIso).getTime();
+          if (!prevSide || nextSide > prevSide) side[listingId] = untilIso;
+          localStorage.setItem("arleco_marketplace_jam_free", JSON.stringify(side));
+        } catch (e) { /* ignore */ }
+        return Promise.resolve({ jam_free_until: untilIso });
+      }
+      if (list[idx].seller_id && list[idx].seller_id !== userId) {
+        return Promise.reject(new Error("Only the seller can mark jam free pricing."));
+      }
+      var prev = list[idx].jam_free_until ? new Date(list[idx].jam_free_until).getTime() : 0;
+      var next = new Date(untilIso).getTime();
+      if (!prev || next > prev) list[idx].jam_free_until = untilIso;
+      writeLocalListings(list);
+      return Promise.resolve({ jam_free_until: list[idx].jam_free_until });
     },
 
     listSellerListings: function (userId) {
@@ -496,7 +629,7 @@
             '<span class="marketplace-card-body">' +
               '<strong>' + escapeHtml(item.title) + "</strong>" +
               '<span class="marketplace-card-meta">' + escapeHtml(categoryLabel(item.category)) +
-              " · " + escapeHtml(formatPrice(item.price_ducats)) +
+              " · " + renderPriceHtml(item) +
               (item.rating_count
                 ? " · " + escapeHtml(formatRating(item.rating_avg, item.rating_count))
                 : "") +
@@ -552,18 +685,26 @@
       var owned = listing.owned;
       var isSeller = listing.is_seller || listing.isSeller ||
         (opts.viewerUserId && listing.seller_id && listing.seller_id === opts.viewerUserId);
-      var price = listing.price_ducats || 0;
+      var listPrice = listPriceDucats(listing);
+      var price = effectivePriceDucats(listing);
+      var jamFree = isJamFreeListing(listing) && listPrice > 0;
       var actionHtml;
       if (isSeller) {
         actionHtml =
           '<button type="button" class="btn btn-sm btn-ghost" disabled>Your listing</button>' +
           '<span class="field-hint">You already own this — use My assets to import it into a project.</span>';
       } else {
-        var actionLabel = owned ? "Add to project" : (price ? "Buy · " + formatPrice(price) : "Get free");
+        var actionLabel = owned
+          ? "Add to project"
+          : (price ? "Buy · " + formatPrice(price) : (jamFree ? "Get free (jam promo)" : "Get free"));
         actionHtml =
           '<button type="button" class="btn btn-sm btn-primary marketplace-acquire-btn" data-listing-id="' +
             escapeAttr(listing.id) + '">' + escapeHtml(actionLabel) + "</button>" +
-          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "");
+          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "") +
+          (jamFree && !owned
+            ? '<span class="field-hint mp-jam-free-note">Free while the jam’s voting period is live — then returns to ' +
+                escapeHtml(formatPrice(listPrice)) + ".</span>"
+            : "");
       }
 
       return (
@@ -571,6 +712,7 @@
         "<h4>" + escapeHtml(listing.title) + "</h4>" +
         '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") +
           (isSeller ? " (you)" : "") + "</p>" +
+        '<p class="marketplace-price-line">' + renderPriceHtml(listing) + "</p>" +
         '<p class="marketplace-rating-line">' +
           escapeHtml(formatRating(listing.rating_avg, listing.rating_count)) +
           (owned && !isSeller
@@ -759,6 +901,11 @@
         item.rating_count = item.rating_count || 0;
         item.my_rating = null;
       }
+      try {
+        var side = JSON.parse(localStorage.getItem("arleco_marketplace_jam_free") || "{}");
+        if (side[listingId] && !item.jam_free_until) item.jam_free_until = side[listingId];
+      } catch (e) { /* ignore */ }
+      item = normalizeJamFreeFields(item);
     }
     return item;
   }

@@ -738,6 +738,38 @@
     return "closed";
   }
 
+  function applyJamFreePromo(userId, listing, jam) {
+    if (!listing || !listing.id || !jam || !jam.judgingEnd) return Promise.resolve(listing);
+    if (!window.ScenaMarketplace || !ScenaMarketplace.setJamFreeUntil) return Promise.resolve(listing);
+    return ScenaMarketplace.setJamFreeUntil(userId, listing.id, jam.judgingEnd).then(function () {
+      listing.jam_free_until = jam.judgingEnd;
+      listing.jam_free = true;
+      return listing;
+    }).catch(function () {
+      // Local enrichment still covers shop UI via jamFreeUntilByListingId
+      return listing;
+    });
+  }
+
+  function jamFreeUntilByListingIdSync(rows) {
+    var map = {};
+    (rows || []).forEach(function (jam) {
+      migrateJam(jam);
+      if (!isAssetJam(jam) || jam.status !== "published") return;
+      var phase = jamPhase(jam);
+      if (phase !== "submissions" && phase !== "judging") return;
+      var until = jam.judgingEnd;
+      if (!until) return;
+      (jam.submissions || []).forEach(function (s) {
+        if (!s || s.disqualified || !s.listingId) return;
+        var prev = map[s.listingId] ? new Date(map[s.listingId]).getTime() : 0;
+        var next = new Date(until).getTime();
+        if (!prev || next > prev) map[s.listingId] = until;
+      });
+    });
+    return map;
+  }
+
   function requiresAgeGate(jam) {
     if (!jam) return false;
     migrateJam(jam);
@@ -867,6 +899,53 @@
     return ScenaWallet.jamPayoutWinner(hostUserId, jamId, winnerUserId, amount);
   }
 
+  function walletRefundEmptyPrizePool(userId, jamId) {
+    if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
+    if (ScenaWallet.jamRefundEmptyPrizePool) {
+      return ScenaWallet.jamRefundEmptyPrizePool(userId, jamId);
+    }
+    if (ScenaWallet.jamRefundPrizeToHost) {
+      return ScenaWallet.jamRefundPrizeToHost(userId, jamId);
+    }
+    return Promise.reject(new Error("Wallet unavailable."));
+  }
+
+  function activeSubmissionCount(jam) {
+    return (jam.submissions || []).filter(function (s) { return s && !s.disqualified; }).length;
+  }
+
+  function refundEmptyPrizePool(jam, actingUserId) {
+    if (!jam || !jam.prizeEnabled) return Promise.resolve(jam);
+    if (jam.prize && (jam.prize.paidOut || jam.prize.refunded)) return Promise.resolve(jam);
+    if (jamPhase(jam) !== "closed") return Promise.resolve(jam);
+    if (activeSubmissionCount(jam) > 0) return Promise.resolve(jam);
+
+    var total = prizePoolTotal(jam);
+    var actor = actingUserId || jam.hostUserId;
+    var markRefunded = function (extra) {
+      jam.prize = jam.prize || {};
+      jam.prize.refunded = true;
+      jam.prize.refundedAt = new Date().toISOString();
+      if (extra) Object.assign(jam.prize, extra);
+      return saveJam(jam);
+    };
+
+    if (total <= 0) return Promise.resolve(markRefunded({ refundedAmount: 0 }));
+
+    return walletRefundEmptyPrizePool(actor, jam.id).then(function (result) {
+      return markRefunded({
+        refundedAmount: (result && result.refunded) != null ? result.refunded : total,
+        refunds: (result && result.refunds) || null,
+      });
+    }).catch(function (err) {
+      var msg = String((err && err.message) || "");
+      if (/no prize pool/i.test(msg) || /already/i.test(msg)) {
+        return markRefunded({ refundedAmount: 0, refundNote: msg });
+      }
+      return Promise.reject(err);
+    });
+  }
+
   function checkWalletBalance(userId, needed) {
     needed = Math.max(0, parseInt(needed, 10) || 0);
     if (!needed) return Promise.resolve();
@@ -977,9 +1056,6 @@
     if (listing.seller_id && listing.seller_id !== userId) {
       throw new Error("You can only submit listings you published.");
     }
-    if (jam.requireFreeListing && Math.max(0, parseInt(listing.price_ducats, 10) || 0) > 0) {
-      throw new Error("This asset jam requires free listings (0 Ducats).");
-    }
     var cats = jam.allowedCategories || [];
     if (cats.length && cats.indexOf(listing.category) < 0) {
       throw new Error("This jam only accepts: " + cats.join(", ") + ".");
@@ -1040,6 +1116,11 @@
   }
 
   function assetRatingControlsHtml(jam, sub, ctx) {
+    if (sub.disqualified) {
+      return '<span class="jam-dq-badge">Disqualified' +
+        (sub.disqualifiedReason ? ": " + escapeHtml(sub.disqualifiedReason) : "") +
+        "</span>";
+    }
     var stats = submissionAvgRating(sub);
     var my = ctx.userId && sub.ratings ? sub.ratings[ctx.userId] : null;
     var label =
@@ -1048,7 +1129,7 @@
           ? "★ " + stats.avg.toFixed(1) + " (" + stats.count + ")"
           : "Not rated yet") +
       "</span>";
-    if (jamPhase(jam) === "submissions" || !ctx.userId || sub.userId === ctx.userId) {
+    if (jamPhase(jam) !== "judging" || !ctx.userId || sub.userId === ctx.userId) {
       return label;
     }
     var stars = "";
@@ -1061,13 +1142,27 @@
     return label + '<div class="mp-stars jam-entry-stars">' + stars + "</div>";
   }
 
+  function hostModerationButtonsHtml(jam, sub, isHost) {
+    if (!isHost || jamPhase(jam) !== "judging") return "";
+    if (sub.disqualified) {
+      return (
+        '<button type="button" class="btn btn-sm btn-ghost jam-reinstate-btn" data-reinstate-sub="' +
+          escapeAttr(sub.id) + '">Reinstate</button>'
+      );
+    }
+    return (
+      '<button type="button" class="btn btn-sm btn-ghost jam-dq-btn" data-dq-sub="' +
+        escapeAttr(sub.id) + '" title="Remove from judging for being off topic">Disqualify (off topic)</button>'
+    );
+  }
+
   function autoPickWinner(jam) {
     var ids = autoPickWinners(jam);
     return ids[0] || null;
   }
 
   function autoPickWinners(jam) {
-    var subs = (jam.submissions || []).slice();
+    var subs = (jam.submissions || []).slice().filter(function (s) { return !s.disqualified; });
     if (!subs.length) return [];
     var count = jam.winnerMode === "unranked" ? 0 : clampWinnerCount(jam.winnerCount || 1);
     if (!count) return [];
@@ -1090,6 +1185,7 @@
 
   function distributePrize(jam) {
     if (!jam.prizeEnabled || jam.winnerMode === "unranked") return Promise.resolve(jam);
+    if (jam.prize && (jam.prize.paidOut || jam.prize.refunded)) return Promise.resolve(jam);
     var placed = getWinnerIds(jam);
     if (!placed.some(Boolean)) return Promise.resolve(jam);
     if (jam.prize && jam.prize.paidOut) return Promise.resolve(jam);
@@ -1143,12 +1239,25 @@
   }
 
   function tryPayoutIfHost(jam, userId) {
-    if (!jam || !userId || jam.hostUserId !== userId) return Promise.resolve(jam);
+    if (!jam || !userId) return Promise.resolve(jam);
     if (jam.winnerMode === "unranked") return Promise.resolve(jam);
-    var ids = getWinnerIds(jam).filter(Boolean);
-    if (!ids.length || (jam.prize && jam.prize.paidOut)) return Promise.resolve(jam);
+    if (jam.prize && (jam.prize.paidOut || jam.prize.refunded)) return Promise.resolve(jam);
     if (jamPhase(jam) !== "closed") return Promise.resolve(jam);
-    var needed = Math.min(clampWinnerCount(jam.winnerCount || 1), (jam.submissions || []).length);
+
+    // No eligible entries (including all-disqualified) → refund each contributor their stake.
+    // Any signed-in user can trigger; ledger pays only original donors (anti host-fraud).
+    if (activeSubmissionCount(jam) === 0) {
+      return refundEmptyPrizePool(jam, userId);
+    }
+
+    if (jam.hostUserId !== userId) return Promise.resolve(jam);
+
+    var ids = getWinnerIds(jam).filter(Boolean);
+    if (!ids.length) return Promise.resolve(jam);
+    var needed = Math.min(
+      clampWinnerCount(jam.winnerCount || 1),
+      activeSubmissionCount(jam)
+    );
     if (ids.length < needed && jam.winnerMode === "host_picks") return Promise.resolve(jam);
     return distributePrize(jam);
   }
@@ -1158,6 +1267,7 @@
     if (jamPhase(jam) !== "closed") return jam;
     if (jam.winnerMode === "unranked") return jam;
     if (getWinnerIds(jam).some(Boolean)) return jam;
+    if (activeSubmissionCount(jam) === 0) return jam;
     if (jam.winnerMode === "auto_likes" || jam.winnerMode === "auto_rating") {
       setWinnerIds(jam, autoPickWinners(jam));
       return saveJam(jam);
@@ -1199,11 +1309,16 @@
         return j.status === "published";
       });
       rows.forEach(finalizeIfDue);
+      // Landing page is game jams only — asset jams live in the marketplace.
+      rows = rows.filter(function (j) {
+        return (j.jamType || "game") !== "asset";
+      });
       rows = rows.filter(function (j) {
         if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
         var phase = jamPhase(j);
         if (phase !== "submissions" && phase !== "judging") return false;
-        return (j.submissions || []).length > 0;
+        var activeSubs = (j.submissions || []).filter(function (s) { return !s.disqualified; });
+        return activeSubs.length > 0;
       });
 
       function jamPopularityScore(jam) {
@@ -1415,6 +1530,9 @@
       if (jam.status !== "published") return Promise.reject(new Error("Publish the jam before adding more Ducats."));
       if (!jam.prizeEnabled) return Promise.reject(new Error("This jam does not have Ducat rewards enabled."));
       if (jam.prize && jam.prize.paidOut) return Promise.reject(new Error("The prize has already been paid out."));
+      if (jam.prize && jam.prize.refunded) {
+        return Promise.reject(new Error("This prize pool was already returned (no entries)."));
+      }
 
       return checkWalletBalance(userId, amount).then(function () {
         return walletSpend(userId, amount, jam.id);
@@ -1536,7 +1654,8 @@
             title: pick.title,
             description: pick.description || "",
             category: pick.category,
-            priceDucats: jam.requireFreeListing ? 0 : Math.max(0, parseInt(pick.priceDucats, 10) || 0),
+            // Keep list price; jam promo makes it free until judging ends.
+            priceDucats: Math.max(0, parseInt(pick.priceDucats, 10) || 0),
           });
         }).then(function (result) {
           return ScenaMarketplace.getListing(result.id, userId).then(function (listing) {
@@ -1546,7 +1665,7 @@
                 seller_id: userId,
                 title: pick.title || "Jam entry",
                 category: pick.category || "pack",
-                price_ducats: jam.requireFreeListing ? 0 : 0,
+                price_ducats: Math.max(0, parseInt(pick.priceDucats, 10) || 0),
                 preview_data_url: pick.previewDataUrl || "",
               };
             } else if (!listing.seller_id) {
@@ -1561,20 +1680,22 @@
       }
 
       return chain.then(function (listing) {
-        var entry = listingToAssetEntry(userId, profile, listing, pick.libraryEntryId || null);
-        var payChain = contribute > 0
-          ? checkWalletBalance(userId, contribute).then(function () {
-              return walletSpend(userId, contribute, jam.id);
-            })
-          : Promise.resolve();
-        return payChain.then(function () {
-          if (contribute > 0) {
-            jam.prize = jam.prize || { contributions: {} };
-            jam.prize.contributions[userId] = (parseInt(jam.prize.contributions[userId], 10) || 0) + contribute;
-          }
-          jam.submissions = jam.submissions || [];
-          jam.submissions.push(entry);
-          return saveJam(jam);
+        return applyJamFreePromo(userId, listing, jam).then(function (promoListing) {
+          var entry = listingToAssetEntry(userId, profile, promoListing || listing, pick.libraryEntryId || null);
+          var payChain = contribute > 0
+            ? checkWalletBalance(userId, contribute).then(function () {
+                return walletSpend(userId, contribute, jam.id);
+              })
+            : Promise.resolve();
+          return payChain.then(function () {
+            if (contribute > 0) {
+              jam.prize = jam.prize || { contributions: {} };
+              jam.prize.contributions[userId] = (parseInt(jam.prize.contributions[userId], 10) || 0) + contribute;
+            }
+            jam.submissions = jam.submissions || [];
+            jam.submissions.push(entry);
+            return saveJam(jam);
+          });
         });
       });
     },
@@ -1586,6 +1707,7 @@
       if (jamPhase(jam) === "submissions") throw new Error("Likes open after submissions close.");
       var sub = (jam.submissions || []).find(function (s) { return s.id === submissionId; });
       if (!sub) throw new Error("Entry not found.");
+      if (sub.disqualified) throw new Error("This entry was disqualified.");
       sub.likes = sub.likes || [];
       var idx = sub.likes.indexOf(userId);
       if (idx >= 0) sub.likes.splice(idx, 1);
@@ -1605,6 +1727,7 @@
       if (jamPhase(jam) === "submissions") return Promise.reject(new Error("Wait until submissions close."));
       var sub = (jam.submissions || []).find(function (s) { return s.id === submissionId; });
       if (!sub) return Promise.reject(new Error("Entry not found."));
+      if (sub.disqualified) return Promise.reject(new Error("This entry was disqualified."));
       var count = clampWinnerCount(jam.winnerCount || 1);
       var ids = getWinnerIds(jam);
       while (ids.length < count) ids.push(null);
@@ -1618,7 +1741,7 @@
       setWinnerIds(jam, ids);
       jam = saveJam(jam);
       var filled = getWinnerIds(jam).filter(Boolean).length;
-      var needed = Math.min(count, (jam.submissions || []).length);
+      var needed = Math.min(count, (jam.submissions || []).filter(function (s) { return !s.disqualified; }).length);
       if (filled >= needed) return distributePrize(jam);
       return Promise.resolve(jam);
     },
@@ -1634,8 +1757,12 @@
       if (jamPhase(jam) === "submissions") {
         return Promise.reject(new Error("Ratings open after submissions close."));
       }
+      if (jamPhase(jam) === "closed") {
+        return Promise.reject(new Error("Judging has ended."));
+      }
       var sub = (jam.submissions || []).find(function (s) { return s.id === submissionId; });
       if (!sub) return Promise.reject(new Error("Entry not found."));
+      if (sub.disqualified) return Promise.reject(new Error("This entry was disqualified."));
       if (sub.userId === userId) return Promise.reject(new Error("You cannot rate your own entry."));
       sub.ratings = sub.ratings || {};
       sub.ratings[userId] = stars;
@@ -1655,8 +1782,125 @@
       });
     },
 
+    /** Host removes an off-topic / invalid entry while judging (voting) is still live. */
+    disqualifyEntry: function (hostUserId, jamId, submissionId, reason) {
+      var jam = findJam(jamId);
+      if (!jam) return Promise.reject(new Error("Jam not found."));
+      migrateJam(jam);
+      if (jam.hostUserId !== hostUserId) {
+        return Promise.reject(new Error("Only the host can disqualify entries."));
+      }
+      if (jamPhase(jam) !== "judging") {
+        return Promise.reject(new Error("You can only disqualify while judging / voting is live."));
+      }
+      var sub = (jam.submissions || []).find(function (s) { return s.id === submissionId; });
+      if (!sub) return Promise.reject(new Error("Entry not found."));
+      if (sub.disqualified) return Promise.resolve(jam);
+      sub.disqualified = true;
+      sub.disqualifiedAt = new Date().toISOString();
+      sub.disqualifiedReason = String(reason || "Off topic").trim() || "Off topic";
+      // Drop from any winner slots
+      var placed = getWinnerIds(jam);
+      if (placed.indexOf(submissionId) >= 0) {
+        setWinnerIds(jam, placed.map(function (id) { return id === submissionId ? null : id; }));
+      }
+      return Promise.resolve(saveJam(jam));
+    },
+
+    reinstateEntry: function (hostUserId, jamId, submissionId) {
+      var jam = findJam(jamId);
+      if (!jam) return Promise.reject(new Error("Jam not found."));
+      migrateJam(jam);
+      if (jam.hostUserId !== hostUserId) {
+        return Promise.reject(new Error("Only the host can reinstate entries."));
+      }
+      if (jamPhase(jam) !== "judging") {
+        return Promise.reject(new Error("You can only reinstate while judging is still live."));
+      }
+      var sub = (jam.submissions || []).find(function (s) { return s.id === submissionId; });
+      if (!sub) return Promise.reject(new Error("Entry not found."));
+      sub.disqualified = false;
+      delete sub.disqualifiedAt;
+      delete sub.disqualifiedReason;
+      return Promise.resolve(saveJam(jam));
+    },
+
+    /** Active asset jams for the marketplace shop strip. */
+    listMarketplaceAssetJams: function (opts) {
+      opts = opts || {};
+      return withMergedJams(function (merged) {
+        var rows = merged.slice().map(migrateJam).filter(function (j) {
+          if (j.status !== "published") return false;
+          if (!isAssetJam(j)) return false;
+          if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
+          var phase = jamPhase(j);
+          return phase === "submissions" || phase === "judging";
+        });
+        rows.sort(function (a, b) {
+          return String(b.submissionEnd || "").localeCompare(String(a.submissionEnd || ""));
+        });
+        return rows.slice(0, Math.max(1, parseInt(opts.limit, 10) || 8)).map(function (jam) {
+          var active = (jam.submissions || []).filter(function (s) { return !s.disqualified; });
+          return {
+            id: jam.id,
+            title: jam.title,
+            tagline: String(jam.tagline || jam.theme || "").trim(),
+            phase: jamPhase(jam),
+            prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+            entryCount: active.length,
+            href: "#/jams/" + jam.id,
+            ageRestricted: requiresAgeGate(jam),
+          };
+        });
+      });
+    },
+
+    renderMarketplaceAssetJamSection: function (jams) {
+      jams = jams || [];
+      if (!jams.length) {
+        return (
+          '<section class="marketplace-asset-jams">' +
+            '<div class="marketplace-asset-jams-head">' +
+              "<h3>Asset jams</h3>" +
+              '<a class="btn btn-sm btn-ghost" href="#/jams/new/asset">Host an asset jam</a>' +
+            "</div>" +
+            '<p class="field-hint">No live asset jams right now — host one for creators making packs this week.</p>' +
+          "</section>"
+        );
+      }
+      var cards = jams.map(function (j) {
+        return (
+          '<a class="marketplace-asset-jam-card" href="' + escapeAttr(j.href) + '">' +
+            '<span class="jam-type-badge jam-type-badge--asset">Asset jam</span>' +
+            "<strong>" + escapeHtml(j.title) + "</strong>" +
+            '<span class="field-hint">' + escapeHtml(j.tagline || "Theme challenge") + "</span>" +
+            '<span class="marketplace-asset-jam-meta">' +
+              escapeHtml(j.phase) +
+              " · " + escapeHtml(String(j.entryCount)) + " entries" +
+              (j.prizePool > 0 ? " · " + escapeHtml(formatDucats(j.prizePool)) : "") +
+            "</span>" +
+          "</a>"
+        );
+      }).join("");
+      return (
+        '<section class="marketplace-asset-jams">' +
+          '<div class="marketplace-asset-jams-head">' +
+            "<div><h3>Asset jams</h3>" +
+            '<p class="field-hint">Theme challenges for packs you make — not on the home page.</p></div>' +
+            '<a class="btn btn-sm btn-secondary" href="#/jams/asset">Browse asset jams</a>' +
+          "</div>" +
+          '<div class="marketplace-asset-jam-grid">' + cards + "</div>" +
+        "</section>"
+      );
+    },
+
     requiresAgeGate: requiresAgeGate,
     jamPhase: jamPhase,
+    jamFreeUntilByListingId: function () {
+      return withMergedJams(function (merged) {
+        return jamFreeUntilByListingIdSync(merged);
+      });
+    },
     prizePoolTotal: prizePoolTotal,
     formatWhen: formatWhen,
     formatDucats: formatDucats,
@@ -1846,7 +2090,7 @@
           '<label class="check-row"><input type="checkbox" name="requireFreeListing"' +
             (isAsset ? "" : " disabled") +
             (draft.requireFreeListing !== false ? " checked" : "") +
-            "> Require free listings (0 Ducats) when publishing to the shop</label>" +
+            "> Prefer free list price (0 Ducats). Jam entries are free during the jam either way — paid prices return after voting ends.</label>" +
         "</section>" +
         '<section class="form-section" id="jamWinnerSection">' +
           "<h2>Winners &amp; ranking</h2>" +
@@ -1940,8 +2184,12 @@
             '<div class="jam-prize-fields" id="jamPrizeFields"' + (draft.prizeEnabled ? "" : " hidden") + ">" +
               hostContribField +
               '<div class="field"><label>Participant contributions</label><select name="participantPrizeMode">' + partModes + "</select></div>" +
+              '<p class="field-hint jam-contrib-warn">Participant Ducats fund the winner pot. ' +
+              "If the jam closes with <strong>no eligible entries</strong>, everyone is refunded what they put in — " +
+              "you only keep your own host contribution, not participant add-ins. " +
+              "Disqualifying every entry also triggers that full per-person refund.</p>" +
               '<div class="field"><label>Minimum per entrant (if required)</label><input type="number" name="participantMin" min="0" max="9999" value="' +
-                escapeAttr(String(draft.participantMin || 0)) + '"></div>' +
+              escapeAttr(String(draft.participantMin || 0)) + '"></div>' +
               (opts.balance != null
                 ? '<p class="field-hint">Your balance: ' + escapeHtml(formatDucats(opts.balance)) + "</p>"
                 : "") +
@@ -2089,20 +2337,22 @@
             var likes = (s.likes || []).length;
             var liked = ctx.userId && (s.likes || []).indexOf(ctx.userId) >= 0;
             var placeIndex = winnerIds.indexOf(s.id);
-            var isWinner = placeIndex >= 0;
+            var isWinner = placeIndex >= 0 && !s.disqualified;
             var placeBadge = isWinner
               ? '<span class="jam-place-badge">' + escapeHtml(ordinalPlace(placeIndex + 1)) + "</span>"
               : "";
-            var pickBtns = isHost && jam.winnerMode === "host_picks" && phase !== "submissions"
+            var pickBtns = isHost && jam.winnerMode === "host_picks" && phase === "judging" && !s.disqualified
               ? hostPickButtonsHtml(jam, s.id)
               : "";
+            var modBtns = hostModerationButtonsHtml(jam, s, isHost);
+            var dqClass = s.disqualified ? " jam-entry--disqualified" : "";
             if (submissionEntryType(s) === "asset") {
               var thumb = s.preview_data_url
                 ? 'style="background-image:url(' + s.preview_data_url + ')"'
                 : 'data-category="' + escapeAttr(s.category || "pack") + '"';
               var showLikes = jam.winnerMode === "auto_likes";
               return (
-                '<div class="jam-entry jam-entry--asset' + (isWinner ? " jam-entry--winner" : "") + '">' +
+                '<div class="jam-entry jam-entry--asset' + (isWinner ? " jam-entry--winner" : "") + dqClass + '">' +
                   '<span class="jam-entry-thumb" ' + thumb + "></span>" +
                   '<div class="jam-entry-head">' +
                     placeBadge +
@@ -2110,32 +2360,39 @@
                     '<span class="field-hint">' + escapeHtml(s.category || "asset") + " · " + escapeHtml(s.userName) + "</span>" +
                   "</div>" +
                   '<div class="jam-entry-actions">' +
-                    (showLikes ? '<span class="jam-likes">' + likes + " ♥</span>" : "") +
+                    (showLikes && !s.disqualified ? '<span class="jam-likes">' + likes + " ♥</span>" : "") +
                     assetRatingControlsHtml(jam, s, ctx) +
-                    (showLikes && phase === "judging" && ctx.userId
+                    (showLikes && phase === "judging" && ctx.userId && !s.disqualified
                       ? '<button type="button" class="btn btn-sm btn-ghost jam-like-btn" data-like-sub="' +
                           escapeAttr(s.id) + '">' + (liked ? "Unlike" : "Like") + "</button>"
                       : "") +
                     pickBtns +
+                    modBtns +
                     '<a class="btn btn-sm" href="/studio#/library/shop">View shop</a>' +
                   "</div>" +
                 "</div>"
               );
             }
             return (
-              '<div class="jam-entry' + (isWinner ? " jam-entry--winner" : "") + '">' +
+              '<div class="jam-entry' + (isWinner ? " jam-entry--winner" : "") + dqClass + '">' +
                 '<div class="jam-entry-head">' +
                   placeBadge +
                   '<strong>' + escapeHtml(s.seriesTitle) + "</strong>" +
                   '<span class="field-hint">' + escapeHtml(s.episodeTitle) + " · " + escapeHtml(s.userName) + "</span>" +
+                  (s.disqualified
+                    ? '<span class="jam-dq-badge">Disqualified' +
+                        (s.disqualifiedReason ? ": " + escapeHtml(s.disqualifiedReason) : "") +
+                      "</span>"
+                    : "") +
                 "</div>" +
                 '<div class="jam-entry-actions">' +
-                  '<span class="jam-likes">' + likes + " ♥</span>" +
-                  (phase === "judging" && ctx.userId && jam.winnerMode !== "unranked"
+                  (!s.disqualified ? '<span class="jam-likes">' + likes + " ♥</span>" : "") +
+                  (phase === "judging" && ctx.userId && jam.winnerMode !== "unranked" && !s.disqualified
                     ? '<button type="button" class="btn btn-sm btn-ghost jam-like-btn" data-like-sub="' +
                         escapeAttr(s.id) + '">' + (liked ? "Unlike" : "Like") + "</button>"
                     : "") +
                   pickBtns +
+                  modBtns +
                   '<a class="btn btn-sm" href="/play?series=' + encodeURIComponent(s.seriesId) +
                     "&episode=" + encodeURIComponent(s.episodeId) + '">Play</a>' +
                 "</div>" +
@@ -2157,7 +2414,7 @@
       }
 
       var addPrizePanel = "";
-      if (isHost && jam.status === "published" && jam.prizeEnabled && !(jam.prize && jam.prize.paidOut)) {
+      if (isHost && jam.status === "published" && jam.prizeEnabled && !(jam.prize && (jam.prize.paidOut || jam.prize.refunded))) {
         addPrizePanel =
           '<section class="form-section jam-add-prize-panel">' +
             "<h2>Add to prize pool</h2>" +
@@ -2176,7 +2433,10 @@
           ? '<div class="field"><label>Add to prize pool (Ducats)' +
               (needContrib ? " — required" : "") + '</label><input type="number" id="jamSubmitContrib" min="' +
               (needContrib ? String(jam.participantMin || 0) : "0") + '" value="' +
-              (needContrib ? String(jam.participantMin || 0) : "0") + '"></div>'
+              (needContrib ? String(jam.participantMin || 0) : "0") + '"></div>' +
+              '<p class="field-hint jam-contrib-warn"><strong>Prize contributions stay in the pot for winners.</strong> ' +
+              "If the jam ends with <strong>no eligible entries</strong> (including if every entry is disqualified), " +
+              "each person gets <strong>their own</strong> Ducats back — the host only recovers what they funded.</p>"
           : "";
         var ageWarn = requiresAgeGate(jam) && !ctx.adultVerified
           ? '<p class="field-hint jam-age-warning">This jam is 18+. Confirm your age on <a href="/account">Account</a> before submitting.</p>'
@@ -2220,8 +2480,8 @@
                     '<div class="field"><label>Listing title</label><input type="text" id="jamSubmitAssetTitle" maxlength="80" placeholder="Title for the shop listing"></div>' +
                     '<div class="field"><label>Description</label><textarea id="jamSubmitAssetDesc" rows="2" maxlength="400" placeholder="What buyers get…"></textarea></div>' +
                     (jam.requireFreeListing
-                      ? '<p class="field-hint">This jam requires free listings (0 Ducats).</p>'
-                      : "") +
+                      ? '<p class="field-hint">This jam prefers a free list price (0 Ducats). Either way, jam entries stay free in the shop until voting ends.</p>'
+                      : '<p class="field-hint">Paid list prices stay on the listing — shoppers get them free until this jam’s voting ends.</p>') +
                     '<button type="button" class="btn btn-secondary" id="jamSubmitAssetPublishBtn"' +
                       (libOpts ? "" : " disabled") + ">Publish &amp; submit</button>" +
                   "</div>"
@@ -2296,15 +2556,20 @@
                   : "") +
                 (winnerIds.filter(Boolean).length
                   ? '<span class="field-hint"> · Placed: ' +
-                    escapeHtml(winnerIds.filter(Boolean).map(function (id, idx) {
+                    escapeHtml(winnerIds.filter(Boolean).map(function (id) {
                       var w = subs.find(function (s) { return s.id === id; });
                       return ordinalPlace(winnerIds.indexOf(id) + 1) + " " + ((w && w.userName) || "?");
                     }).join(", ")) + "</span>"
                   : "") +
+                (jam.prize && jam.prize.refunded
+                  ? '<span class="field-hint"> · Refunded to contributors (no eligible entries)</span>'
+                  : "") +
               "</p></section>"
-            : (jam.winnerMode === "unranked"
+            : (jam.prize && jam.prize.refunded
+                ? '<section class="form-section"><h2>Prize</h2><p class="field-hint">Pool refunded to each contributor — this jam had no eligible entries.</p></section>'
+                : (jam.winnerMode === "unranked"
                 ? '<section class="form-section"><h2>Ranking</h2><p class="field-hint">Unranked showcase — no official winners.</p></section>'
-                : "")) +
+                : ""))) +
           addPrizePanel +
           submitPanel +
           '<section class="form-section"><h2>Entries (' + subs.length + ")</h2>" + subsHtml + "</section>" +

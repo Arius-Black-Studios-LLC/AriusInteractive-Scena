@@ -29,7 +29,7 @@ export function JamHomeFeed({ spotlight }: Props) {
       <div className="section-head">
         <div>
           <h2>Jams</h2>
-          <span className="section-meta">Game jams and asset jams with live entries</span>
+          <span className="section-meta">Live game jam entries</span>
         </div>
         <a className="btn btn-ghost btn-sm" href="/studio#/jams">
           Browse all jams

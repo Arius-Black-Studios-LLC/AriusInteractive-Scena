@@ -21,6 +21,7 @@ export function SiteHeader({ onOpenLogin }: Props) {
           <a href="/#discover">Discover</a>
           <a href="/#featured">Featured</a>
           <Link to="/blog">Blog</Link>
+          <Link to="/forums">Forums</Link>
           <Link to="/learn">Conservatory</Link>
           <a href="/studio#/jams">Game jams</a>
         </nav>

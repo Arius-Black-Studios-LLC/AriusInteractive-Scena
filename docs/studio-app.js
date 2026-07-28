@@ -72,6 +72,8 @@
         return { view: "jams", jamMode: "new", jamType: parts[2] === "asset" ? "asset" : "game" };
       }
       if (parts[2] === "edit" && parts[1]) return { view: "jams", jamMode: "edit", jamId: parts[1] };
+      if (parts[1] === "asset" && !parts[2]) return { view: "jams", jamMode: "list", jamTypeFilter: "asset" };
+      if (parts[1] === "game" && !parts[2]) return { view: "jams", jamMode: "list", jamTypeFilter: "game" };
       if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
       return { view: "jams", jamMode: "list" };
     }
@@ -1600,7 +1602,17 @@
         })
       : Promise.resolve(null);
 
-    balancePromise.then(function (balance) {
+    var assetJamsPromise = window.ScenaJams && ScenaJams.listMarketplaceAssetJams
+      ? ScenaJams.listMarketplaceAssetJams({
+          limit: 6,
+          hideAdult: true,
+          viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+        }).catch(function () { return []; })
+      : Promise.resolve([]);
+
+    Promise.all([balancePromise, assetJamsPromise]).then(function (pair) {
+      var balance = pair[0];
+      var assetJams = pair[1] || [];
       return ScenaMarketplace.loadListings({
         category: libraryUiState.shopCategory,
         query: libraryUiState.shopQuery,
@@ -1612,13 +1624,16 @@
               showPackUpsell: true,
               viewerUserId: userId,
             });
-            return { listings: listings, detailHtml: detailHtml, balance: balance };
+            return { listings: listings, detailHtml: detailHtml, balance: balance, assetJams: assetJams };
           });
         }
-        return { listings: listings, detailHtml: detailHtml, balance: balance };
+        return { listings: listings, detailHtml: detailHtml, balance: balance, assetJams: assetJams };
       });
     }).then(function (payload) {
-      var shopHtml = ScenaMarketplace.renderStorePanel(payload.listings, {
+      var jamStrip = window.ScenaJams && ScenaJams.renderMarketplaceAssetJamSection
+        ? ScenaJams.renderMarketplaceAssetJamSection(payload.assetJams)
+        : "";
+      var shopHtml = jamStrip + ScenaMarketplace.renderStorePanel(payload.listings, {
         category: libraryUiState.shopCategory,
         query: libraryUiState.shopQuery,
         selectedId: libraryUiState.shopSelectedId,
@@ -1630,6 +1645,7 @@
         shopHtml: shopHtml,
       });
       bindLibraryShopPanel(root);
+      bindStudioHashLinks(root);
     }).catch(function (err) {
       root.innerHTML =
         '<p class="field-hint">Could not load shop' +
@@ -2080,6 +2096,10 @@
       return;
     }
 
+    if (route.jamTypeFilter === "asset" || route.jamTypeFilter === "game") {
+      jamBrowseState.jamType = route.jamTypeFilter;
+    }
+
     ScenaJams.list({
       publishedOnly: true,
       genre: jamBrowseState.genre,
@@ -2504,6 +2524,33 @@
           render();
         }).catch(function (err) {
           toast((err && err.message) || "Could not rate entry.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-dq-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-dq-sub");
+        if (!window.confirm("Disqualify this entry as off topic? It will drop out of judging while voting is live.")) {
+          return;
+        }
+        ScenaJams.disqualifyEntry(userId, jam.id, subId, "Off topic").then(function () {
+          toast("Entry disqualified.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not disqualify entry.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-reinstate-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-reinstate-sub");
+        ScenaJams.reinstateEntry(userId, jam.id, subId).then(function () {
+          toast("Entry reinstated.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not reinstate entry.");
         });
       });
     });

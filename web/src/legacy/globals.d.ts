@@ -52,6 +52,7 @@ declare global {
       signInWithEmail: (email: string, role?: string, path?: string) => Promise<void>;
       signOut: () => Promise<void>;
       getClient: () => unknown;
+      getSession?: () => Promise<LegacySession>;
       onSessionChange?: (session: LegacySession) => void;
     };
     ScenaCatalog?: {
