@@ -814,6 +814,7 @@
         dialogue: { x: 4, y: 68, w: 92 },
         nameplate: { x: 6, y: 62 },
         choices: { x: 52, y: 28, w: 42 },
+        menu: { x: 92, y: 4 },
       },
       menu: {
         enabled: true,
@@ -2280,6 +2281,7 @@
           dialogue: Object.assign({}, base.layout.dialogue, (saved.layout && saved.layout.dialogue) || {}),
           nameplate: Object.assign({}, base.layout.nameplate, (saved.layout && saved.layout.nameplate) || {}),
           choices: Object.assign({}, base.layout.choices, (saved.layout && saved.layout.choices) || {}),
+          menu: Object.assign({}, base.layout.menu, (saved.layout && saved.layout.menu) || {}),
         },
         menu: Object.assign({}, base.menu, saved.menu || {}),
       };
@@ -2305,6 +2307,7 @@
           dialogue: Object.assign({}, defaultReaderUi().layout.dialogue, (series.readerUi.layout && series.readerUi.layout.dialogue) || {}),
           nameplate: Object.assign({}, defaultReaderUi().layout.nameplate, (series.readerUi.layout && series.readerUi.layout.nameplate) || {}),
           choices: Object.assign({}, defaultReaderUi().layout.choices, (series.readerUi.layout && series.readerUi.layout.choices) || {}),
+          menu: Object.assign({}, defaultReaderUi().layout.menu, (series.readerUi.layout && series.readerUi.layout.menu) || {}),
         };
       }
       return series.readerUi;

@@ -378,8 +378,7 @@
         '<div class="marketplace-detail-empty">' +
           "<h4>Your asset library</h4>" +
           "<p>Characters, stages, audio, and items you made or purchased — reuse them in any project without paying again.</p>" +
-          '<p class="field-hint">Select an asset to import into a series, sell it, or build a multi-item pack.</p>' +
-          '<button type="button" class="btn btn-secondary btn-sm" id="libraryCreatePackBtn">Create pack from My assets</button>' +
+          '<p class="field-hint">Select an asset to import into a series, or sell it from the detail panel.</p>' +
         "</div>"
       );
 
@@ -397,7 +396,6 @@
             opts.pageTab === "jams" ? (opts.jamsHtml || "") :
             '<div class="marketplace-toolbar">' +
               '<input type="search" class="marketplace-search library-search" placeholder="Search your library…" value="' + escapeAttr(opts.query || "") + '">' +
-              '<button type="button" class="btn btn-secondary btn-sm" id="libraryCreatePackBtn">Create pack</button>' +
             "</div>" +
             '<div class="marketplace-chips">' + chips + "</div>" +
             '<div class="marketplace-layout">' +
