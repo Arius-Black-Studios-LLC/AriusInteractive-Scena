@@ -746,15 +746,27 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (min-width: 901px) {
-  .workspace-editor:not(.has-inspector-selection) .workspace-panels {
+  /* Keep the graph column width stable — inspector floats over the canvas. */
+  .workspace-editor:not(.workspace-editor--learn) .workspace-panels {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    position: relative;
   }
 
-  .workspace-editor.has-inspector-selection .workspace-panels {
-    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 340px);
+  .workspace-editor:not(.workspace-editor--learn) .panel-left.graph-inspector {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(320px, 42%);
+    max-width: 360px;
+    z-index: 40;
+    display: none;
+    box-shadow: 8px 0 28px rgba(20, 16, 24, 0.14);
+    border-right: 1px solid var(--scena-border);
+    background: var(--scena-surface);
   }
 
-  .workspace-editor.has-inspector-selection .panel-left {
+  .workspace-editor:not(.workspace-editor--learn).has-inspector-selection .panel-left.graph-inspector {
     display: flex;
   }
 }
@@ -817,8 +829,9 @@ a { color: inherit; text-decoration: none; }
 .workspace-panels {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(280px, 340px);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
   min-height: 0;
+  position: relative;
 }
 
 .panel-left,
@@ -3830,7 +3843,7 @@ body.is-resizing-center {
 .badge-summary-text strong { color: var(--scena-accent); }
 
 @media (max-width: 1100px) {
-  .workspace-panels { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(240px, 300px); }
+  .workspace-panels { grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); }
 }
 
 @media (max-width: 900px) {
@@ -4930,6 +4943,136 @@ body.is-resizing-center {
   font-size: 0.75rem;
   color: var(--scena-muted, #666);
   margin-top: 4px;
+}
+
+.marketplace-asset-jams--compact {
+  padding: 12px 14px;
+}
+
+.marketplace-card--yours {
+  border-color: rgba(124, 17, 40, 0.35);
+}
+
+.mp-yours-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: #7c1128;
+  background: rgba(124, 17, 40, 0.1);
+}
+
+.asset-jam-shop {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.asset-jam-shop-intro h3 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+}
+
+.asset-jam-shop-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.asset-jam-shop-toolbar .marketplace-search {
+  flex: 1;
+  min-width: 180px;
+}
+
+.asset-jam-shop-shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.asset-jam-shelf {
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--scena-border);
+}
+
+.asset-jam-shelf:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.asset-jam-shelf-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.asset-jam-shelf-head .jam-cover--compact {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+}
+
+.asset-jam-shelf-copy {
+  flex: 1;
+  min-width: 160px;
+}
+
+.asset-jam-shelf-title {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.asset-jam-shelf-title:hover {
+  text-decoration: underline;
+}
+
+.asset-jam-shelf-desc {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--scena-muted, #555);
+  max-width: 52ch;
+}
+
+.asset-jam-shelf-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.asset-jam-shelf-card {
+  flex: 0 0 168px;
+  scroll-snap-align: start;
+  text-align: left;
+}
+
+.asset-jam-shelf-empty {
+  margin: 0;
+  padding: 8px 0;
+}
+
+.asset-jam-shop-detail-layout {
+  margin-top: 8px;
+  border-top: 1px solid var(--scena-border);
+  padding-top: 14px;
+}
+
+.asset-jam-shop-detail {
+  max-width: 420px;
 }
 
 .jam-entry--disqualified {

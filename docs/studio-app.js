@@ -65,7 +65,12 @@
       window.location.replace("/account");
       return { view: "dashboard" };
     }
-    if (parts[0] === "library") return { view: "library", libraryTab: parts[1] === "shop" ? "shop" : "assets" };
+    if (parts[0] === "library") {
+      var libTab = "assets";
+      if (parts[1] === "shop") libTab = "shop";
+      else if (parts[1] === "jams") libTab = "jams";
+      return { view: "library", libraryTab: libTab };
+    }
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
       if (parts[1] === "new") {
@@ -1495,7 +1500,17 @@
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  var libraryUiState = { tab: "assets", category: "", query: "", selectedId: "", shopCategory: "", shopQuery: "", shopSelectedId: "" };
+  var libraryUiState = {
+    tab: "assets",
+    category: "",
+    query: "",
+    selectedId: "",
+    shopCategory: "",
+    shopQuery: "",
+    shopSelectedId: "",
+    jamShopQuery: "",
+    jamShopSelectedId: "",
+  };
   var jamBrowseState = { genre: "all", keyword: "", sort: "date", phase: "all", jamType: "all" };
 
   function listUserSeries() {
@@ -1546,6 +1561,10 @@
 
     if (libraryUiState.tab === "shop") {
       paintLibraryShop(root);
+      return;
+    }
+    if (libraryUiState.tab === "jams") {
+      paintLibraryAssetJams(root);
       return;
     }
 
@@ -1616,6 +1635,7 @@
       return ScenaMarketplace.loadListings({
         category: libraryUiState.shopCategory,
         query: libraryUiState.shopQuery,
+        viewerUserId: userId,
       }).then(function (listings) {
         var detailHtml = "";
         if (libraryUiState.shopSelectedId) {
@@ -1654,13 +1674,71 @@
     });
   }
 
+  function paintLibraryAssetJams(root) {
+    if (!window.ScenaJams || !ScenaJams.listAssetJamShopShelves) {
+      root.innerHTML = '<p class="field-hint">Asset jam shop unavailable.</p>';
+      return;
+    }
+    var selectedId = libraryUiState.jamShopSelectedId;
+    ScenaJams.listAssetJamShopShelves({
+      query: libraryUiState.jamShopQuery,
+      limit: 10,
+      hideAdult: true,
+      viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+      viewerUserId: userId,
+    }).then(function (shelves) {
+      var detailPromise = Promise.resolve("");
+      if (selectedId && window.ScenaMarketplace) {
+        detailPromise = ScenaMarketplace.getListing(selectedId, userId).then(function (listing) {
+          return ScenaMarketplace.renderListingDetail(listing, {
+            showPackUpsell: true,
+            viewerUserId: userId,
+          });
+        }).catch(function () { return ""; });
+      }
+      return detailPromise.then(function (detailHtml) {
+        var jamsHtml =
+          ScenaJams.renderAssetJamShopShelves(shelves, {
+            query: libraryUiState.jamShopQuery,
+            viewerUserId: userId,
+          }) +
+          (detailHtml
+            ? '<div class="marketplace-layout asset-jam-shop-detail-layout">' +
+                '<div class="marketplace-detail asset-jam-shop-detail">' + detailHtml + "</div>" +
+              "</div>"
+            : "");
+        root.innerHTML = ScenaAssetLibrary.renderPanel([], {
+          pageTab: "jams",
+          jamsHtml: jamsHtml,
+        });
+        bindLibraryAssetJamsPanel(root);
+        bindStudioHashLinks(root);
+      });
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load asset jams' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        "</p>";
+    });
+  }
+
+  function libraryTabNavigate(page) {
+    if (page === "shop") {
+      libraryUiState.tab = "shop";
+      navigate("/library/shop");
+    } else if (page === "jams") {
+      libraryUiState.tab = "jams";
+      navigate("/library/jams");
+    } else {
+      libraryUiState.tab = "assets";
+      navigate("/library");
+    }
+  }
+
   function bindLibraryAssetsPanel(root) {
     root.querySelectorAll("[data-library-page]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var page = btn.getAttribute("data-library-page");
-        libraryUiState.tab = page === "shop" ? "shop" : "assets";
-        if (page === "shop") navigate("/library/shop");
-        else navigate("/library");
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
       });
     });
     root.querySelectorAll("[data-library-category]").forEach(function (btn) {
@@ -1852,10 +1930,7 @@
   function bindLibraryShopPanel(root) {
     root.querySelectorAll("[data-library-page]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var page = btn.getAttribute("data-library-page");
-        libraryUiState.tab = page === "shop" ? "shop" : "assets";
-        if (page === "shop") navigate("/library/shop");
-        else navigate("/library");
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
       });
     });
     root.querySelectorAll("[data-marketplace-category]").forEach(function (btn) {
@@ -1929,6 +2004,76 @@
         toast((err && err.message) || "Could not buy Ducats.");
       });
     }
+  }
+
+  function bindLibraryAssetJamsPanel(root) {
+    root.querySelectorAll("[data-library-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
+      });
+    });
+    var search = root.querySelector(".asset-jam-shop-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        libraryUiState.jamShopQuery = search.value.trim();
+        libraryUiState.jamShopSelectedId = "";
+        paintLibraryRoot();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          libraryUiState.jamShopQuery = search.value.trim();
+          libraryUiState.jamShopSelectedId = "";
+          paintLibraryRoot();
+        }
+      });
+    }
+    root.querySelectorAll(".asset-jam-shelf-card[data-listing-id]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryUiState.jamShopSelectedId = btn.getAttribute("data-listing-id");
+        paintLibraryRoot();
+      });
+    });
+    root.querySelectorAll(".marketplace-acquire-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-listing-id");
+        if (!listingId) return;
+        btn.disabled = true;
+        ScenaMarketplace.purchase(userId, listingId).then(function (result) {
+          return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
+            if (window.ScenaAssetLibrary && listing) {
+              ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
+            }
+            return result;
+          });
+        }).then(function () {
+          btn.disabled = false;
+          toast("Added to your library — import into any project from My assets.");
+          libraryUiState.tab = "assets";
+          libraryUiState.selectedId = "";
+          navigate("/library");
+        }).catch(function (err) {
+          btn.disabled = false;
+          toast((err && err.message) || "Purchase failed.");
+        });
+      });
+    });
+    root.querySelectorAll("[data-mp-rate-listing]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-mp-rate-listing");
+        var stars = btn.getAttribute("data-mp-stars");
+        if (!listingId || btn.disabled) return;
+        ScenaMarketplace.rateListing(userId, listingId, stars).then(function () {
+          toast("Thanks for rating!");
+          paintLibraryRoot();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not save rating.");
+        });
+      });
+    });
   }
 
   function handleJamNeedDucats(root, err, onRetry) {

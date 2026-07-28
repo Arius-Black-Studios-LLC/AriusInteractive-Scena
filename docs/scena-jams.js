@@ -1855,41 +1855,212 @@
       });
     },
 
+    /**
+     * Shop “Asset jams” shelves: top live jams with purchaseable submitted listings.
+     * opts: { query, limit, hideAdult, viewerIsAdult, viewerUserId }
+     */
+    listAssetJamShopShelves: function (opts) {
+      opts = opts || {};
+      var limit = Math.max(1, Math.min(parseInt(opts.limit, 10) || 10, 20));
+      var query = String(opts.query || "").trim().toLowerCase();
+      return withMergedJams(function (merged) {
+        var rows = merged.slice().map(migrateJam).filter(function (j) {
+          if (j.status !== "published") return false;
+          if (!isAssetJam(j)) return false;
+          if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
+          var phase = jamPhase(j);
+          if (phase !== "submissions" && phase !== "judging") return false;
+          if (query) {
+            var hay = [
+              j.title, j.tagline, j.theme, j.description, j.hostName,
+            ].map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
+            if (hay.indexOf(query) < 0) return false;
+          }
+          return true;
+        });
+        rows.sort(function (a, b) {
+          var pa = prizePoolTotal(a);
+          var pb = prizePoolTotal(b);
+          if (pb !== pa) return pb - pa;
+          var ea = (a.submissions || []).filter(function (s) { return !s.disqualified; }).length;
+          var eb = (b.submissions || []).filter(function (s) { return !s.disqualified; }).length;
+          if (eb !== ea) return eb - ea;
+          return String(b.submissionEnd || "").localeCompare(String(a.submissionEnd || ""));
+        });
+        var top = rows.slice(0, limit);
+        var listingIds = [];
+        top.forEach(function (jam) {
+          (jam.submissions || []).forEach(function (s) {
+            if (s && !s.disqualified && s.listingId) listingIds.push(s.listingId);
+          });
+        });
+        var uniqueIds = [];
+        var seen = {};
+        listingIds.forEach(function (id) {
+          if (!id || seen[id]) return;
+          seen[id] = true;
+          uniqueIds.push(id);
+        });
+
+        var loadListings = Promise.resolve({});
+        if (uniqueIds.length && window.ScenaMarketplace) {
+          loadListings = Promise.all(uniqueIds.map(function (id) {
+            return ScenaMarketplace.getListing(id, opts.viewerUserId || null).catch(function () { return null; });
+          })).then(function (items) {
+            var map = {};
+            (items || []).forEach(function (l) {
+              if (l && l.id) map[l.id] = l;
+            });
+            return map;
+          });
+        }
+
+        return loadListings.then(function (listingById) {
+          return top.map(function (jam) {
+            var assets = [];
+            var seenListing = {};
+            (jam.submissions || []).forEach(function (s) {
+              if (!s || s.disqualified || !s.listingId || seenListing[s.listingId]) return;
+              seenListing[s.listingId] = true;
+              var listing = listingById[s.listingId];
+              if (listing) {
+                assets.push(listing);
+              } else {
+                assets.push({
+                  id: s.listingId,
+                  title: s.listingTitle || "Untitled asset",
+                  category: s.category || "pack",
+                  preview_data_url: s.preview_data_url || "",
+                  price_ducats: 0,
+                  jam_free: true,
+                  seller_name: s.userName || "Creator",
+                  seller_id: s.userId || null,
+                });
+              }
+            });
+            var desc = String(jam.tagline || jam.theme || jam.description || "").trim();
+            if (desc.length > 160) desc = desc.slice(0, 157) + "…";
+            return {
+              id: jam.id,
+              title: jam.title,
+              description: desc,
+              phase: jamPhase(jam),
+              prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+              entryCount: (jam.submissions || []).filter(function (s) { return !s.disqualified; }).length,
+              href: "#/jams/" + jam.id,
+              coverStyle: normalizeCoverStyle(jam.coverStyle),
+              assets: assets,
+            };
+          });
+        });
+      });
+    },
+
+    renderAssetJamShopShelves: function (shelves, opts) {
+      opts = opts || {};
+      shelves = shelves || [];
+      var searchVal = escapeAttr(opts.query || "");
+      var toolbar =
+        '<div class="marketplace-toolbar asset-jam-shop-toolbar">' +
+          '<input type="search" class="marketplace-search asset-jam-shop-search" placeholder="Search asset jams…" value="' + searchVal + '">' +
+          '<a class="btn btn-sm btn-secondary" href="#/jams/new/asset">Host an asset jam</a>' +
+        "</div>";
+
+      if (!shelves.length) {
+        return (
+          '<div class="asset-jam-shop">' +
+            toolbar +
+            '<p class="field-hint">No live asset jams match your search. Host one, or check back when creators are submitting packs.</p>' +
+          "</div>"
+        );
+      }
+
+      var blocks = shelves.map(function (shelf) {
+        var assetCards = (shelf.assets || []).map(function (item) {
+          var thumb = item.preview_data_url
+            ? 'style="background-image:url(' + item.preview_data_url + ')"'
+            : 'data-category="' + escapeAttr(item.category || "pack") + '"';
+          var isYours = item.is_seller || item.isSeller ||
+            (opts.viewerUserId && item.seller_id && item.seller_id === opts.viewerUserId);
+          var listPrice = Number(item.price_ducats) || 0;
+          var jamFree = !!(item.jam_free || item.jamFree) && listPrice > 0;
+          var priceLabel = jamFree
+            ? "Free during jam"
+            : (listPrice ? (listPrice + " Ducats") : "Free");
+          return (
+            '<button type="button" class="marketplace-card asset-jam-shelf-card' +
+              (isYours ? " marketplace-card--yours" : "") +
+              '" data-listing-id="' + escapeAttr(item.id) + '" data-from-jam="' + escapeAttr(shelf.id) + '">' +
+              '<span class="marketplace-card-thumb" ' + thumb + "></span>" +
+              '<span class="marketplace-card-body">' +
+                "<strong>" + escapeHtml(item.title) +
+                  (isYours ? ' <span class="mp-yours-badge">Yours</span>' : "") +
+                "</strong>" +
+                '<span class="marketplace-card-meta">' + escapeHtml(priceLabel) + "</span>" +
+              "</span>" +
+            "</button>"
+          );
+        }).join("");
+
+        if (!assetCards) {
+          assetCards = '<p class="field-hint asset-jam-shelf-empty">No shop listings submitted yet — entries may still be publishing.</p>';
+        }
+
+        return (
+          '<article class="asset-jam-shelf">' +
+            '<div class="asset-jam-shelf-head">' +
+              renderJamCover(shelf.coverStyle, { compact: true, title: shelf.title }) +
+              '<div class="asset-jam-shelf-copy">' +
+                '<a class="asset-jam-shelf-title" href="' + escapeAttr(shelf.href) + '">' +
+                  escapeHtml(shelf.title) + "</a>" +
+                '<p class="asset-jam-shelf-desc">' + escapeHtml(shelf.description || "Asset jam") + "</p>" +
+                '<span class="marketplace-asset-jam-meta">' +
+                  escapeHtml(shelf.phase) +
+                  " · " + escapeHtml(String(shelf.entryCount)) + " entries" +
+                  (shelf.prizePool > 0 ? " · " + escapeHtml(formatDucats(shelf.prizePool)) : "") +
+                "</span>" +
+              "</div>" +
+              '<a class="btn btn-sm btn-ghost" href="' + escapeAttr(shelf.href) + '">Open jam</a>' +
+            "</div>" +
+            '<div class="asset-jam-shelf-row">' + assetCards + "</div>" +
+          "</article>"
+        );
+      }).join("");
+
+      return (
+        '<div class="asset-jam-shop">' +
+          '<div class="asset-jam-shop-intro">' +
+            "<h3>Shop asset jams</h3>" +
+            '<p class="field-hint">Browse live asset jams and grab purchaseable packs submitted to each challenge.</p>' +
+          "</div>" +
+          toolbar +
+          '<div class="asset-jam-shop-shelves">' + blocks + "</div>" +
+        "</div>"
+      );
+    },
+
     renderMarketplaceAssetJamSection: function (jams) {
       jams = jams || [];
       if (!jams.length) {
         return (
-          '<section class="marketplace-asset-jams">' +
+          '<section class="marketplace-asset-jams marketplace-asset-jams--compact">' +
             '<div class="marketplace-asset-jams-head">' +
               "<h3>Asset jams</h3>" +
-              '<a class="btn btn-sm btn-ghost" href="#/jams/new/asset">Host an asset jam</a>' +
+              '<a class="btn btn-sm btn-secondary" href="#/library/jams">Shop asset jams</a>' +
             "</div>" +
-            '<p class="field-hint">No live asset jams right now — host one for creators making packs this week.</p>' +
+            '<p class="field-hint">No live asset jams right now — <a href="#/jams/new/asset">host one</a> or open the Asset jams tab.</p>' +
           "</section>"
         );
       }
-      var cards = jams.map(function (j) {
-        return (
-          '<a class="marketplace-asset-jam-card" href="' + escapeAttr(j.href) + '">' +
-            '<span class="jam-type-badge jam-type-badge--asset">Asset jam</span>' +
-            "<strong>" + escapeHtml(j.title) + "</strong>" +
-            '<span class="field-hint">' + escapeHtml(j.tagline || "Theme challenge") + "</span>" +
-            '<span class="marketplace-asset-jam-meta">' +
-              escapeHtml(j.phase) +
-              " · " + escapeHtml(String(j.entryCount)) + " entries" +
-              (j.prizePool > 0 ? " · " + escapeHtml(formatDucats(j.prizePool)) : "") +
-            "</span>" +
-          "</a>"
-        );
-      }).join("");
       return (
-        '<section class="marketplace-asset-jams">' +
+        '<section class="marketplace-asset-jams marketplace-asset-jams--compact">' +
           '<div class="marketplace-asset-jams-head">' +
             "<div><h3>Asset jams</h3>" +
-            '<p class="field-hint">Theme challenges for packs you make — not on the home page.</p></div>' +
-            '<a class="btn btn-sm btn-secondary" href="#/jams/asset">Browse asset jams</a>' +
+            '<p class="field-hint">' + escapeHtml(String(jams.length)) +
+              " live challenge" + (jams.length === 1 ? "" : "s") +
+              " with shoppable packs.</p></div>" +
+            '<a class="btn btn-sm btn-secondary" href="#/library/jams">Shop asset jams</a>' +
           "</div>" +
-          '<div class="marketplace-asset-jam-grid">' + cards + "</div>" +
         "</section>"
       );
     },

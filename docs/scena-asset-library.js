@@ -363,12 +363,15 @@
       return (
         '<div class="marketplace-panel asset-library-panel">' +
           '<div class="asset-library-tabs">' +
-            '<button type="button" class="asset-library-tab' + (opts.pageTab === "shop" ? "" : " is-active") +
+            '<button type="button" class="asset-library-tab' + (opts.pageTab === "assets" || !opts.pageTab ? " is-active" : "") +
               '" data-library-page="assets">My assets</button>' +
             '<button type="button" class="asset-library-tab' + (opts.pageTab === "shop" ? " is-active" : "") +
               '" data-library-page="shop">Shop</button>' +
+            '<button type="button" class="asset-library-tab' + (opts.pageTab === "jams" ? " is-active" : "") +
+              '" data-library-page="jams">Asset jams</button>' +
           "</div>" +
           (opts.pageTab === "shop" ? (opts.shopHtml || "") :
+            opts.pageTab === "jams" ? (opts.jamsHtml || "") :
             '<div class="marketplace-toolbar">' +
               '<input type="search" class="marketplace-search library-search" placeholder="Search your library…" value="' + escapeAttr(opts.query || "") + '">' +
               '<button type="button" class="btn btn-secondary btn-sm" id="libraryCreatePackBtn">Create pack</button>' +

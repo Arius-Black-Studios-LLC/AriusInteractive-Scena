@@ -369,6 +369,43 @@
     return preferred || "pack";
   }
 
+  function mergeViewerListings(rows, viewerUserId) {
+    rows = (rows || []).slice();
+    if (!viewerUserId) return rows;
+    var byId = {};
+    rows.forEach(function (r) {
+      if (!r || !r.id) return;
+      byId[r.id] = Object.assign({}, r);
+      if (r.seller_id && r.seller_id === viewerUserId) {
+        byId[r.id].is_seller = true;
+        byId[r.id].seller_id = viewerUserId;
+      }
+    });
+    readLocalListings().forEach(function (l) {
+      if (!l || !l.id) return;
+      if (l.seller_id !== viewerUserId) return;
+      if (l.status === "removed") return;
+      var existing = byId[l.id];
+      if (existing) {
+        byId[l.id] = Object.assign({}, existing, {
+          is_seller: true,
+          seller_id: viewerUserId,
+          seller_name: existing.seller_name || "You",
+        });
+      } else {
+        byId[l.id] = Object.assign({}, l, {
+          is_seller: true,
+          seller_id: viewerUserId,
+          seller_name: "You",
+          status: l.status || "live",
+        });
+      }
+    });
+    return Object.keys(byId).map(function (id) { return byId[id]; }).filter(function (l) {
+      return (l.status || "live") === "live";
+    });
+  }
+
   window.ScenaMarketplace = {
     CATEGORIES: CATEGORIES,
 
@@ -376,6 +413,7 @@
       opts = opts || {};
       var category = opts.category || "";
       var query = opts.query || "";
+      var viewerUserId = opts.viewerUserId || opts.userId || null;
 
       var sb = getClient();
       var chain;
@@ -390,14 +428,62 @@
             return filterLocalListings(category, query);
           }
           var rows = res.data || [];
-          return rows.length ? rows : filterLocalListings(category, query);
+          // Always merge local/own listings so sellers can see themselves in the shop.
+          var cloud = rows.length ? rows : [];
+          var local = filterLocalListings(category, query);
+          var byId = {};
+          cloud.concat(local).forEach(function (r) {
+            if (!r || !r.id) return;
+            if (!byId[r.id]) byId[r.id] = r;
+            else byId[r.id] = Object.assign({}, byId[r.id], r);
+          });
+          var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+          if (category) merged = merged.filter(function (r) { return r.category === category; });
+          if (query) {
+            var q = query.toLowerCase();
+            merged = merged.filter(function (r) {
+              return (r.title || "").toLowerCase().indexOf(q) >= 0 ||
+                (r.description || "").toLowerCase().indexOf(q) >= 0;
+            });
+          }
+          return merged.length ? merged : filterLocalListings(category, query);
         }).catch(function () {
           return filterLocalListings(category, query);
         });
       } else {
         chain = Promise.resolve(filterLocalListings(category, query));
       }
-      return chain.then(enrichListingsWithJamFree);
+      return chain.then(function (rows) {
+        return mergeViewerListings(rows, viewerUserId);
+      }).then(function (rows) {
+        if (!viewerUserId) return rows;
+        return ScenaMarketplace.listSellerListings(viewerUserId).then(function (mine) {
+          if (!mine || !mine.length) return rows;
+          var byId = {};
+          (rows || []).forEach(function (r) {
+            if (r && r.id) byId[r.id] = r;
+          });
+          mine.forEach(function (l) {
+            if (!l || !l.id || (l.status && l.status !== "live")) return;
+            byId[l.id] = Object.assign({}, byId[l.id] || {}, l, {
+              is_seller: true,
+              seller_id: viewerUserId,
+              seller_name: (byId[l.id] && byId[l.id].seller_name) || l.seller_name || "You",
+              status: "live",
+            });
+          });
+          var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+          if (category) merged = merged.filter(function (r) { return r.category === category; });
+          if (query) {
+            var q = query.toLowerCase();
+            merged = merged.filter(function (r) {
+              return (r.title || "").toLowerCase().indexOf(q) >= 0 ||
+                (r.description || "").toLowerCase().indexOf(q) >= 0;
+            });
+          }
+          return merged;
+        });
+      }).then(enrichListingsWithJamFree);
     },
 
     getListing: function (listingId, userId) {
@@ -408,6 +494,7 @@
           if (res.error || !res.data) return findLocalListing(listingId, userId);
           var row = res.data;
           row.owned = row.owned || Boolean(readPurchases(userId)[listingId]);
+          if (userId && row.seller_id === userId) row.is_seller = true;
           return row;
         }).catch(function () {
           return findLocalListing(listingId, userId);
@@ -417,6 +504,7 @@
       }
       return chain.then(function (listing) {
         if (!listing) return null;
+        if (userId && listing.seller_id === userId) listing.is_seller = true;
         return enrichListingsWithJamFree([listing]).then(function (rows) {
           return rows[0] || listing;
         });
@@ -526,7 +614,33 @@
       var local = readLocalListings().filter(function (l) {
         return l.seller_id === userId && l.status !== "removed";
       });
-      return Promise.resolve(local);
+      var sb = getClient();
+      if (!useCloud() || !sb) return Promise.resolve(local);
+      return sb.from("marketplace_listings")
+        .select("id,title,description,category,price_ducats,preview_data_url,purchase_count,created_at,seller_id,status,jam_free_until")
+        .eq("seller_id", userId)
+        .eq("status", "live")
+        .order("created_at", { ascending: false })
+        .limit(100)
+        .then(function (res) {
+          if (res.error) {
+            console.warn("listSellerListings:", res.error.message);
+            return local;
+          }
+          var cloud = (res.data || []).map(function (row) {
+            return Object.assign({}, row, {
+              is_seller: true,
+              seller_name: "You",
+            });
+          });
+          var byId = {};
+          cloud.concat(local).forEach(function (l) {
+            if (!l || !l.id) return;
+            byId[l.id] = Object.assign({}, byId[l.id] || {}, l, { is_seller: true, seller_id: userId });
+          });
+          return Object.keys(byId).map(function (id) { return byId[id]; });
+        })
+        .catch(function () { return local; });
     },
 
     publishListing: function (userId, spec) {
@@ -571,7 +685,27 @@
         p_preview_data_url: spec.previewDataUrl || null,
       }).then(function (res) {
         if (res.error) throw new Error(res.error.message || "Could not publish listing.");
-        return { id: res.data };
+        var id = res.data && (res.data.id || res.data);
+        // Mirror locally so the shop always shows your own listing even if browse omits seller_id.
+        if (id) {
+          var list = readLocalListings().filter(function (l) { return l.id !== id; });
+          list.unshift({
+            id: id,
+            seller_id: userId,
+            title: spec.title,
+            description: spec.description || "",
+            category: spec.category,
+            price_ducats: spec.priceDucats || 0,
+            preview_data_url: spec.previewDataUrl || "",
+            bundle: spec.bundle,
+            status: "live",
+            purchase_count: 0,
+            seller_name: spec.sellerName || "You",
+            is_seller: true,
+          });
+          writeLocalListings(list);
+        }
+        return { id: id };
       });
     },
 
@@ -622,12 +756,16 @@
         var thumb = item.preview_data_url
           ? 'style="background-image:url(' + item.preview_data_url + ')"'
           : 'data-category="' + escapeAttr(item.category) + '"';
+        var isYours = item.is_seller || item.isSeller;
         return (
           '<button type="button" class="marketplace-card' + (selectedId === item.id ? " is-active" : "") +
+            (isYours ? " marketplace-card--yours" : "") +
             '" data-listing-id="' + escapeAttr(item.id) + '">' +
             '<span class="marketplace-card-thumb" ' + thumb + "></span>" +
             '<span class="marketplace-card-body">' +
-              '<strong>' + escapeHtml(item.title) + "</strong>" +
+              '<strong>' + escapeHtml(item.title) +
+                (isYours ? ' <span class="mp-yours-badge">Yours</span>' : "") +
+              "</strong>" +
               '<span class="marketplace-card-meta">' + escapeHtml(categoryLabel(item.category)) +
               " · " + renderPriceHtml(item) +
               (item.rating_count
@@ -906,6 +1044,7 @@
         if (side[listingId] && !item.jam_free_until) item.jam_free_until = side[listingId];
       } catch (e) { /* ignore */ }
       item = normalizeJamFreeFields(item);
+      if (userId && item.seller_id === userId) item.is_seller = true;
     }
     return item;
   }
