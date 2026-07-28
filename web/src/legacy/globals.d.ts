@@ -119,6 +119,7 @@ declare global {
         patch: Record<string, unknown>,
         ctx: Record<string, unknown>,
       ) => Promise<Record<string, unknown>>;
+      clearCache?: (userId?: string) => void;
       authorSnapshot: (profile: Record<string, unknown>) => Record<string, unknown>;
       isAdultVerified?: (profile?: Record<string, unknown>) => boolean;
       seriesNeedsAgeGate?: (series: { contentFlags?: string[] }) => boolean;
