@@ -2022,7 +2022,7 @@ body.is-resizing-center {
 }
 
 .ui-mock-menu-pane--audio {
-  background: var(--ui-audio-bg, rgba(26, 24, 22, 0.92));
+  background: var(--ui-audio-pane-bg, var(--ui-audio-bg, rgba(26, 24, 22, 0.92)));
   color: var(--ui-audio-text, #f5f0e6);
   opacity: var(--ui-audio-opacity, 1);
   border: var(--ui-audio-border-width, 0px) solid var(--ui-audio-border-color, transparent);
@@ -2036,18 +2036,25 @@ body.is-resizing-center {
   flex-direction: column;
   gap: 6px;
   color: var(--ui-audio-font-color, var(--ui-audio-text, #f5f0e6));
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: var(--ui-audio-bg, transparent);
+  border: var(--ui-audio-border-width, 0px) solid var(--ui-audio-border-color, transparent);
+  box-shadow: 0 0 var(--ui-audio-glow-size, 0px) var(--ui-audio-glow-color, transparent);
 }
 .ui-mock-audio-bar {
   height: 8px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.12);
+  background: var(--ui-audio-bg, rgba(255,255,255,0.12));
   overflow: hidden;
 }
 .ui-mock-audio-bar i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--ui-audio-slide-sprite, linear-gradient(90deg, var(--ui-accent, #2a9d8f), #5ec4b8)) center / cover;
+  background: var(--ui-audio-slide-sprite, none), var(--ui-audio-fill, var(--ui-accent, #2a9d8f));
+  background-size: cover;
+  background-position: center;
 }
 
 .ui-mock-inventory-item {
@@ -2056,7 +2063,7 @@ body.is-resizing-center {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.06);
+  background-color: var(--ui-inventoryitem-bg, rgba(255,255,255,0.06));
   opacity: var(--ui-inventoryitem-opacity, 1);
   border: var(--ui-inventoryitem-border-width, 0px) solid var(--ui-inventoryitem-border-color, transparent);
   box-shadow: 0 0 var(--ui-inventoryitem-glow-size, 0px) var(--ui-inventoryitem-glow-color, transparent);
@@ -2107,6 +2114,11 @@ body.is-resizing-center {
   position: relative;
   height: 100%;
   min-height: 0;
+}
+
+/* Reader letterbox: playfield sized by aspect-ratio, not stretched to frame. */
+#playerRoot .preview-frame--laid-out .player-story-inner {
+  height: auto;
 }
 
 .preview-frame--laid-out .preview-stage {

@@ -23,7 +23,8 @@
   width: 100%;
 }
 
-.player-frame.preview-frame {
+/* Immersive reader shell only — do NOT stretch studio #gamePreview (needs 16:9 letterbox). */
+#playerRoot .player-frame.preview-frame {
   flex: 1;
   width: 100% !important;
   height: 100% !important;
@@ -31,7 +32,7 @@
   max-height: none !important;
   min-height: 0;
   aspect-ratio: unset !important;
-  container-type: inline-size;
+  container-type: size;
   box-shadow: none;
   border-radius: 0;
   overflow: hidden;
@@ -69,6 +70,45 @@
   flex-direction: column;
   min-height: 0;
   width: 100%;
+}
+
+/* Letterbox reading playfield to 16:9 (1920×1080 design space) on all viewports. */
+#playerRoot .player-story--reading {
+  height: auto;
+  min-height: 100%;
+  min-height: 100cqh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(8px, env(safe-area-inset-top, 0px))
+    max(8px, env(safe-area-inset-right, 0px))
+    max(8px, env(safe-area-inset-bottom, 0px))
+    max(8px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  background: #050505;
+}
+
+#playerRoot .player-story--reading .player-story-inner {
+  flex: none;
+  position: relative;
+  width: min(
+    100%,
+    calc((100dvh - 72px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)),
+    calc((100cqh - 16px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9))
+  );
+  max-height: min(
+    calc(100dvh - 72px),
+    calc(100cqh - 16px),
+    calc(100cqw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16))
+  );
+  aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
+  height: auto;
+  container-type: inline-size;
+  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
 }
 
 .player-story--discuss-hint::after {
@@ -1095,16 +1135,18 @@
   gap: 6px;
   padding: 10px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background-color: var(--ui-inventoryitem-bg, rgba(255, 255, 255, 0.06));
   border: 1px solid rgba(201, 162, 39, 0.25);
   text-align: center;
-  opacity: var(--ui-inventory-opacity, 1);
-  border-width: var(--ui-inventory-border-width, 1px);
-  border-color: var(--ui-inventory-border-color, rgba(201, 162, 39, 0.25));
-  box-shadow: 0 0 var(--ui-inventory-glow-size, 0px) var(--ui-inventory-glow-color, transparent);
+  opacity: var(--ui-inventoryitem-opacity, var(--ui-inventory-opacity, 1));
+  border-width: var(--ui-inventoryitem-border-width, var(--ui-inventory-border-width, 1px));
+  border-color: var(--ui-inventoryitem-border-color, var(--ui-inventory-border-color, rgba(201, 162, 39, 0.25)));
+  box-shadow: 0 0 var(--ui-inventoryitem-glow-size, var(--ui-inventory-glow-size, 0px)) var(--ui-inventoryitem-glow-color, var(--ui-inventory-glow-color, transparent));
   background-image: var(--ui-inventory-item-sprite, none);
   background-size: 100% 100%;
-  font-size: var(--ui-inventory-font-size, 100%);
+  font-size: var(--ui-inventoryitem-font-size, var(--ui-inventory-font-size, 100%));
+  font-family: var(--ui-inventoryitem-font-family, inherit);
+  color: var(--ui-inventoryitem-font-color, var(--ui-inventory-text, inherit));
 }
 
 .player-inventory-icon {
@@ -1146,13 +1188,20 @@
 }
 
 .player-inventory-list li {
-  padding: 10px 0;
+  padding: 10px 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.92rem;
-  border-width: var(--ui-inventory-border-width, 1px);
-  border-color: var(--ui-inventory-border-color, rgba(255,255,255,0.08));
-  box-shadow: 0 0 var(--ui-inventory-glow-size, 0px) var(--ui-inventory-glow-color, transparent);
-  font-size: var(--ui-inventory-font-size, 100%);
+  background-color: var(--ui-inventoryitem-bg, transparent);
+  opacity: var(--ui-inventoryitem-opacity, 1);
+  border-width: var(--ui-inventoryitem-border-width, 1px);
+  border-style: solid;
+  border-color: var(--ui-inventoryitem-border-color, rgba(255,255,255,0.08));
+  box-shadow: 0 0 var(--ui-inventoryitem-glow-size, 0px) var(--ui-inventoryitem-glow-color, transparent);
+  font-size: var(--ui-inventoryitem-font-size, var(--ui-inventory-font-size, 100%));
+  font-family: var(--ui-inventoryitem-font-family, inherit);
+  color: var(--ui-inventoryitem-font-color, inherit);
 }
 
 .player-inventory-qty {
@@ -1171,6 +1220,14 @@
   gap: 10px;
   align-items: center;
   font-size: 0.88rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: var(--ui-audio-bg, transparent);
+  border: var(--ui-audio-border-width, 0px) solid var(--ui-audio-border-color, transparent);
+  box-shadow: 0 0 var(--ui-audio-glow-size, 0px) var(--ui-audio-glow-color, transparent);
+  color: var(--ui-audio-font-color, inherit);
+  font-family: var(--ui-audio-font-family, inherit);
+  font-size: var(--ui-audio-font-size, 0.88rem);
 }
 
 .player-setting-row--check {
@@ -1181,6 +1238,8 @@
 
 .player-setting-row input[type="range"] {
   width: 120px;
+  accent-color: var(--ui-audio-fill, var(--ui-accent, #2a9d8f));
+  background: var(--ui-audio-bg, rgba(255,255,255,0.12));
 }
 
 .player-setting-val {
@@ -1190,24 +1249,17 @@
 }
 
 @media (max-width: 768px) {
-  .player-story--reading {
-    height: auto;
+  #playerRoot .player-story--reading {
     min-height: 100dvh;
     min-height: 100svh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding:
       max(12px, env(safe-area-inset-top, 0px))
       max(12px, env(safe-area-inset-right, 0px))
       max(12px, env(safe-area-inset-bottom, 0px))
       max(12px, env(safe-area-inset-left, 0px));
-    box-sizing: border-box;
-    background: #050505;
   }
 
-  .player-story--reading .player-story-inner {
-    flex: none;
+  #playerRoot .player-story--reading .player-story-inner {
     width: min(
       100%,
       calc((100svh - 24px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9))
@@ -1216,12 +1268,7 @@
       calc(100svh - 24px),
       calc(100vw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16))
     );
-    aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
-    container-type: inline-size;
-    font-size: calc((9px + 0.72cqw) * var(--ui-dialogue-scale, 1));
-    overflow: hidden;
     border-radius: 4px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   }
 
   .player-story--reading .preview-dialogue:not(.preview-dialogue--choices) {

@@ -837,15 +837,15 @@
         audioSlide: null,
       },
       appearance: {
-        dialogue: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        choices: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        nameplate: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        menu: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        menuPanel: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        transcript: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        inventory: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        inventoryItem: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
-        audio: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "" },
+        dialogue: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        choices: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        nameplate: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        menu: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        menuPanel: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        transcript: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        inventory: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        inventoryItem: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "#2a2a2a" },
+        audio: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "#333333", fillColor: "#2a9d8f" },
       },
       typing: { enabled: true, speed: 28, sound: true },
       sounds: { clickAssetId: null },
@@ -2407,6 +2407,10 @@
         el.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
         el.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
         el.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
+        if (ap.bgColor) el.style.setProperty("--ui-" + css + "-bg", ap.bgColor);
+        else el.style.removeProperty("--ui-" + css + "-bg");
+        if (ap.fillColor) el.style.setProperty("--ui-" + css + "-fill", ap.fillColor);
+        else el.style.removeProperty("--ui-" + css + "-fill");
         if (ap.fontFamily) el.style.setProperty("--ui-" + css + "-font-family", ap.fontFamily);
         else el.style.removeProperty("--ui-" + css + "-font-family");
         if (ap.fontColor) el.style.setProperty("--ui-" + css + "-font-color", ap.fontColor);
@@ -2478,7 +2482,7 @@
       if (menuCfg.transcriptText) el.style.setProperty("--ui-transcript-text", menuCfg.transcriptText);
       if (menuCfg.inventoryBg) el.style.setProperty("--ui-inventory-bg", menuCfg.inventoryBg);
       if (menuCfg.inventoryText) el.style.setProperty("--ui-inventory-text", menuCfg.inventoryText);
-      if (menuCfg.audioBg) el.style.setProperty("--ui-audio-bg", menuCfg.audioBg);
+      if (menuCfg.audioBg) el.style.setProperty("--ui-audio-pane-bg", menuCfg.audioBg);
       if (menuCfg.audioText) el.style.setProperty("--ui-audio-text", menuCfg.audioText);
       el.style.setProperty("--ui-inventory-list-w", ((menuCfg.inventoryListWidth != null ? menuCfg.inventoryListWidth : 100)) + "%");
       el.style.setProperty("--ui-inventory-list-h", ((menuCfg.inventoryListHeight != null ? menuCfg.inventoryListHeight : 100)) + "%");

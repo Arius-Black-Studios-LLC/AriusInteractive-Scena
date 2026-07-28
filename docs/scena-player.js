@@ -1128,6 +1128,7 @@
     this.frozenBeatHtml = stageHtml + dialogueHtml;
     this.storyEl.className = this.readingStoryClassName();
     this.storyEl.innerHTML = '<div class="player-story-inner">' + this.frozenBeatHtml + "</div>";
+    if (this.readerMenu && this.readerMenu.attachToPlayfield) this.readerMenu.attachToPlayfield();
     this.applyTypingEffect();
     this.refreshCommentsUI();
     if (canParallax && this.parallaxEnabled) this.bindParallax();

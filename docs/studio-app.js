@@ -828,12 +828,16 @@
       var fontColor = form.querySelector('[name="' + prefix + 'FontColor"]');
       var fontSize = form.querySelector('[name="' + prefix + 'FontSize"]');
       var bestFit = form.querySelector('[name="' + prefix + 'BestFit"]');
+      var bgColor = form.querySelector('[name="' + prefix + 'BgColor"]');
+      var fillColor = form.querySelector('[name="' + prefix + 'FillColor"]');
       if (opacity) ap.opacity = Math.max(0, Math.min(100, parseInt(opacity.value, 10) || 100));
       if (smooth) ap.smooth = !!smooth.checked;
       if (borderWidth) ap.borderWidth = Math.max(0, Math.min(16, parseInt(borderWidth.value, 10) || 0));
       if (borderColor) ap.borderColor = borderColor.value || "#ffffff";
       if (glowSize) ap.glowSize = Math.max(0, Math.min(24, parseInt(glowSize.value, 10) || 0));
       if (glowColor) ap.glowColor = glowColor.value || "#2a9d8f";
+      if (bgColor) ap.bgColor = bgColor.value || "";
+      if (fillColor) ap.fillColor = fillColor.value || "";
       if (includeFont) {
         if (fontFamily) ap.fontFamily = fontFamily.value || "";
         if (fontColor) ap.fontColor = fontColor.value || "";
@@ -1254,6 +1258,8 @@
       bestFit: true,
       fontFamily: "",
       fontColor: "",
+      bgColor: "",
+      fillColor: "",
     };
   }
 
@@ -1279,9 +1285,16 @@
   function uiAppearanceFields(key, ap, opts) {
     opts = opts || {};
     var prefix = "uiAp" + key.charAt(0).toUpperCase() + key.slice(1);
+    var defaultBg = opts.defaultBgColor || "#2a2a2a";
     return (
       '<div class="field"><label>Opacity</label><input type="range" name="' + prefix + 'Opacity" min="0" max="100" step="1" value="' + (ap.opacity || 100) + '"></div>' +
       '<div class="field"><label class="field-inline"><input type="checkbox" name="' + prefix + 'Smooth"' + (ap.smooth ? " checked" : "") + '> Smooth edges</label></div>' +
+      '<div class="field"><label>Background color</label><input type="color" name="' + prefix + 'BgColor" value="' +
+        escapeAttr(toColorInput(ap.bgColor) || defaultBg) + '"></div>' +
+      (opts.includeFill ? (
+        '<div class="field"><label>Fill color</label><input type="color" name="' + prefix + 'FillColor" value="' +
+          escapeAttr(toColorInput(ap.fillColor) || (opts.defaultFillColor || "#2a9d8f")) + '"></div>'
+      ) : "") +
       '<div class="field"><label>Border width</label><input type="range" name="' + prefix + 'BorderWidth" min="0" max="16" step="1" value="' + (ap.borderWidth || 0) + '"></div>' +
       '<div class="field"><label>Border color</label><input type="color" name="' + prefix + 'BorderColor" value="' + escapeAttr(toColorInput(ap.borderColor) || "#ffffff") + '"></div>' +
       '<div class="field"><label>Glow / shadow strength</label><input type="range" name="' + prefix + 'GlowSize" min="0" max="24" step="1" value="' + (ap.glowSize || 0) + '"></div>' +
@@ -1483,9 +1496,9 @@
             ((ui.menu && ui.menu.inventoryListWidth) || 100) + '"></div>' +
           '<div class="field"><label>List height (%)</label><input type="range" name="uiInventoryListHeight" min="40" max="100" step="1" value="' +
             ((ui.menu && ui.menu.inventoryListHeight) || 100) + '"></div>' +
-          '<div class="field"><label>Background</label><input type="color" name="uiInventoryBg" value="' +
+          '<div class="field"><label>Panel background</label><input type="color" name="uiInventoryBg" value="' +
             escapeAttr(toColorInput((ui.menu && ui.menu.inventoryBg) || "#1a1816") || "#1a1816") + '"></div>' +
-          '<div class="field"><label>Text color</label><input type="color" name="uiInventoryText" value="' +
+          '<div class="field"><label>Panel text</label><input type="color" name="uiInventoryText" value="' +
             escapeAttr(toColorInput((ui.menu && ui.menu.inventoryText) || "#f5f0e6") || "#f5f0e6") + '"></div>' +
           '<div class="field"><label class="field-inline">' +
             '<input type="checkbox" name="uiShowInventoryHud"' + (ui.menu && ui.menu.showInventoryHud ? " checked" : "") + "> " +
@@ -1507,7 +1520,7 @@
             artImportActionsHtml({ inputId: "uiInventoryItemSpriteInput", kind: "ui", pixelBtnId: "uiInventoryItemSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiInventoryItemSpriteClear"' + (hasInvSprite ? "" : " hidden") + ">Remove sprite</button>" +
           "</div>" +
-          uiAppearanceFields("inventoryItem", apInv, { includeFont: true, defaultFontColor: (ui.menu && ui.menu.inventoryText) || "#f5f0e6" }) +
+          uiAppearanceFields("inventoryItem", apInv, { includeFont: true, defaultFontColor: (ui.menu && ui.menu.inventoryText) || "#f5f0e6", defaultBgColor: "#2a2a2a" }) +
         "</div>"
       );
     }
@@ -1519,16 +1532,23 @@
         '<div class="game-ui-inspector-panel" data-ui-panel="audio">' +
           "<h2>Audio settings</h2>" +
           '<p class="field-hint">Colors and slide assets for volume controls inside the menu.</p>' +
-          '<div class="field"><label>Background</label><input type="color" name="uiAudioBg" value="' +
+          '<div class="field"><label>Panel background</label><input type="color" name="uiAudioBg" value="' +
             escapeAttr(toColorInput((ui.menu && ui.menu.audioBg) || "#1a1816") || "#1a1816") + '"></div>' +
-          '<div class="field"><label>Text color</label><input type="color" name="uiAudioText" value="' +
+          '<div class="field"><label>Panel text</label><input type="color" name="uiAudioText" value="' +
             escapeAttr(toColorInput((ui.menu && ui.menu.audioText) || "#f5f0e6") || "#f5f0e6") + '"></div>' +
           '<div class="field"><label>Slide / fader sprite</label>' +
             '<div class="ui-sprite-preview" id="uiAudioSlideSpritePreview" style="' + (hasAudioSlide ? "background-image:url(" + ui.customSprites.audioSlide + ")" : "") + '"></div>' +
             artImportActionsHtml({ inputId: "uiAudioSlideSpriteInput", kind: "ui", pixelBtnId: "uiAudioSlideSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiAudioSlideSpriteClear"' + (hasAudioSlide ? "" : " hidden") + ">Remove sprite</button>" +
           "</div>" +
-          uiAppearanceFields("audio", apAudio, { includeFont: true, defaultFontColor: (ui.menu && ui.menu.audioText) || "#f5f0e6" }) +
+          '<p class="field-hint">Background / fill below style the slider rows and tracks.</p>' +
+          uiAppearanceFields("audio", apAudio, {
+            includeFont: true,
+            includeFill: true,
+            defaultFontColor: (ui.menu && ui.menu.audioText) || "#f5f0e6",
+            defaultBgColor: "#333333",
+            defaultFillColor: resolved.colors.accent || "#2a9d8f",
+          }) +
         "</div>"
       );
     }
@@ -2289,7 +2309,7 @@
     if (ui.menu && ui.menu.transcriptText) frame.style.setProperty("--ui-transcript-text", ui.menu.transcriptText);
     if (ui.menu && ui.menu.inventoryBg) frame.style.setProperty("--ui-inventory-bg", ui.menu.inventoryBg);
     if (ui.menu && ui.menu.inventoryText) frame.style.setProperty("--ui-inventory-text", ui.menu.inventoryText);
-    if (ui.menu && ui.menu.audioBg) frame.style.setProperty("--ui-audio-bg", ui.menu.audioBg);
+    if (ui.menu && ui.menu.audioBg) frame.style.setProperty("--ui-audio-pane-bg", ui.menu.audioBg);
     if (ui.menu && ui.menu.audioText) frame.style.setProperty("--ui-audio-text", ui.menu.audioText);
     frame.style.setProperty("--ui-inventory-list-w", ((ui.menu && ui.menu.inventoryListWidth) || 100) + "%");
     frame.style.setProperty("--ui-inventory-list-h", ((ui.menu && ui.menu.inventoryListHeight) || 100) + "%");
@@ -2327,6 +2347,10 @@
       frame.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
       frame.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
       frame.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
+      if (ap.bgColor) frame.style.setProperty("--ui-" + css + "-bg", ap.bgColor);
+      else frame.style.removeProperty("--ui-" + css + "-bg");
+      if (ap.fillColor) frame.style.setProperty("--ui-" + css + "-fill", ap.fillColor);
+      else frame.style.removeProperty("--ui-" + css + "-fill");
       if (ap.fontFamily) frame.style.setProperty("--ui-" + css + "-font-family", ap.fontFamily);
       else frame.style.removeProperty("--ui-" + css + "-font-family");
       if (ap.fontColor) frame.style.setProperty("--ui-" + css + "-font-color", ap.fontColor);
