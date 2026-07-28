@@ -165,6 +165,7 @@
       href: "/series?series=" + encodeURIComponent(series.id),
       cover: coverKey(series, demoMeta, opts.index || 0),
       thumbStyle: thumbStyle,
+      thumbnailDataUrl: series.thumbnailDataUrl || "",
       flags: flagLabels(series, demoMeta),
       isAgeRestricted: entryIsAgeRestricted(series, demoMeta),
       updatedAt: series.updatedAt || "",
@@ -293,6 +294,7 @@
             return null;
           }
           var series = row.data;
+          series.creatorUserId = row.user_id;
           if (window.ScenaStore && ScenaStore.normalizeSeries) ScenaStore.normalizeSeries(series);
           return series;
         }).catch(function () {

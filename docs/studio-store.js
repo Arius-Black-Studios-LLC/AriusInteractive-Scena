@@ -307,9 +307,33 @@
       entryNodeId: null,
       readerUi: null,
       status: "draft",
+      monetization: null,
+      creatorUserId: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+  }
+
+  function defaultMonetization() {
+    return {
+      mode: "free",
+      freeEpisodeCount: 1,
+      defaultEpisodePriceDucats: 5,
+      freeAfterDays: 0,
+    };
+  }
+
+  function normalizeMonetization(series) {
+    if (!series) return defaultMonetization();
+    if (!series.monetization || typeof series.monetization !== "object") {
+      series.monetization = defaultMonetization();
+    }
+    var m = series.monetization;
+    if (m.mode !== "paid") m.mode = "free";
+    m.freeEpisodeCount = Math.max(0, parseInt(m.freeEpisodeCount, 10) || 0);
+    m.defaultEpisodePriceDucats = Math.max(0, parseInt(m.defaultEpisodePriceDucats, 10) || 0);
+    m.freeAfterDays = Math.max(0, parseInt(m.freeAfterDays, 10) || 0);
+    return m;
   }
 
   var ROUTE_ELSE_ID = "__scena_else__";
@@ -2505,11 +2529,11 @@
       var data = readAll();
       if (!data[userId]) data[userId] = [];
       series.updatedAt = new Date().toISOString();
+      if (userId) series.creatorUserId = userId;
+      this.normalizeSeries(series);
       if (this.hasPublishedEpisodes(series)) {
         series.status = "published";
       }
-      if (!series.backgroundScenes) series.backgroundScenes = [];
-      if (!series.characterProfiles) series.characterProfiles = [];
       var idx = data[userId].findIndex(function (s) { return s.id === series.id; });
       if (idx === -1) data[userId].push(series);
       else data[userId][idx] = series;
@@ -3219,6 +3243,46 @@
       return palette[Math.abs(hash) % palette.length];
     },
 
+    validateSeriesListing: function (series) {
+      var issues = [];
+      if (!series) return { ok: false, issues: ["Series not found."] };
+      if (!(series.title || "").trim()) issues.push("Add a series title in Settings.");
+      if (!(series.thumbnailDataUrl || "").trim()) issues.push("Upload a thumbnail (400×600) in Settings → Listing images.");
+      if (!(series.bannerDataUrl || "").trim()) issues.push("Upload a banner (800×400) in Settings → Listing images.");
+      return { ok: issues.length === 0, issues: issues };
+    },
+
+    episodeIsFreeByAge: function (episode, series) {
+      if (!episode || !series) return false;
+      normalizeMonetization(series);
+      var days = typeof episode.freeAfterDays === "number" && !isNaN(episode.freeAfterDays)
+        ? episode.freeAfterDays
+        : series.monetization.freeAfterDays;
+      if (!days || days <= 0) return false;
+      var pub = episodePublishAt(episode);
+      if (!pub) return false;
+      return Date.now() - new Date(pub).getTime() >= days * 86400000;
+    },
+
+    episodeReaderPrice: function (series, episode) {
+      if (!episode || !series) return 0;
+      normalizeMonetization(series);
+      if (series.monetization.mode !== "paid") return 0;
+      if (this.episodeIsFreeByAge(episode, series)) return 0;
+      var num = episode.number || 1;
+      if (num <= series.monetization.freeEpisodeCount) return 0;
+      if (typeof episode.ducatPrice === "number" && !isNaN(episode.ducatPrice)) {
+        return Math.max(0, parseInt(episode.ducatPrice, 10) || 0);
+      }
+      return Math.max(0, series.monetization.defaultEpisodePriceDucats || 0);
+    },
+
+    episodePriceLabel: function (series, episode) {
+      var price = this.episodeReaderPrice(series, episode);
+      if (!price) return "Free";
+      return price + " Ducat" + (price === 1 ? "" : "s");
+    },
+
     normalizeSeries: function (series) {
       if (!series) return series;
       if (!series.nodes) series.nodes = [];
@@ -3248,6 +3312,7 @@
       }
       this.ensureDefaultAudio(series);
       this.normalizeEpisodes(series);
+      normalizeMonetization(series);
       this.ensureReaderUi(series);
       this.ensureEntryNode(series);
       try {

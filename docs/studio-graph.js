@@ -383,6 +383,17 @@
             '<div class="upload-preview episode-thumb-preview" id="episodeEditorThumbPreview">400×600</div>' +
             '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden id="episodeEditorThumbInput"></label>' +
           '</div></div>' +
+        '<div class="field episode-monetization-field" id="episodeEditorMonetizationField">' +
+          '<label>Chapter access (optional overrides)</label>' +
+          '<div class="form-row">' +
+            '<div class="field"><label>Ducat price</label>' +
+              '<input type="number" id="episodeEditorDucatPrice" min="0" max="999" placeholder="Series default">' +
+              '<p class="field-hint">Leave blank to use series default. 0 = free.</p></div>' +
+            '<div class="field"><label>Free after (days)</label>' +
+              '<input type="number" id="episodeEditorFreeAfterDays" min="0" max="365" placeholder="Series default">' +
+              '<p class="field-hint">Override how many days after release this chapter becomes free.</p></div>' +
+          '</div>' +
+        '</div>' +
         '<div class="field episode-status-field">' +
           '<p class="episode-status-line" id="episodeEditorStatusLine"></p>' +
           '<div class="field episode-publish-field" id="episodeEditorPublishField">' +
@@ -4065,6 +4076,17 @@
         preview.textContent = "400×600";
       }
     }
+    var priceInput = modal.querySelector("#episodeEditorDucatPrice");
+    var freeDaysInput = modal.querySelector("#episodeEditorFreeAfterDays");
+    var monetizationField = modal.querySelector("#episodeEditorMonetizationField");
+    var seriesPaid = this.series.monetization && this.series.monetization.mode === "paid";
+    if (monetizationField) monetizationField.hidden = !seriesPaid;
+    if (priceInput) {
+      priceInput.value = typeof episode.ducatPrice === "number" ? String(episode.ducatPrice) : "";
+    }
+    if (freeDaysInput) {
+      freeDaysInput.value = typeof episode.freeAfterDays === "number" ? String(episode.freeAfterDays) : "";
+    }
     if (titleEl) titleEl.focus();
   };
 
@@ -4080,6 +4102,18 @@
     var blurbEl = modal.querySelector("#episodeEditorBlurb");
     ep.title = titleEl ? titleEl.value.trim() : "";
     ep.shortDescription = blurbEl ? blurbEl.value.trim() : "";
+    var priceInput = modal.querySelector("#episodeEditorDucatPrice");
+    var freeDaysInput = modal.querySelector("#episodeEditorFreeAfterDays");
+    if (priceInput) {
+      var priceRaw = priceInput.value.trim();
+      if (!priceRaw) delete ep.ducatPrice;
+      else ep.ducatPrice = Math.max(0, parseInt(priceRaw, 10) || 0);
+    }
+    if (freeDaysInput) {
+      var daysRaw = freeDaysInput.value.trim();
+      if (!daysRaw) delete ep.freeAfterDays;
+      else ep.freeAfterDays = Math.max(0, parseInt(daysRaw, 10) || 0);
+    }
   };
 
   ScenaGraphEditor.prototype.bindEpisodeEditorModal = function () {
@@ -4200,6 +4234,14 @@
     if (!ep || this.learnMode) return Promise.resolve(false);
     var self = this;
     opts = opts || { when: "now" };
+    var listing = ScenaStore.validateSeriesListing(this.series);
+    if (!listing.ok) {
+      this.onSaveError(
+        "Cannot publish — series listing is incomplete:\n\n" +
+        listing.issues.join("\n")
+      );
+      return Promise.resolve(false);
+    }
     var validation = ScenaStore.validateGraph(this.series);
     if (!validation.ok) {
       var metricErrors = (validation.issues || []).filter(function (item) {

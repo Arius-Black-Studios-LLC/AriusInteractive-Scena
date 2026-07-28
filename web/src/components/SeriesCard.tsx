@@ -6,10 +6,25 @@ type Props = {
   entry: CatalogEntry;
 };
 
+function thumbnailUrl(entry: CatalogEntry): string | null {
+  const ext = entry as CatalogEntry & { thumbnailDataUrl?: string };
+  if (ext.thumbnailDataUrl) return ext.thumbnailDataUrl;
+  const style = entry.thumbStyle || "";
+  const match = style.match(/url\(([^)]+)\)/);
+  return match ? match[1].replace(/^["']|["']$/g, "") : null;
+}
+
 export function SeriesCard({ entry }: Props) {
+  const imageUrl = thumbnailUrl(entry);
   const body = (
     <>
-      <div className={`series-card-thumb series-card-thumb--${entry.cover}`}>
+      <div
+        className={
+          "series-card-thumb" +
+          (imageUrl ? " series-card-thumb--image" : ` series-card-thumb--${entry.cover}`)
+        }
+        style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : undefined}
+      >
         {entry.epLabel ? <span className="series-card-ep">{entry.epLabel}</span> : null}
       </div>
       <div className="series-card-body">

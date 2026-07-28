@@ -21,8 +21,15 @@
 
 .series-card-thumb {
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 3 / 4;
   background: linear-gradient(135deg, #f9ecef, #e8d4da);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.series-card-thumb--image {
+  background-color: var(--surface-2, #f3f1ec);
 }
 
 .series-card-thumb--a { background: linear-gradient(135deg, #fde8ef, #f5c2d4); }

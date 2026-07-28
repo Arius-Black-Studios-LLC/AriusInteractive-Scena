@@ -17,6 +17,7 @@ export type CatalogEntry = {
   readersThisWeekLabel?: string;
   chaptersReadThisWeekLabel?: string;
   thumbStyle?: string;
+  thumbnailDataUrl?: string;
   isDemo?: boolean;
   genreKeys?: string[];
   isAgeRestricted?: boolean;

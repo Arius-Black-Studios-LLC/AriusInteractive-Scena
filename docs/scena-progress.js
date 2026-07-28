@@ -937,7 +937,7 @@
 
 
 
-    isEpisodeUnlocked: function (scopeId, series, episode) {
+    isEpisodeProgressUnlocked: function (scopeId, series, episode) {
 
       if (!episode || !series) return false;
 
@@ -960,6 +960,24 @@
       var rec = this.get(scopeId, series.id).episodes[prev.id];
 
       return !!(rec && rec.completed);
+
+    },
+
+
+
+    isEpisodeUnlocked: function (scopeId, series, episode) {
+
+      if (!this.isEpisodeProgressUnlocked(scopeId, series, episode)) return false;
+
+      if (!window.ScenaStore || !ScenaStore.episodeReaderPrice) return true;
+
+      var price = ScenaStore.episodeReaderPrice(series, episode);
+
+      if (!price) return true;
+
+      if (window.ScenaWallet && ScenaWallet.hasUnlock(scopeId, series.id, episode.id)) return true;
+
+      return false;
 
     },
 
@@ -1075,6 +1093,21 @@
       }
 
       if (this.isEpisodeUnlocked(scopeId, series, episode)) return "";
+
+      if (window.ScenaStore && ScenaStore.episodeReaderPrice) {
+        var price = ScenaStore.episodeReaderPrice(series, episode);
+        if (price > 0) {
+          if (this.isEpisodeProgressUnlocked(scopeId, series, episode)) {
+            if (window.ScenaWallet && !window.ScenaAuth) {
+              return "Sign in to unlock this chapter for " + price + " Ducats.";
+            }
+            if (window.ScenaAuth && ScenaAuth.isConfigured && ScenaAuth.isConfigured() && !ScenaAuth.getSessionUserId()) {
+              return "Sign in to unlock this chapter for " + price + " Ducats.";
+            }
+            return "Unlock this chapter for " + price + " Ducats.";
+          }
+        }
+      }
 
       if (!window.ScenaStore || !ScenaStore.previousEpisode) return "Complete the previous chapter first.";
 

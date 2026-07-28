@@ -719,20 +719,22 @@
             field("Long description", "longDescription", series.longDescription, "Series detail page body", true, 5) +
           '</section>' +
           '<section class="form-section">' +
-            '<h2>Listing images</h2>' +
+            '<h2>Listing images <span class="field-required">Required</span></h2>' +
+            '<p class="field-hint">Thumbnail and banner are required before you can publish chapters. They appear on Discover and your series page.</p>' +
             '<div class="form-row">' +
               '<div class="field">' +
-                '<label>Thumbnail</label>' +
-                '<div class="upload-preview' + (series.thumbnailDataUrl ? "" : "") + '" id="thumbPreview" style="' + (series.thumbnailDataUrl ? "background-image:url(" + series.thumbnailDataUrl + ")" : "") + '">' + (series.thumbnailDataUrl ? "" : "400×600") + '</div>' +
+                '<label>Thumbnail <span class="field-required">Required</span></label>' +
+                '<div class="upload-preview' + (series.thumbnailDataUrl ? " upload-preview--filled" : "") + '" id="thumbPreview" style="' + (series.thumbnailDataUrl ? "background-image:url(" + series.thumbnailDataUrl + ")" : "") + '">' + (series.thumbnailDataUrl ? "" : "400×600") + '</div>' +
                 '<input type="file" accept="image/*" id="thumbInput">' +
               '</div>' +
               '<div class="field">' +
-                '<label>Banner</label>' +
-                '<div class="upload-preview is-banner" id="bannerPreview" style="' + (series.bannerDataUrl ? "background-image:url(" + series.bannerDataUrl + ")" : "") + '">' + (series.bannerDataUrl ? "" : "800×400") + '</div>' +
+                '<label>Banner <span class="field-required">Required</span></label>' +
+                '<div class="upload-preview is-banner' + (series.bannerDataUrl ? " upload-preview--filled" : "") + '" id="bannerPreview" style="' + (series.bannerDataUrl ? "background-image:url(" + series.bannerDataUrl + ")" : "") + '">' + (series.bannerDataUrl ? "" : "800×400") + '</div>' +
                 '<input type="file" accept="image/*" id="bannerInput">' +
               '</div>' +
             '</div>' +
           '</section>' +
+          renderMonetizationSection(series) +
           '<section class="form-section">' +
             '<h2>Genres</h2>' +
             '<p class="field-hint">Pick what kind of story this is — used for discover and search.</p>' +
@@ -757,6 +759,41 @@
           '<p class="field-hint" style="margin-top:16px">Story metrics and branching logic live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
         '</form>' +
       '</div>'
+    );
+  }
+
+  function renderMonetizationSection(series) {
+    ScenaStore.normalizeSeries(series);
+    var m = series.monetization || {};
+    var isPaid = m.mode === "paid";
+    return (
+      '<section class="form-section" id="monetizationSection">' +
+        '<h2>Reader access (Ducats)</h2>' +
+        '<p class="field-hint">Choose whether chapters are free or cost Ducats. Readers still must finish the previous chapter before the next one unlocks.</p>' +
+        '<div class="field">' +
+          '<label>Series access</label>' +
+          '<select name="monetizationMode" id="monetizationMode">' +
+            '<option value="free"' + (!isPaid ? " selected" : "") + '>Entire series free</option>' +
+            '<option value="paid"' + (isPaid ? " selected" : "") + '>Paid chapters (Ducats)</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="monetizationPaidFields"' + (isPaid ? "" : ' hidden') + '>' +
+          '<div class="field">' +
+            '<label>Free chapters at start</label>' +
+            '<input type="number" name="freeEpisodeCount" min="0" max="99" value="' + (m.freeEpisodeCount != null ? m.freeEpisodeCount : 1) + '">' +
+            '<p class="field-hint">How many early chapters readers can play without spending Ducats (usually 1).</p>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>Default price per chapter (Ducats)</label>' +
+            '<input type="number" name="defaultEpisodePriceDucats" min="0" max="999" value="' + (m.defaultEpisodePriceDucats != null ? m.defaultEpisodePriceDucats : 5) + '">' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>Become free after (days)</label>' +
+            '<input type="number" name="freeAfterDays" min="0" max="365" value="' + (m.freeAfterDays != null ? m.freeAfterDays : 0) + '">' +
+            '<p class="field-hint">0 = stay paid forever. Example: 7 means a chapter costs Ducats for one week after release, then becomes free for everyone.</p>' +
+          '</div>' +
+        '</div>' +
+      '</section>'
     );
   }
 
@@ -785,6 +822,8 @@
       saveTimer = setTimeout(function () {
         try {
           collectSettingsForm(form, series);
+          var listing = validateSettingsListing(series);
+          if (!listing.ok) return;
           persistSeries(series);
           updateSidebarSeriesTitle(series);
         } catch (err) {
@@ -792,6 +831,15 @@
           toast("Could not save settings — try again.");
         }
       }, 600);
+    }
+
+    var monetizationMode = form.querySelector("#monetizationMode");
+    var monetizationPaidFields = form.querySelector("#monetizationPaidFields");
+    if (monetizationMode && monetizationPaidFields) {
+      monetizationMode.addEventListener("change", function () {
+        monetizationPaidFields.hidden = monetizationMode.value !== "paid";
+        scheduleAutoSave();
+      });
     }
 
     bindImageUpload("#thumbInput", "#thumbPreview", function (url) { series.thumbnailDataUrl = url; scheduleAutoSave(); }, "thumb", series.id);
@@ -910,6 +958,11 @@
     if (saveSettingsBtn) {
       saveSettingsBtn.addEventListener("click", function () {
         collectSettingsForm(form, series);
+        var listing = validateSettingsListing(series);
+        if (!listing.ok) {
+          toast(listing.issues[0] || "Thumbnail and banner are required.");
+          return;
+        }
         persistSeries(series, "Series saved");
       });
     }
@@ -981,6 +1034,21 @@
       });
     }
     if (form.querySelector("#readerUiSection")) collectReaderUi(form, series);
+    if (!series.monetization) series.monetization = { mode: "free", freeEpisodeCount: 1, defaultEpisodePriceDucats: 5, freeAfterDays: 0 };
+    var modeEl = form.querySelector('[name="monetizationMode"]');
+    var freeCountEl = form.querySelector('[name="freeEpisodeCount"]');
+    var priceEl = form.querySelector('[name="defaultEpisodePriceDucats"]');
+    var freeDaysEl = form.querySelector('[name="freeAfterDays"]');
+    if (modeEl) series.monetization.mode = modeEl.value === "paid" ? "paid" : "free";
+    if (freeCountEl) series.monetization.freeEpisodeCount = Math.max(0, parseInt(freeCountEl.value, 10) || 0);
+    if (priceEl) series.monetization.defaultEpisodePriceDucats = Math.max(0, parseInt(priceEl.value, 10) || 0);
+    if (freeDaysEl) series.monetization.freeAfterDays = Math.max(0, parseInt(freeDaysEl.value, 10) || 0);
+    ScenaStore.normalizeSeries(series);
+  }
+
+  function validateSettingsListing(series) {
+    if (!window.ScenaStore || !ScenaStore.validateSeriesListing) return { ok: true, issues: [] };
+    return ScenaStore.validateSeriesListing(series);
   }
 
   function bindSoundPreview(btnSel, selectSel, series, isBgm) {

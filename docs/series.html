@@ -109,6 +109,7 @@
   <script src="scena-catalog.js?v=1"></script>
 
   <script src="scena-progress.js?v=8"></script>
+  <script src="scena-wallet.js?v=1"></script>
 
   <script>
 
@@ -230,6 +231,14 @@
         chapterList.innerHTML = episodes.map(function (ep) {
 
           var unlocked = ScenaProgress.isEpisodeUnlocked(scopeId, series, ep);
+          var progressOk = ScenaProgress.isEpisodeProgressUnlocked(scopeId, series, ep);
+          var price = window.ScenaStore && ScenaStore.episodeReaderPrice
+            ? ScenaStore.episodeReaderPrice(series, ep)
+            : 0;
+          var needsPurchase = progressOk && !unlocked && price > 0;
+          var priceLabel = window.ScenaStore && ScenaStore.episodePriceLabel
+            ? ScenaStore.episodePriceLabel(series, ep)
+            : (price ? (price + " Ducats") : "Free");
 
           var rec = progress.episodes[ep.id] || {};
 
@@ -239,7 +248,7 @@
 
             ? "Completed"
 
-            : (rec.checkpoint ? "In progress" : (unlocked ? "Ready" : (window.ScenaStore && ScenaStore.isEpisodeScheduled && ScenaStore.isEpisodeScheduled(ep) ? "Coming soon" : "Locked")));
+            : (rec.checkpoint ? "In progress" : (unlocked ? "Ready" : (window.ScenaStore && ScenaStore.isEpisodeScheduled && ScenaStore.isEpisodeScheduled(ep) ? "Coming soon" : (needsPurchase ? priceLabel : "Locked"))));
 
           var playUrl = unlocked
 
@@ -263,7 +272,23 @@
 
           var lockReason = unlocked ? "" : ScenaProgress.lockReason(scopeId, series, ep);
 
-
+          var actionsHtml = "";
+          if (unlocked) {
+            actionsHtml =
+              '<a class="btn btn-primary" href="' + escapeHtml(playUrl) + '">' +
+                (rec.checkpoint ? "Continue" : "Play") +
+              "</a>" +
+              (rec.completed || rec.checkpoint
+                ? ('<a class="btn btn-ghost" href="' + escapeHtml(ScenaProgress.playUrl(series.id, ep.id, true)) + '">Restart</a>')
+                : "");
+          } else if (needsPurchase) {
+            actionsHtml =
+              '<button type="button" class="btn btn-primary" data-unlock-episode="' + escapeHtml(ep.id) + '" data-unlock-price="' + price + '">' +
+                "Unlock · " + price + " Ducats" +
+              "</button>";
+          } else {
+            actionsHtml = '<button type="button" class="btn btn-primary is-disabled" disabled aria-disabled="true">Locked</button>';
+          }
 
           return (
 
@@ -295,31 +320,57 @@
 
               (lockReason ? ('<p class="series-chapter-lock">' + escapeHtml(lockReason) + "</p>") : "") +
 
-              '<div class="series-chapter-actions">' +
-
-                (unlocked
-
-                  ? ('<a class="btn btn-primary" href="' + escapeHtml(playUrl) + '">' +
-
-                      (rec.checkpoint ? "Continue" : "Play") +
-
-                    "</a>" +
-
-                    (rec.completed || rec.checkpoint
-
-                      ? ('<a class="btn btn-ghost" href="' + escapeHtml(ScenaProgress.playUrl(series.id, ep.id, true)) + '">Restart</a>')
-
-                      : ""))
-
-                  : ('<button type="button" class="btn btn-primary is-disabled" disabled aria-disabled="true">Locked</button>')) +
-
-              "</div>" +
+              '<div class="series-chapter-actions">' + actionsHtml + '</div>' +
 
             "</article>"
 
           );
 
         }).join("");
+
+        bindChapterUnlocks(series, scopeId);
+
+      }
+
+
+
+      function bindChapterUnlocks(series, scopeId) {
+
+        if (!chapterList || !window.ScenaWallet) return;
+
+        chapterList.querySelectorAll("[data-unlock-episode]").forEach(function (btn) {
+
+          btn.addEventListener("click", function () {
+
+            var epId = btn.getAttribute("data-unlock-episode");
+
+            var ep = (series.episodes || []).find(function (item) { return item.id === epId; });
+
+            if (!ep) return;
+
+            var price = parseInt(btn.getAttribute("data-unlock-price"), 10) || 0;
+
+            btn.disabled = true;
+
+            btn.textContent = "Unlocking…";
+
+            ScenaWallet.unlockChapter(scopeId, series.id, epId, price, series.creatorUserId || null).then(function () {
+
+              refreshPage(series, scopeId);
+
+            }).catch(function (err) {
+
+              btn.disabled = false;
+
+              btn.textContent = "Unlock · " + price + " Ducats";
+
+              alert((err && err.message) || "Could not unlock chapter.");
+
+            });
+
+          });
+
+        });
 
       }
 
@@ -805,7 +856,11 @@
 
           var actions = document.getElementById("seriesHeaderActions");
           if (actions) actions.hidden = !(session && session.user);
-          boot(session && session.user ? session.user.id : null);
+          var userId = session && session.user ? session.user.id : null;
+          var walletReady = userId && window.ScenaWallet
+            ? ScenaWallet.load(ScenaProgress.scopeFromUser(userId)).catch(function () { return null; })
+            : Promise.resolve(null);
+          walletReady.then(function () { boot(userId); });
 
         }).catch(function () { boot(null); });
 
