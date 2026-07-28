@@ -525,118 +525,17 @@
   };
 
   ScenaPlayer.prototype.applyReaderUi = function () {
-    if (!this.frameEl) return;
-    var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String("16:9").split(":");
-    var aw = parseInt(parts[0], 10) || 16;
-    var ah = parseInt(parts[1], 10) || 9;
-    var el = this.frameEl;
-    el.style.setProperty("--preview-aspect-w", String(aw));
-    el.style.setProperty("--preview-aspect-h", String(ah));
-    if (this.series && this.series.readerUi) this.series.readerUi.aspectRatio = "16:9";
-    el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
-    el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
-    el.style.setProperty("--ui-accent", ui.colors.accent);
-    el.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
-    el.style.setProperty("--ui-choice-text", ui.colors.choiceText);
-    el.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
-    el.style.setProperty("--ui-speaker", ui.colors.speaker);
-    el.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
-    el.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
-    el.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
-    el.className = "preview-frame player-frame preview-ui--" + ui.preset +
-      " preview-shape-dialogue--" + ui.shapes.dialogue +
-      " preview-shape-choice--" + ui.shapes.choice;
-    var appearance = ui.appearance || {};
-    [
-      ["dialogue", "dialogue"],
-      ["choices", "choices"],
-      ["nameplate", "nameplate"],
-      ["menu", "menu"],
-      ["menuPanel", "menupanel"],
-      ["inventoryItem", "inventory"],
-    ].forEach(function (pair) {
-      var key = pair[0];
-      var css = pair[1];
-      var ap = appearance[key] || {};
-      el.style.setProperty("--ui-" + css + "-opacity", ((ap.opacity == null ? 100 : ap.opacity) / 100).toFixed(3));
-      el.style.setProperty("--ui-" + css + "-border-width", (ap.borderWidth || 0) + "px");
-      el.style.setProperty("--ui-" + css + "-border-color", ap.borderColor || "#ffffff");
-      el.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
-      el.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
-      el.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
-      el.dataset["smooth" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.smooth ? "1" : "0";
-      el.dataset["bestfit" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.bestFit === false ? "0" : "1";
+    if (!this.frameEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
+    var self = this;
+    ScenaStore.applyReaderUiToFrame(this.frameEl, this.series, {
+      onApplied: function () {
+        self.initReaderMenu();
+        if (self.readerMenu) {
+          self.readerMenu.mount();
+          self.readerMenu.sync();
+        }
+      },
     });
-    if (ui.customSprites.dialogueBox) {
-      el.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
-      el.dataset.customDialogue = "1";
-    } else {
-      el.style.removeProperty("--ui-dialogue-sprite");
-      delete el.dataset.customDialogue;
-    }
-    if (ui.customSprites.choiceButton) {
-      el.style.setProperty("--ui-choice-sprite", "url(" + ui.customSprites.choiceButton + ")");
-      el.dataset.customChoice = "1";
-    } else {
-      el.style.removeProperty("--ui-choice-sprite");
-      delete el.dataset.customChoice;
-    }
-    if (ui.customSprites && ui.customSprites.nameplate) el.style.setProperty("--ui-nameplate-sprite", "url(" + ui.customSprites.nameplate + ")");
-    else el.style.removeProperty("--ui-nameplate-sprite");
-    if (ui.customSprites && ui.customSprites.menuButton) el.style.setProperty("--ui-menu-button-sprite", "url(" + ui.customSprites.menuButton + ")");
-    else el.style.removeProperty("--ui-menu-button-sprite");
-    if (ui.customSprites && ui.customSprites.menuPanel) el.style.setProperty("--ui-menu-panel-sprite", "url(" + ui.customSprites.menuPanel + ")");
-    else el.style.removeProperty("--ui-menu-panel-sprite");
-    if (ui.customSprites && ui.customSprites.inventoryItem) el.style.setProperty("--ui-inventory-item-sprite", "url(" + ui.customSprites.inventoryItem + ")");
-    else el.style.removeProperty("--ui-inventory-item-sprite");
-    var layout = ui.layout || {};
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
-    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
-    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
-    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
-    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
-    el.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
-    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
-    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
-    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
-    el.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
-    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
-    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
-    el.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
-    var menuPos = layout.menu || { x: 92, y: 4 };
-    el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
-    el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
-    el.style.setProperty("--ui-layout-menu-right", "auto");
-    var menuCfg = ui.menu || {};
-    var mp = layout.menuPanel || null;
-    if (mp) {
-      el.style.setProperty("--ui-layout-menupanel-x", (mp.x != null ? mp.x : 58) + "%");
-      el.style.setProperty("--ui-layout-menupanel-y", (mp.y != null ? mp.y : 0) + "%");
-      el.style.setProperty("--ui-layout-menupanel-w", (mp.w != null ? mp.w : 42) + "%");
-      el.style.setProperty("--ui-layout-menupanel-h", (mp.h != null ? mp.h : 100) + "%");
-      el.classList.add("player-frame--menu-laid-out");
-      el.style.setProperty("--ui-menu-panel-w", (mp.w != null ? mp.w : 42) + "%");
-    } else {
-      var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
-      el.style.setProperty("--ui-menu-panel-w", panelW + "%");
-      el.classList.remove("player-frame--menu-laid-out");
-    }
-    if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
-    if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
-    var accent = String(ui.colors.accent || "#2a9d8f");
-    var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (rgb) {
-      el.style.setProperty("--ui-accent-rgb",
-        parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
-    }
-    el.classList.add("preview-frame--laid-out");
-    this.initReaderMenu();
-    if (this.readerMenu) {
-      this.readerMenu.mount();
-      this.readerMenu.sync();
-    }
   };
 
   ScenaPlayer.prototype.ensureShell = function () {

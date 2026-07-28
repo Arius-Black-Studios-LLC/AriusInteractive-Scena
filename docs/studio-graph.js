@@ -3023,57 +3023,13 @@
   };
 
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
-    if (!this.previewEl) return;
-    var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
-    var aw = parseInt(parts[0], 10) || 16;
-    var ah = parseInt(parts[1], 10) || 9;
-    var el = this.previewEl;
-    el.style.setProperty("--preview-aspect-w", String(aw));
-    el.style.setProperty("--preview-aspect-h", String(ah));
-    el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
-    el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
-    el.style.setProperty("--ui-accent", ui.colors.accent);
-    el.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
-    el.style.setProperty("--ui-choice-text", ui.colors.choiceText);
-    el.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
-    el.style.setProperty("--ui-speaker", ui.colors.speaker);
-    el.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
-    el.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
-    el.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
-    el.className = "preview-frame player-frame preview-ui--" + ui.preset +
-      " preview-shape-dialogue--" + ui.shapes.dialogue +
-      " preview-shape-choice--" + ui.shapes.choice;
-    if (ui.customSprites.dialogueBox) {
-      el.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
-      el.dataset.customDialogue = "1";
-    } else {
-      el.style.removeProperty("--ui-dialogue-sprite");
-      delete el.dataset.customDialogue;
-    }
-    if (ui.customSprites.choiceButton) {
-      el.style.setProperty("--ui-choice-sprite", "url(" + ui.customSprites.choiceButton + ")");
-      el.dataset.customChoice = "1";
-    } else {
-      el.style.removeProperty("--ui-choice-sprite");
-      delete el.dataset.customChoice;
-    }
-    var layout = ui.layout || {};
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
-    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
-    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
-    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
-    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
-    el.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
-    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
-    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
-    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
-    el.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
-    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
-    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
-    el.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
-    el.classList.add("preview-frame--laid-out");
+    if (!this.previewEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
+    var self = this;
+    ScenaStore.applyReaderUiToFrame(this.previewEl, this.series, {
+      onApplied: function () {
+        self.syncReaderMenu();
+      },
+    });
   };
 
   ScenaGraphEditor.prototype.renderPreview = function () {
