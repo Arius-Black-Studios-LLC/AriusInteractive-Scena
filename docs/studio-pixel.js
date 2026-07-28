@@ -1,5 +1,5 @@
 /**
- * Arleco Studio — simple pixel art editor + series art folder.
+ * Arleco Studio — simple pixel art editor + series art folder (with frames / onion skin).
  */
 (function (root) {
   var PALETTE = [
@@ -9,6 +9,10 @@
   ];
 
   var SIZE_PRESETS = [16, 24, 32, 48, 64, 96, 128, 160, 256];
+  var MAX_FRAMES = 32;
+  var ONION_PREV = "rgba(220, 40, 40, 1)";
+  var ONION_NEXT = "rgba(40, 180, 70, 1)";
+  var ONION_ALPHA = 0.32;
 
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -40,9 +44,15 @@
     return "#" + p(r) + p(g) + p(b);
   }
 
+  function blankDataUrl(w, h) {
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, w || 1);
+    c.height = Math.max(1, h || 1);
+    return c.toDataURL("image/png");
+  }
+
   function createEditor(opts) {
     var series = opts.series;
-    var userId = opts.userId;
     var persist = opts.persist;
     var toast = opts.toast || function () {};
     var rootEl = opts.container;
@@ -59,12 +69,72 @@
       painting: false,
       undo: [],
       redo: [],
+      frames: [null],
+      frameIndex: 0,
+      frameDelay: 120,
+      onionSkin: true,
+      playing: false,
+      playTimer: null,
     };
 
     var canvas;
     var ctx;
     var display;
+    var onionScratch = null;
+    var frameImgCache = {};
     var onWindowUp = null;
+
+    function currentFrameDataUrl() {
+      return canvas ? canvas.toDataURL("image/png") : blankDataUrl(state.width, state.height);
+    }
+
+    function commitCurrentFrame() {
+      if (!canvas) return;
+      state.frames[state.frameIndex] = currentFrameDataUrl();
+      delete frameImgCache[state.frameIndex];
+    }
+
+    function ensureFrameSlot(i) {
+      if (!state.frames[i]) {
+        state.frames[i] = blankDataUrl(state.width, state.height);
+      }
+    }
+
+    function loadFrameImage(index, dataUrl, cb) {
+      if (!dataUrl) {
+        if (cb) cb(null);
+        return;
+      }
+      var cached = frameImgCache[index];
+      if (cached && cached.src === dataUrl && cached.complete) {
+        if (cb) cb(cached);
+        return;
+      }
+      var img = new Image();
+      img.onload = function () {
+        frameImgCache[index] = img;
+        if (cb) cb(img);
+      };
+      img.onerror = function () {
+        if (cb) cb(null);
+      };
+      img.src = dataUrl;
+    }
+
+    function tintedOnion(sourceImg, cssW, cssH, tint) {
+      if (!onionScratch) onionScratch = document.createElement("canvas");
+      onionScratch.width = Math.max(1, Math.round(cssW));
+      onionScratch.height = Math.max(1, Math.round(cssH));
+      var octx = onionScratch.getContext("2d");
+      octx.imageSmoothingEnabled = false;
+      octx.clearRect(0, 0, onionScratch.width, onionScratch.height);
+      octx.drawImage(sourceImg, 0, 0, onionScratch.width, onionScratch.height);
+      octx.globalCompositeOperation = "source-atop";
+      octx.fillStyle = tint;
+      octx.fillRect(0, 0, onionScratch.width, onionScratch.height);
+      octx.globalCompositeOperation = "source-over";
+      return onionScratch;
+    }
 
     function pushUndo() {
       if (!canvas) return;
@@ -82,9 +152,11 @@
         if (done) done();
       };
       img.onerror = function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        paintDisplay();
         if (done) done();
       };
-      img.src = dataUrl;
+      img.src = dataUrl || blankDataUrl(canvas.width, canvas.height);
     }
 
     function paintDisplay() {
@@ -100,8 +172,36 @@
       dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       dctx.imageSmoothingEnabled = false;
       dctx.clearRect(0, 0, cssW, cssH);
+
+      var showOnion = state.onionSkin && !state.playing && state.frames.length > 1;
+      if (showOnion) {
+        var prevIdx = state.frameIndex - 1;
+        var nextIdx = state.frameIndex + 1;
+        if (prevIdx >= 0 && state.frames[prevIdx]) {
+          var prevImg = frameImgCache[prevIdx];
+          if (prevImg && prevImg.complete) {
+            dctx.globalAlpha = ONION_ALPHA;
+            dctx.drawImage(tintedOnion(prevImg, cssW, cssH, ONION_PREV), 0, 0);
+            dctx.globalAlpha = 1;
+          } else {
+            loadFrameImage(prevIdx, state.frames[prevIdx], function () { paintDisplay(); });
+          }
+        }
+        if (nextIdx < state.frames.length && state.frames[nextIdx]) {
+          var nextImg = frameImgCache[nextIdx];
+          if (nextImg && nextImg.complete) {
+            dctx.globalAlpha = ONION_ALPHA;
+            dctx.drawImage(tintedOnion(nextImg, cssW, cssH, ONION_NEXT), 0, 0);
+            dctx.globalAlpha = 1;
+          } else {
+            loadFrameImage(nextIdx, state.frames[nextIdx], function () { paintDisplay(); });
+          }
+        }
+      }
+
       dctx.drawImage(canvas, 0, 0, cssW, cssH);
-      if (state.zoom >= 6) {
+
+      if (state.zoom >= 6 && !state.playing) {
         dctx.strokeStyle = "rgba(255,255,255,0.08)";
         dctx.lineWidth = 1;
         for (var x = 0; x <= canvas.width; x++) {
@@ -184,6 +284,7 @@
     }
 
     function applyTool(e, isStart) {
+      if (state.playing) stopPlayback();
       var p = pixelFromEvent(e);
       if (state.tool === "eyedropper") {
         var c = getPixel(p.x, p.y);
@@ -204,31 +305,192 @@
         setPixel(p.x, p.y, hexToRgba(state.color));
       }
       paintDisplay();
+      renderTimeline();
     }
 
-    function resizeCanvas(w, h, clear) {
+    function resizeAllFrames(w, h, clear) {
       w = Math.max(8, Math.min(512, parseInt(w, 10) || 64));
       h = Math.max(8, Math.min(512, parseInt(h, 10) || 64));
-      var prev = null;
-      if (canvas && !clear) {
-        try { prev = canvas.toDataURL("image/png"); } catch (e) { prev = null; }
-      }
+      commitCurrentFrame();
       state.width = w;
       state.height = h;
       canvas.width = w;
       canvas.height = h;
       ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, w, h);
-      if (prev) {
-        restoreFromDataUrl(prev);
-      } else {
+
+      if (clear) {
+        state.frames = [blankDataUrl(w, h)];
+        state.frameIndex = 0;
+        frameImgCache = {};
+        ctx.clearRect(0, 0, w, h);
         paintDisplay();
+      } else {
+        var nextFrames = state.frames.map(function (src) {
+          var c = document.createElement("canvas");
+          c.width = w;
+          c.height = h;
+          var cctx = c.getContext("2d");
+          cctx.imageSmoothingEnabled = false;
+          if (!src) return c.toDataURL("image/png");
+          return src;
+        });
+        // redraw each frame scaled into new size asynchronously then continue
+        var pending = nextFrames.length;
+        var rebuilt = new Array(nextFrames.length);
+        nextFrames.forEach(function (src, i) {
+          var img = new Image();
+          img.onload = function () {
+            var c = document.createElement("canvas");
+            c.width = w;
+            c.height = h;
+            var cctx = c.getContext("2d");
+            cctx.imageSmoothingEnabled = false;
+            cctx.drawImage(img, 0, 0);
+            rebuilt[i] = c.toDataURL("image/png");
+            pending--;
+            if (pending === 0) {
+              state.frames = rebuilt;
+              frameImgCache = {};
+              restoreFromDataUrl(state.frames[state.frameIndex]);
+              renderTimeline();
+            }
+          };
+          img.onerror = function () {
+            rebuilt[i] = blankDataUrl(w, h);
+            pending--;
+            if (pending === 0) {
+              state.frames = rebuilt;
+              frameImgCache = {};
+              restoreFromDataUrl(state.frames[state.frameIndex]);
+              renderTimeline();
+            }
+          };
+          img.src = src || blankDataUrl(1, 1);
+        });
       }
+
       var wInput = rootEl.querySelector("#pixelWidth");
       var hInput = rootEl.querySelector("#pixelHeight");
       if (wInput) wInput.value = String(w);
       if (hInput) hInput.value = String(h);
+      renderTimeline();
+    }
+
+    function goToFrame(index) {
+      if (index < 0 || index >= state.frames.length) return;
+      if (index === state.frameIndex) return;
+      if (state.playing) stopPlayback();
+      commitCurrentFrame();
+      state.frameIndex = index;
+      state.undo = [];
+      state.redo = [];
+      ensureFrameSlot(index);
+      restoreFromDataUrl(state.frames[index]);
+      renderTimeline();
+      preloadOnionNeighbors();
+    }
+
+    function preloadOnionNeighbors() {
+      var prev = state.frameIndex - 1;
+      var next = state.frameIndex + 1;
+      if (prev >= 0) loadFrameImage(prev, state.frames[prev], function () { paintDisplay(); });
+      if (next < state.frames.length) loadFrameImage(next, state.frames[next], function () { paintDisplay(); });
+    }
+
+    function addFrame(afterIndex) {
+      if (state.frames.length >= MAX_FRAMES) {
+        toast("Max " + MAX_FRAMES + " frames.");
+        return;
+      }
+      if (state.playing) stopPlayback();
+      commitCurrentFrame();
+      var insertAt = (afterIndex != null ? afterIndex : state.frameIndex) + 1;
+      state.frames.splice(insertAt, 0, blankDataUrl(state.width, state.height));
+      frameImgCache = {};
+      state.frameIndex = insertAt;
+      state.undo = [];
+      state.redo = [];
+      state.dirty = true;
+      restoreFromDataUrl(state.frames[insertAt]);
+      renderTimeline();
+      preloadOnionNeighbors();
+    }
+
+    function duplicateFrame() {
+      if (state.frames.length >= MAX_FRAMES) {
+        toast("Max " + MAX_FRAMES + " frames.");
+        return;
+      }
+      if (state.playing) stopPlayback();
+      commitCurrentFrame();
+      var copy = state.frames[state.frameIndex];
+      state.frames.splice(state.frameIndex + 1, 0, copy);
+      frameImgCache = {};
+      state.frameIndex += 1;
+      state.undo = [];
+      state.redo = [];
+      state.dirty = true;
+      restoreFromDataUrl(state.frames[state.frameIndex]);
+      renderTimeline();
+      preloadOnionNeighbors();
+    }
+
+    function deleteFrame() {
+      if (state.frames.length <= 1) {
+        pushUndo();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        state.frames[0] = currentFrameDataUrl();
+        state.dirty = true;
+        paintDisplay();
+        renderTimeline();
+        return;
+      }
+      if (state.playing) stopPlayback();
+      state.frames.splice(state.frameIndex, 1);
+      frameImgCache = {};
+      if (state.frameIndex >= state.frames.length) state.frameIndex = state.frames.length - 1;
+      state.undo = [];
+      state.redo = [];
+      state.dirty = true;
+      restoreFromDataUrl(state.frames[state.frameIndex]);
+      renderTimeline();
+      preloadOnionNeighbors();
+    }
+
+    function stopPlayback() {
+      state.playing = false;
+      if (state.playTimer) {
+        clearInterval(state.playTimer);
+        state.playTimer = null;
+      }
+      var playBtn = rootEl.querySelector("#pixelPlayBtn");
+      if (playBtn) playBtn.textContent = "Play";
+      // restore editing frame (may have advanced during play)
+      ensureFrameSlot(state.frameIndex);
+      restoreFromDataUrl(state.frames[state.frameIndex]);
+      renderTimeline();
+    }
+
+    function togglePlayback() {
+      if (state.playing) {
+        stopPlayback();
+        return;
+      }
+      if (state.frames.length < 2) {
+        toast("Add another frame to play an animation.");
+        return;
+      }
+      commitCurrentFrame();
+      state.playing = true;
+      var playBtn = rootEl.querySelector("#pixelPlayBtn");
+      if (playBtn) playBtn.textContent = "Stop";
+      state.playTimer = setInterval(function () {
+        state.frameIndex = (state.frameIndex + 1) % state.frames.length;
+        restoreFromDataUrl(state.frames[state.frameIndex]);
+        renderTimeline();
+      }, Math.max(40, state.frameDelay || 120));
+      renderTimeline();
     }
 
     function syncToolUi() {
@@ -240,6 +502,35 @@
       });
       var zoomLabel = rootEl.querySelector("#pixelZoomVal");
       if (zoomLabel) zoomLabel.textContent = state.zoom + "×";
+      var onionToggle = rootEl.querySelector("#pixelOnionToggle");
+      if (onionToggle) onionToggle.checked = !!state.onionSkin;
+      var delayInput = rootEl.querySelector("#pixelFrameDelay");
+      if (delayInput) delayInput.value = String(state.frameDelay);
+      var frameLabel = rootEl.querySelector("#pixelFrameLabel");
+      if (frameLabel) {
+        frameLabel.textContent = "Frame " + (state.frameIndex + 1) + " / " + state.frames.length;
+      }
+    }
+
+    function renderTimeline() {
+      syncToolUi();
+      var strip = rootEl.querySelector("#pixelFrameStrip");
+      if (!strip) return;
+      commitCurrentFrame();
+      strip.innerHTML = state.frames.map(function (src, i) {
+        return (
+          '<button type="button" class="pixel-frame-thumb' + (i === state.frameIndex ? " is-active" : "") +
+            '" data-frame-index="' + i + '" title="Frame ' + (i + 1) + '">' +
+            '<span class="pixel-frame-thumb-img" style="background-image:url(' + escapeAttr(src || "") + ')"></span>' +
+            '<span class="pixel-frame-thumb-num">' + (i + 1) + "</span>" +
+          "</button>"
+        );
+      }).join("");
+      strip.querySelectorAll("[data-frame-index]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          goToFrame(parseInt(btn.getAttribute("data-frame-index"), 10));
+        });
+      });
     }
 
     function renderFolderList() {
@@ -251,13 +542,16 @@
         return;
       }
       list.innerHTML = items.map(function (item) {
+        var frameCount = (item.frames && item.frames.length) || 1;
+        var meta = escapeHtml(kindLabel(item.kind)) + " · " + item.width + "×" + item.height +
+          (frameCount > 1 ? " · " + frameCount + " frames" : "");
         return (
           '<button type="button" class="pixel-art-item' + (state.editingId === item.id ? " is-active" : "") +
             '" data-art-id="' + escapeAttr(item.id) + '">' +
             '<span class="pixel-art-thumb" style="background-image:url(' + escapeAttr(item.dataUrl) + ')"></span>' +
             "<span class=\"pixel-art-meta\">" +
               "<strong>" + escapeHtml(item.name) + "</strong>" +
-              "<span>" + escapeHtml(kindLabel(item.kind)) + " · " + item.width + "×" + item.height + "</span>" +
+              "<span>" + meta + "</span>" +
             "</span>" +
           "</button>"
         );
@@ -272,60 +566,92 @@
     function loadArt(id) {
       var item = ScenaStore.getArtAsset(series, id);
       if (!item || !item.dataUrl) return;
+      if (state.playing) stopPlayback();
       state.editingId = item.id;
       state.dirty = false;
       state.undo = [];
       state.redo = [];
-      resizeCanvas(item.width, item.height, true);
-      restoreFromDataUrl(item.dataUrl);
+      state.frameDelay = item.frameDelay || 120;
+      state.width = item.width || 64;
+      state.height = item.height || 64;
+      canvas.width = state.width;
+      canvas.height = state.height;
+      ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.imageSmoothingEnabled = false;
+      var frames = (item.frames && item.frames.length) ? item.frames.slice() : [item.dataUrl];
+      state.frames = frames.map(function (f) { return f || blankDataUrl(state.width, state.height); });
+      state.frameIndex = 0;
+      frameImgCache = {};
+      restoreFromDataUrl(state.frames[0]);
       var nameInput = rootEl.querySelector("#pixelName");
       var kindInput = rootEl.querySelector("#pixelKind");
       if (nameInput) nameInput.value = item.name || "";
       if (kindInput) kindInput.value = item.kind || "character";
+      var wInput = rootEl.querySelector("#pixelWidth");
+      var hInput = rootEl.querySelector("#pixelHeight");
+      if (wInput) wInput.value = String(state.width);
+      if (hInput) hInput.value = String(state.height);
       renderFolderList();
+      renderTimeline();
+      preloadOnionNeighbors();
       toast("Loaded “" + item.name + "”");
     }
 
     function newCanvas() {
+      if (state.playing) stopPlayback();
       state.editingId = null;
       state.dirty = false;
       state.undo = [];
       state.redo = [];
-      resizeCanvas(state.width, state.height, true);
+      state.frames = [blankDataUrl(state.width, state.height)];
+      state.frameIndex = 0;
+      frameImgCache = {};
+      resizeAllFrames(state.width, state.height, true);
       var nameInput = rootEl.querySelector("#pixelName");
       if (nameInput) nameInput.value = "";
       renderFolderList();
+      renderTimeline();
     }
 
     function saveArt() {
+      if (state.playing) stopPlayback();
+      commitCurrentFrame();
       var nameInput = rootEl.querySelector("#pixelName");
       var kindInput = rootEl.querySelector("#pixelKind");
       var name = (nameInput && nameInput.value.trim()) || "Untitled sprite";
       var kind = (kindInput && kindInput.value) || "character";
-      var raw = canvas.toDataURL("image/png");
       var btn = rootEl.querySelector("#pixelSaveBtn");
       if (btn) {
         btn.disabled = true;
         btn.textContent = "Saving…";
       }
-      ScenaStore.storePixelDataUrl(raw, {
-        purpose: "pixel-art",
-        seriesId: series.id,
-        assetId: state.editingId || undefined,
-      }).then(function (url) {
+      var baseId = state.editingId || ("art_" + Date.now().toString(36));
+      var uploads = state.frames.map(function (frameUrl, i) {
+        return ScenaStore.storePixelDataUrl(frameUrl, {
+          purpose: "pixel-art",
+          seriesId: series.id,
+          assetId: baseId + "-f" + i,
+        });
+      });
+      Promise.all(uploads).then(function (urls) {
         var saved = ScenaStore.upsertArtAsset(series, {
-          id: state.editingId || undefined,
+          id: state.editingId || baseId,
           name: name,
           kind: kind,
           width: canvas.width,
           height: canvas.height,
-          dataUrl: url,
+          dataUrl: urls[0],
+          frames: urls,
+          frameDelay: state.frameDelay,
         });
         state.editingId = saved.id;
+        state.frames = urls.slice();
         state.dirty = false;
+        frameImgCache = {};
         return persist(series).then(function () {
           renderFolderList();
-          toast("Saved to Art folder.");
+          renderTimeline();
+          toast(urls.length > 1 ? "Saved " + urls.length + " frames to Art folder." : "Saved to Art folder.");
         });
       }).catch(function (err) {
         console.error(err);
@@ -344,6 +670,7 @@
         return;
       }
       if (!window.confirm("Remove this sprite from the Art folder?")) return;
+      if (state.playing) stopPlayback();
       ScenaStore.removeArtAsset(series, state.editingId);
       persist(series).then(function () {
         newCanvas();
@@ -368,7 +695,7 @@
           '<header class="pixel-art-header">' +
             "<div>" +
               "<h1>Art</h1>" +
-              '<p class="page-lead">Draw pixel sprites for this series. Save them to your Art folder as character, background, or UI art — then use them without importing files.</p>' +
+              '<p class="page-lead">Draw pixel sprites and short animations. Onion skin shows the previous frame in red and the next in green.</p>' +
             "</div>" +
           "</header>" +
           '<div class="pixel-art-workspace">' +
@@ -383,9 +710,33 @@
               '<div class="pixel-art-list" id="pixelArtList"></div>' +
               '<button type="button" class="btn btn-sm btn-secondary" id="pixelNewBtn">New canvas</button>' +
             "</aside>" +
-            '<div class="pixel-art-stage-wrap">' +
-              '<div class="pixel-art-stage" id="pixelStage">' +
-                '<canvas id="pixelDisplay" class="pixel-art-display"></canvas>' +
+            '<div class="pixel-art-center">' +
+              '<div class="pixel-art-stage-wrap">' +
+                '<div class="pixel-art-stage" id="pixelStage">' +
+                  '<canvas id="pixelDisplay" class="pixel-art-display"></canvas>' +
+                "</div>" +
+              "</div>" +
+              '<div class="pixel-anim-bar">' +
+                '<div class="pixel-anim-controls">' +
+                  '<span class="pixel-frame-label" id="pixelFrameLabel">Frame 1 / 1</span>' +
+                  '<button type="button" class="btn btn-sm btn-ghost" id="pixelPrevFrameBtn" title="Previous frame">‹</button>' +
+                  '<button type="button" class="btn btn-sm btn-ghost" id="pixelNextFrameBtn" title="Next frame">›</button>' +
+                  '<button type="button" class="btn btn-sm btn-secondary" id="pixelAddFrameBtn">Add frame</button>' +
+                  '<button type="button" class="btn btn-sm btn-ghost" id="pixelDupFrameBtn">Duplicate</button>' +
+                  '<button type="button" class="btn btn-sm btn-ghost" id="pixelDelFrameBtn">Delete frame</button>' +
+                  '<button type="button" class="btn btn-sm btn-primary" id="pixelPlayBtn">Play</button>' +
+                  '<label class="pixel-onion-label field-inline">' +
+                    '<input type="checkbox" id="pixelOnionToggle" checked> Onion skin' +
+                  "</label>" +
+                  '<label class="pixel-delay-label">Delay' +
+                    '<input type="number" id="pixelFrameDelay" min="40" max="1000" step="10" value="120"> ms' +
+                  "</label>" +
+                "</div>" +
+                '<div class="pixel-onion-legend" aria-hidden="true">' +
+                  '<span class="pixel-onion-prev">Prev (red)</span>' +
+                  '<span class="pixel-onion-next">Next (green)</span>' +
+                "</div>" +
+                '<div class="pixel-frame-strip" id="pixelFrameStrip"></div>' +
               "</div>" +
             "</div>" +
             '<aside class="pixel-art-tools" aria-label="Tools">' +
@@ -424,7 +775,7 @@
               '<hr class="pixel-art-divider">' +
               '<p class="game-ui-pane-label">Save</p>' +
               '<div class="field"><label>Name</label>' +
-                '<input type="text" id="pixelName" maxlength="80" placeholder="e.g. hero_idle">' +
+                '<input type="text" id="pixelName" maxlength="80" placeholder="e.g. hero_walk">' +
               "</div>" +
               '<div class="field"><label>Type</label>' +
                 '<select id="pixelKind">' + kinds + "</select>" +
@@ -433,7 +784,7 @@
                 '<button type="button" class="btn btn-primary" id="pixelSaveBtn">Save to Art folder</button>' +
                 '<button type="button" class="btn btn-ghost btn-sm" id="pixelDeleteBtn">Delete</button>' +
               "</div>" +
-              '<p class="field-hint">Sprites stay with this series under Art. Use Character / Background / UI so you can find them later.</p>' +
+              '<p class="field-hint">Multi-frame sprites save as short animations in the Art folder.</p>' +
             "</aside>" +
           "</div>" +
           '<canvas id="pixelBuffer" hidden></canvas>' +
@@ -444,7 +795,8 @@
     function bind() {
       canvas = rootEl.querySelector("#pixelBuffer");
       display = rootEl.querySelector("#pixelDisplay");
-      resizeCanvas(64, 64, true);
+      state.frames = [blankDataUrl(64, 64)];
+      resizeAllFrames(64, 64, true);
 
       rootEl.querySelectorAll("[data-pixel-tool]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -487,9 +839,9 @@
         applySize.addEventListener("click", function () {
           var w = rootEl.querySelector("#pixelWidth").value;
           var h = rootEl.querySelector("#pixelHeight").value;
-          if (state.dirty && !window.confirm("Resize canvas? Artwork outside the new size may be cropped.")) return;
+          if (state.dirty && !window.confirm("Resize canvas? All frames will be resized.")) return;
           pushUndo();
-          resizeCanvas(w, h, false);
+          resizeAllFrames(w, h, false);
           state.dirty = true;
         });
       }
@@ -503,37 +855,40 @@
         });
       }
 
-    onWindowUp = function () {
-      state.painting = false;
-    };
+      onWindowUp = function () {
+        state.painting = false;
+      };
 
-    display.addEventListener("mousedown", function (e) {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      state.painting = state.tool === "pencil" || state.tool === "eraser";
-      applyTool(e, true);
-    });
-    display.addEventListener("mousemove", function (e) {
-      if (!state.painting) return;
-      applyTool(e, false);
-    });
-    window.addEventListener("mouseup", onWindowUp);
+      display.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        state.painting = state.tool === "pencil" || state.tool === "eraser";
+        applyTool(e, true);
+      });
+      display.addEventListener("mousemove", function (e) {
+        if (!state.painting) return;
+        applyTool(e, false);
+      });
+      window.addEventListener("mouseup", onWindowUp);
 
       rootEl.querySelector("#pixelUndoBtn").addEventListener("click", function () {
         if (!state.undo.length) return;
         state.redo.push(canvas.toDataURL("image/png"));
         restoreFromDataUrl(state.undo.pop());
+        state.dirty = true;
       });
       rootEl.querySelector("#pixelRedoBtn").addEventListener("click", function () {
         if (!state.redo.length) return;
         state.undo.push(canvas.toDataURL("image/png"));
         restoreFromDataUrl(state.redo.pop());
+        state.dirty = true;
       });
       rootEl.querySelector("#pixelClearBtn").addEventListener("click", function () {
         pushUndo();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         state.dirty = true;
         paintDisplay();
+        renderTimeline();
       });
       rootEl.querySelector("#pixelNewBtn").addEventListener("click", function () {
         if (state.dirty && !window.confirm("Start a new canvas? Unsaved pixels will be lost.")) return;
@@ -541,6 +896,30 @@
       });
       rootEl.querySelector("#pixelSaveBtn").addEventListener("click", saveArt);
       rootEl.querySelector("#pixelDeleteBtn").addEventListener("click", deleteCurrent);
+
+      rootEl.querySelector("#pixelAddFrameBtn").addEventListener("click", function () { addFrame(); });
+      rootEl.querySelector("#pixelDupFrameBtn").addEventListener("click", duplicateFrame);
+      rootEl.querySelector("#pixelDelFrameBtn").addEventListener("click", deleteFrame);
+      rootEl.querySelector("#pixelPrevFrameBtn").addEventListener("click", function () {
+        goToFrame(Math.max(0, state.frameIndex - 1));
+      });
+      rootEl.querySelector("#pixelNextFrameBtn").addEventListener("click", function () {
+        goToFrame(Math.min(state.frames.length - 1, state.frameIndex + 1));
+      });
+      rootEl.querySelector("#pixelPlayBtn").addEventListener("click", togglePlayback);
+      rootEl.querySelector("#pixelOnionToggle").addEventListener("change", function (e) {
+        state.onionSkin = !!e.target.checked;
+        paintDisplay();
+      });
+      rootEl.querySelector("#pixelFrameDelay").addEventListener("change", function (e) {
+        state.frameDelay = Math.max(40, Math.min(1000, parseInt(e.target.value, 10) || 120));
+        e.target.value = String(state.frameDelay);
+        state.dirty = true;
+        if (state.playing) {
+          stopPlayback();
+          togglePlayback();
+        }
+      });
 
       rootEl.querySelectorAll("[data-art-filter]").forEach(function (btn) {
         btn.addEventListener("click", function () {
@@ -556,6 +935,8 @@
 
       syncToolUi();
       renderFolderList();
+      renderTimeline();
+      preloadOnionNeighbors();
     }
 
     rootEl.innerHTML = markup();
@@ -564,6 +945,8 @@
     return {
       destroy: function () {
         state.painting = false;
+        if (state.playTimer) clearInterval(state.playTimer);
+        state.playTimer = null;
         if (onWindowUp) window.removeEventListener("mouseup", onWindowUp);
         onWindowUp = null;
       },

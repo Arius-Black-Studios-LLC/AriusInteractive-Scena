@@ -412,6 +412,26 @@
 
       });
 
+      if (Array.isArray(art.frames)) {
+
+        art.frames.forEach(function (frameUrl, frameIndex) {
+
+          queue("art", art.id + "-f" + frameIndex, function () {
+
+            return art.frames[frameIndex];
+
+          }, function (url) {
+
+            art.frames[frameIndex] = url;
+
+            if (frameIndex === 0) art.dataUrl = url;
+
+          });
+
+        });
+
+      }
+
     });
 
 

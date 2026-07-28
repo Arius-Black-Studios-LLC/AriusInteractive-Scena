@@ -607,12 +607,9 @@
         '<p class="field-hint">Presets, colors, shapes, and sprites. Drag layout on the mockup to the left.</p>' +
         '<div class="ui-preset-cards" id="uiPresetCards">' + presetCards + '</div>' +
         '<div class="ui-settings-grid">' +
-          '<div class="field"><label>Aspect ratio</label>' +
-            '<select name="uiAspectRatio">' +
-              '<option value="16:9"' + (ui.aspectRatio === "16:9" ? " selected" : "") + '>16:9 landscape</option>' +
-              '<option value="9:16"' + (ui.aspectRatio === "9:16" ? " selected" : "") + '>9:16 portrait</option>' +
-              '<option value="4:3"' + (ui.aspectRatio === "4:3" ? " selected" : "") + '>4:3 classic</option>' +
-            '</select></div>' +
+          '<div class="field"><label>Display</label>' +
+            '<p class="field-hint" style="margin:0">Always 1920×1080 (16:9)</p>' +
+            '<input type="hidden" name="uiAspectRatio" value="16:9"></div>' +
           '<div class="field"><label>Dialogue shape</label>' +
             '<select name="uiDialogueShape">' +
               ["bar", "minimal", "frame", "box"].map(function (s) {
@@ -698,7 +695,8 @@
     var presetActive = document.querySelector("#uiPresetCards .ui-preset-card.is-active");
     if (presetActive) ui.preset = presetActive.getAttribute("data-ui-preset");
     var aspect = form.querySelector('[name="uiAspectRatio"]');
-    if (aspect) ui.aspectRatio = aspect.value;
+    if (aspect) ui.aspectRatio = "16:9";
+    else ui.aspectRatio = "16:9";
     var dialogueShape = form.querySelector('[name="uiDialogueShape"]');
     var choiceShape = form.querySelector('[name="uiChoiceShape"]');
     var uiAccent = form.querySelector('[name="uiAccent"]');
@@ -869,7 +867,7 @@
           "</aside>" +
           '<div class="game-ui-canvas-col">' +
             '<div class="game-ui-mock-toolbar">' +
-              '<span class="field-hint">Canvas matches your game aspect ratio. Select an element, then edit it. Drag to reposition.</span>' +
+              '<span class="field-hint">Preview is locked to 1920×1080 (16:9), same as the game. Select an element, then edit below. Drag to reposition.</span>' +
               '<div class="game-ui-mock-toolbar-actions">' +
                 '<button type="button" class="btn btn-sm' + (gameUiMenuOpen ? " btn-primary" : " btn-ghost") +
                   '" id="uiToggleMenuBtn">' + (gameUiMenuOpen ? "Close menu" : "Open menu") + "</button>" +
@@ -879,8 +877,10 @@
             mock +
           "</div>" +
           '<aside class="game-ui-inspector" aria-label="Inspector">' +
-            '<p class="game-ui-pane-label">Inspector</p>' +
-            renderUiInspector(series, selected) +
+            '<div class="game-ui-inspector-main">' +
+              '<p class="game-ui-pane-label">Inspector</p>' +
+              renderUiInspector(series, selected) +
+            "</div>" +
             '<section class="form-section game-ui-export" id="uiAssetActions">' +
               "<h2>Save &amp; sell</h2>" +
               '<div class="field"><label>Asset title</label>' +
@@ -906,7 +906,7 @@
 
   function renderUiHierarchy(selected) {
     var items = [
-      { id: "scene", label: "Scene", hint: "Aspect & preset" },
+      { id: "scene", label: "Scene", hint: "Preset & look" },
       { id: "dialogue", label: "Dialogue box", hint: "Text panel" },
       { id: "nameplate", label: "Nameplate", hint: "Speaker name" },
       { id: "choices", label: "Choices", hint: "Option buttons" },
@@ -954,12 +954,12 @@
     var menuOpen = gameUiMenuOpen || selected === "menuPanel";
     var panelSide = (ui.menu && ui.menu.panelSide === "left") ? "left" : "right";
     return (
-      '<div class="ui-mock-stage" id="uiMockStage" data-aspect="' + escapeAttr(ui.aspectRatio || "16:9") + '">' +
+      '<div class="ui-mock-stage" id="uiMockStage" data-aspect="16:9">' +
         '<div class="ui-mock-frame preview-frame player-frame preview-ui--' + escapeAttr(ui.preset || "scena-classic") +
           " preview-shape-dialogue--" + escapeAttr(ui.shapes.dialogue || "bar") +
           " preview-shape-choice--" + escapeAttr(ui.shapes.choice || "rounded") +
           (menuOpen ? " is-menu-open" : "") +
-          '" id="uiMockFrame">' +
+          '" id="uiMockFrame" style="--preview-aspect-w:16;--preview-aspect-h:9">' +
           '<div class="ui-mock-bg" aria-hidden="true"></div>' +
           '<button type="button" class="ui-mock-layer ui-mock-menu' + (selected === "menu" ? " is-selected" : "") +
             (menuOn ? "" : " is-hidden-ui") +
@@ -1031,14 +1031,9 @@
       '<div id="readerUiSection" class="game-ui-inspector-body">' +
         '<div class="game-ui-inspector-panel" data-ui-panel="scene"' + (selected === "scene" ? "" : " hidden") + ">" +
           "<h2>Scene</h2>" +
-          '<p class="field-hint">Canvas size and overall look.</p>' +
+          '<p class="field-hint">Game canvas is always <strong>1920×1080</strong> (16:9 landscape). Overall look and accents.</p>' +
           '<div class="ui-preset-cards" id="uiPresetCards">' + presetCards + "</div>" +
-          '<div class="field"><label>Aspect ratio</label>' +
-            '<select name="uiAspectRatio">' +
-              '<option value="16:9"' + (ui.aspectRatio === "16:9" ? " selected" : "") + '>16:9 landscape</option>' +
-              '<option value="9:16"' + (ui.aspectRatio === "9:16" ? " selected" : "") + '>9:16 portrait</option>' +
-              '<option value="4:3"' + (ui.aspectRatio === "4:3" ? " selected" : "") + '>4:3 classic</option>' +
-            "</select></div>" +
+          '<input type="hidden" name="uiAspectRatio" value="16:9">' +
           '<div class="field"><label>Corner radius</label><input type="range" name="uiCornerRadius" min="0" max="24" step="1" value="' + (ui.sizes.cornerRadius || 6) + '"><span class="field-hint" id="uiCornerRadiusVal">' + (ui.sizes.cornerRadius || 6) + "px</span></div>" +
           '<div class="field"><label>Accent color</label><input type="color" name="uiAccent" value="' + escapeAttr(resolved.colors.accent || "#2a9d8f") + '"></div>' +
           '<div class="field"><label>Button click sound</label>' +
@@ -1656,9 +1651,10 @@
   function applyUiMockFrameStyles(frame, series) {
     if (!frame) return;
     var ui = ScenaStore.resolveReaderUi(series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
-    frame.style.setProperty("--preview-aspect-w", String(parseInt(parts[0], 10) || 16));
-    frame.style.setProperty("--preview-aspect-h", String(parseInt(parts[1], 10) || 9));
+    // Game playfield is always 1920×1080 (16:9).
+    frame.style.setProperty("--preview-aspect-w", "16");
+    frame.style.setProperty("--preview-aspect-h", "9");
+    if (series && series.readerUi) series.readerUi.aspectRatio = "16:9";
     frame.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
     frame.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
     frame.style.setProperty("--ui-accent", ui.colors.accent);
@@ -1732,7 +1728,7 @@
     var tabsEl = frame.querySelector("#uiMockMenuTabs");
     if (tabsEl) tabsEl.innerHTML = renderUiMockMenuTabs(ui);
     var stage = $("#uiMockStage");
-    if (stage) stage.setAttribute("data-aspect", ui.aspectRatio || "16:9");
+    if (stage) stage.setAttribute("data-aspect", "16:9");
     var widthHint = $("#uiMenuPanelWidthVal");
     if (widthHint) widthHint.textContent = panelW + "%";
   }

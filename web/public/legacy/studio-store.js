@@ -2294,7 +2294,7 @@
       var preset = READER_UI_PRESETS[presetKey] || READER_UI_PRESETS["scena-classic"];
       return {
         preset: presetKey,
-        aspectRatio: saved.aspectRatio || base.aspectRatio,
+        aspectRatio: "16:9",
         colors: Object.assign({}, preset.colors, saved.colors || {}),
         sizes: Object.assign({}, base.sizes, saved.sizes || {}),
         shapes: Object.assign({}, preset.shapes, saved.shapes || {}),
@@ -2333,6 +2333,7 @@
           menu: Object.assign({}, defaultReaderUi().layout.menu, (series.readerUi.layout && series.readerUi.layout.menu) || {}),
         };
       }
+      series.readerUi.aspectRatio = "16:9";
       return series.readerUi;
     },
 
@@ -3606,13 +3607,19 @@
     upsertArtAsset: function (series, asset) {
       this.ensureArtFolder(series);
       var kind = asset.kind === "background" || asset.kind === "ui" ? asset.kind : "character";
+      var frames = Array.isArray(asset.frames) && asset.frames.length
+        ? asset.frames.filter(function (f) { return !!f; })
+        : (asset.dataUrl ? [asset.dataUrl] : []);
+      if (!frames.length && asset.dataUrl) frames = [asset.dataUrl];
       var next = {
         id: asset.id || this.assetUid("art"),
         name: String(asset.name || "Untitled").trim() || "Untitled",
         kind: kind,
         width: Math.max(1, parseInt(asset.width, 10) || 64),
         height: Math.max(1, parseInt(asset.height, 10) || 64),
-        dataUrl: asset.dataUrl || "",
+        dataUrl: frames[0] || asset.dataUrl || "",
+        frames: frames,
+        frameDelay: Math.max(40, Math.min(1000, parseInt(asset.frameDelay, 10) || 120)),
         updatedAt: new Date().toISOString(),
         createdAt: asset.createdAt || new Date().toISOString(),
       };

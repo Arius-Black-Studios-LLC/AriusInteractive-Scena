@@ -521,12 +521,13 @@
   ScenaPlayer.prototype.applyReaderUi = function () {
     if (!this.frameEl) return;
     var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
+    var parts = String("16:9").split(":");
     var aw = parseInt(parts[0], 10) || 16;
     var ah = parseInt(parts[1], 10) || 9;
     var el = this.frameEl;
     el.style.setProperty("--preview-aspect-w", String(aw));
     el.style.setProperty("--preview-aspect-h", String(ah));
+    if (this.series && this.series.readerUi) this.series.readerUi.aspectRatio = "16:9";
     el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
     el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
     el.style.setProperty("--ui-accent", ui.colors.accent);
