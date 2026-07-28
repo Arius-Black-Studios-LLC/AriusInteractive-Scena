@@ -10,7 +10,12 @@
 
   function isConfigured() {
     var c = getConfig();
-    return Boolean(c.supabaseUrl && c.supabaseAnonKey);
+    var url = String(c.supabaseUrl || "").trim();
+    var key = String(c.supabaseAnonKey || "").trim();
+    if (!url || !key) return false;
+    if (/YOUR_PROJECT|YOUR_ANON|test\.supabase\.co/i.test(url)) return false;
+    if (/YOUR_ANON|test-key|^YOUR_/i.test(key)) return false;
+    return true;
   }
 
   function getClient() {

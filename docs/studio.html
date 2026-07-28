@@ -78,9 +78,9 @@
 
   <div class="toast" id="studioToast" role="status" aria-live="polite"></div>
 
-  <script src="scena-config.js?v=9"></script>
+  <script src="scena-config.js?v=10"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="scena-auth.js?v=10"></script>
+  <script src="scena-auth.js?v=11"></script>
   <script src="scena-cloud.js?v=25"></script>
   <script src="scena-badges.js?v=6"></script>
   <script src="scena-default-audio.js?v=1"></script>
@@ -157,7 +157,7 @@
       }
 
       if (!window.ScenaAuth || !ScenaAuth.isConfigured()) {
-        showError("Configure scena-config.js, then log in from the Arleco landing page.");
+        showError("Auth is not configured. Restore docs/scena-config.js from your Supabase keys (see scena-config.example.js), then open http://127.0.0.1:5500/studio after logging in.");
         return;
       }
 
