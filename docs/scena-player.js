@@ -1097,12 +1097,15 @@
       this.appendDialogueLog(speaker, dialogueText);
     }
 
+    var nameplateHtml = speaker !== "Narration"
+      ? '<strong class="preview-nameplate preview-speaker">' + escapeHtml(speaker) + '</strong>'
+      : "";
     var dialogueHtml = "";
     if (ScenaStore.hasChoices(node)) {
       var visibleChoices = ScenaStore.filterVisibleChoices(node, this.playMetrics || {}, this.choicesMade || [], this.playKeyItems || {});
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue player-dialogue">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           (dialogueText ? '<p class="player-dialogue-text">' + escapeHtml(dialogueText) + '</p>' : "") +
         '</div>' +
         '<div class="preview-dialogue preview-dialogue--choices player-choices">' +
@@ -1118,8 +1121,8 @@
         ? '<p class="preview-continue-hint player-tap-hint">Tap to continue</p>'
         : '<p class="preview-continue-hint player-tap-hint">Tap to finish</p>';
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue player-dialogue is-clickable">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           '<p class="player-dialogue-text">' + escapeHtml(dialogueText || "…") + '</p>' +
           continueHint +
         '</div>';

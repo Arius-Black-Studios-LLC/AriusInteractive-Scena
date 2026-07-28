@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="screen-orientation" content="landscape" />
   <title>Reading — Arleco</title>
   <meta name="description" content="Read a Arleco visual novel episode — make choices, track stats, and follow branching story paths." />
   <meta name="robots" content="noindex, follow" />
@@ -10,12 +11,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="studio.css?v=76" />
-  <link rel="stylesheet" href="play.css?v=19" />
+  <link rel="stylesheet" href="studio.css?v=77" />
+  <link rel="stylesheet" href="play.css?v=20" />
   <link rel="stylesheet" href="scena-logo.css?v=3" />
 </head>
 <body class="player-body">
   <div class="loading-screen" id="loading">Opening story…</div>
+
+  <div class="player-rotate-gate" id="playerRotateGate" hidden>
+    <div class="player-rotate-gate-inner">
+      <span class="player-rotate-gate-icon" aria-hidden="true"></span>
+      <h2>Turn your phone</h2>
+      <p>Reading uses a 1920×1080 landscape stage. Rotate to landscape to continue.</p>
+    </div>
+  </div>
 
   <div class="player-shell" id="playerApp" hidden>
     <div class="player-topbar" id="playerTopbar">
@@ -44,7 +53,7 @@
   <script src="scena-profile.js?v=1"></script>
   <script src="scena-audio.js?v=1"></script>
   <script src="scena-reader-menu.js?v=3"></script>
-  <script src="scena-player.js?v=26"></script>
+  <script src="scena-player.js?v=27"></script>
   <script>
     (function () {
       var loading = document.getElementById("loading");
@@ -70,6 +79,32 @@
           return ScenaProgress.seriesMenuUrl(id);
         }
         return "/series?series=" + encodeURIComponent(id);
+      }
+
+      function lockReaderLandscape() {
+        document.body.classList.add("player-needs-landscape");
+        var gate = document.getElementById("playerRotateGate");
+        function syncGate() {
+          var portrait = window.matchMedia("(orientation: portrait) and (max-width: 920px)").matches;
+          if (gate) gate.hidden = !portrait;
+        }
+        syncGate();
+        if (!lockReaderLandscape._bound) {
+          lockReaderLandscape._bound = true;
+          window.addEventListener("orientationchange", syncGate);
+          window.addEventListener("resize", syncGate);
+        }
+        var orient = screen.orientation || screen.mozOrientation || screen.msOrientation;
+        if (orient && typeof orient.lock === "function") {
+          try {
+            var locked = orient.lock("landscape");
+            if (locked && typeof locked.catch === "function") locked.catch(function () {});
+          } catch (e) { /* ignore — browsers often require gesture/fullscreen */ }
+        } else if (typeof screen.lockOrientation === "function") {
+          try { screen.lockOrientation("landscape"); } catch (e2) { /* ignore */ }
+        } else if (typeof screen.mozLockOrientation === "function") {
+          try { screen.mozLockOrientation("landscape"); } catch (e3) { /* ignore */ }
+        }
       }
 
       function boot(userId, session) {
@@ -157,6 +192,7 @@
               showError("This episode has no playable beats yet.");
               return;
             }
+            lockReaderLandscape();
             loading.hidden = true;
             app.hidden = false;
           });

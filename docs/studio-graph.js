@@ -3144,14 +3144,17 @@
       this.appendPreviewDialogueLog(speaker, dialogueText);
     }
 
+    var nameplateHtml = speaker !== "Narration"
+      ? '<strong class="preview-nameplate preview-speaker">' + escapeHtml(speaker) + '</strong>'
+      : "";
     var dialogueHtml = "";
     if (ScenaStore.hasChoices(node)) {
       var previewChoices = isPlaying
         ? ScenaStore.filterVisibleChoices(node, this.playMetrics || {}, this.playChoicesMade || [], this.playKeyItems || {})
         : (data.choices || []);
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           (dialogueText ? '<p>' + escapeHtml(dialogueText) + '</p>' : "") +
         '</div>' +
         '<div class="preview-dialogue preview-dialogue--choices">' +
@@ -3176,8 +3179,8 @@
       var endHint = (data.isEnd && isPlaying) ? '<p class="preview-continue-hint">Click to finish</p>' : "";
       var continueHint = (!data.isEnd && isPlaying) ? '<p class="preview-continue-hint">Click or press Space to continue</p>' : "";
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue' + (isPlaying ? " is-clickable" : "") + '">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           '<p>' + escapeHtml(dialogueText || "…") + '</p>' +
           continueHint + endHint +
         '</div>';

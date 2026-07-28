@@ -1033,22 +1033,28 @@ body.is-resizing-binder {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  background: #050505;
 }
 
+/* Always letterbox to 16:9 (1920×1080). Never set width+height independently — that warps. */
 .preview-frame {
   position: relative;
   container-type: inline-size;
+  box-sizing: border-box;
   aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
   width: min(100cqw, calc(100cqh * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)));
-  height: min(100cqh, calc(100cqw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16)));
-  max-width: 100%;
-  max-height: 100%;
+  height: auto;
+  max-width: 100cqw;
+  max-height: none;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: #1a1a1a;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
+  --preview-aspect-w: 16;
+  --preview-aspect-h: 9;
   --ui-dialogue-bg: rgba(0, 0, 0, 0.75);
   --ui-dialogue-text: #ffffff;
   --ui-accent: #2a9d8f;
@@ -1195,7 +1201,9 @@ body.is-resizing-center {
 .preview-layer {
   position: absolute;
   inset: 0;
-  background: center/cover no-repeat;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .preview-layer-bg { z-index: 0; background-color: #2a2520; }
@@ -1225,7 +1233,9 @@ body.is-resizing-center {
   bottom: 0;
   width: 38%;
   height: 88%;
-  background: bottom center/contain no-repeat;
+  background-position: bottom center;
+  background-repeat: no-repeat;
+  background-size: contain;
   z-index: 2;
 }
 
@@ -2114,6 +2124,8 @@ body.is-resizing-center {
   position: relative;
   height: 100%;
   min-height: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 /* Reader letterbox: playfield sized by aspect-ratio, not stretched to frame. */
@@ -2151,8 +2163,39 @@ body.is-resizing-center {
   overflow: auto;
 }
 
-.preview-frame--laid-out .preview-speaker {
-  max-width: var(--ui-layout-nameplate-w, none);
+/* Nameplate uses its own editor layout box (not nested inside dialogue). */
+.preview-frame--laid-out .preview-nameplate {
+  position: absolute;
+  left: var(--ui-layout-nameplate-x, 6%);
+  top: var(--ui-layout-nameplate-y, 62%);
+  width: var(--ui-layout-nameplate-w, 28%);
+  z-index: 7;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.2em 0.55em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: rgba(0, 0, 0, 0.55);
+  border-left: 3px solid var(--ui-accent);
+  border-radius: 4px;
+  color: var(--ui-speaker);
+  font-size: var(--ui-nameplate-font-size, 0.85em);
+  font-family: var(--ui-nameplate-font-family, inherit);
+  opacity: var(--ui-nameplate-opacity, 1);
+  border-width: var(--ui-nameplate-border-width, 0px);
+  border-style: solid;
+  border-color: var(--ui-nameplate-border-color, transparent);
+  border-left-width: max(3px, var(--ui-nameplate-border-width, 0px));
+  border-left-color: var(--ui-accent);
+  box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
+  background-image: var(--ui-nameplate-sprite, none);
+  background-size: 100% 100%;
+  pointer-events: none;
+}
+
+.preview-frame--laid-out .preview-dialogue .preview-speaker {
+  display: none;
 }
 
 @media (max-width: 960px) {

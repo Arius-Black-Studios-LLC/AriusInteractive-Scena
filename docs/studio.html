@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fraunces:wght@500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="studio.css?v=76" />
-  <link rel="stylesheet" href="play.css?v=19" />
+  <link rel="stylesheet" href="studio.css?v=77" />
+  <link rel="stylesheet" href="play.css?v=20" />
   <link rel="stylesheet" href="scena-logo.css?v=3" />
   <link rel="stylesheet" href="arleco-theme.css?v=1" />
 </head>
@@ -99,7 +99,7 @@
   <script src="scena-jams.js?v=1"></script>
   <script src="scena-audio.js?v=1"></script>
   <script src="scena-reader-menu.js?v=3"></script>
-  <script src="studio-graph.js?v=85"></script>
+  <script src="studio-graph.js?v=86"></script>
   <script src="studio-pixel.js?v=1"></script>
   <script src="scena-pixel-art-picker.js?v=1"></script>
   <script src="studio-app.js?v=42"></script>
@@ -124,17 +124,18 @@
 
       function openStudio(session) {
         if (booted) return;
-        booted = true;
         if (!window.ScenaStudio) {
-          showError("Studio failed to load. Hard-refresh with Ctrl+Shift+R.");
+          sendToHome();
           return;
         }
+        booted = true;
         loading.hidden = true;
         app.hidden = false;
         try {
           ScenaStudio.start(session);
         } catch (err) {
-          showError("Could not open studio: " + (err.message || "Unknown error"));
+          booted = false;
+          sendToHome();
         }
       }
 
@@ -151,18 +152,22 @@
         });
       }
 
+      function sendToHome() {
+        window.location.replace("/");
+      }
+
       function sendToLogin() {
         try { sessionStorage.setItem("scena_post_login", "/studio"); } catch (e) {}
-        window.location.href = "/"
+        window.location.replace("/");
       }
 
       if (!window.ScenaAuth || !ScenaAuth.isConfigured()) {
-        showError("Auth is not configured. Restore docs/scena-config.js from your Supabase keys (see scena-config.example.js), then open http://127.0.0.1:5500/studio after logging in.");
+        sendToHome();
         return;
       }
 
       if (ScenaAuth.isFileProtocol()) {
-        loading.innerHTML = "Open via <strong>http://127.0.0.1:5500/studio</strong> (run serve.ps1 first).";
+        sendToHome();
         return;
       }
 
@@ -178,7 +183,7 @@
         }
         if (!booted) sendToLogin();
       }).catch(function () {
-        if (!booted) sendToLogin();
+        if (!booted) sendToHome();
       });
 
       setTimeout(function () {
@@ -188,7 +193,7 @@
           bootStudio(fallback);
           return;
         }
-        showError("Could not verify login. Go back to the landing page, log out, log in again, then open Creator studio.");
+        sendToHome();
       }, 4000);
 
       document.getElementById("signOutBtn").addEventListener("click", function () {
