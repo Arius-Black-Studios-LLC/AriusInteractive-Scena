@@ -107,6 +107,8 @@
     this.previewRatio = 0.42;
     this.isResizingCenter = false;
     this.isDirty = false;
+    this.layoutEditMode = !!options.layoutEdit;
+    this.previewRatioBeforeLayoutEdit = null;
     this.boundaryPlacementMode = false;
     this.dragBoundary = null;
     this.selectedBoundaryId = null;
@@ -141,6 +143,9 @@
     this.applyCenterSplit();
     this.applyPreviewUi();
     this.paintAll();
+    if (this.layoutEditMode) {
+      this.setLayoutEditMode(true, { skipHash: true });
+    }
     if (this.learnMode) this.notifyLearnChange();
   }
 
@@ -271,6 +276,8 @@
     this.workspaceEditor.classList.toggle("is-binder-blocks", tab === "blocks");
     this.workspaceEditor.classList.toggle("is-binder-details", tab === "details");
     this.workspaceEditor.classList.toggle("is-binder-assets", tab === "assets");
+    this.workspaceEditor.classList.toggle("is-binder-layout", tab === "layout");
+    this.workspaceEditor.classList.toggle("is-layout-edit", !!this.layoutEditMode);
     if (this.workspaceBinder) {
       this.workspaceBinder.classList.toggle("is-open", open);
       this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
@@ -294,7 +301,7 @@
       this.setMobileDrawer(mobileMap[tab] || null);
       return;
     }
-    if (tab !== "blocks" && tab !== "details" && tab !== "assets") return;
+    if (tab !== "blocks" && tab !== "details" && tab !== "assets" && tab !== "layout") return;
     this.binderTab = tab;
     this.syncBinderChrome();
     if (opts.persist !== false) {
@@ -730,6 +737,7 @@
         '<div class="graph-toolbar graph-toolbar--studio">' +
           '<div class="graph-toolbar-desktop">' +
             '<button type="button" class="btn btn-sm graph-play-btn" id="graphPlayBtn" title="Play from selected beat">▶ Play</button>' +
+            '<button type="button" class="btn btn-sm" id="graphLayoutEditBtn" title="Edit dialogue, nameplate, choices, and menu on the game view" aria-pressed="false">Edit game layout</button>' +
             '<button type="button" class="btn btn-sm" id="addBoundaryBtn" title="Split the graph into publishable chapters">+ Chapter boundary</button>' +
             '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate</button>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
@@ -771,6 +779,7 @@
               '<button type="button" class="workspace-binder-tab" data-binder-tab="blocks" role="tab" aria-selected="false">Blocks</button>' +
               '<button type="button" class="workspace-binder-tab" data-binder-tab="details" role="tab" aria-selected="false">Details</button>' +
               '<button type="button" class="workspace-binder-tab" data-binder-tab="assets" role="tab" aria-selected="false">Assets</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="layout" role="tab" aria-selected="false" id="binderLayoutTab" hidden>Game UI</button>' +
               '<button type="button" class="workspace-binder-close" id="binderClose" title="Close binder" hidden>×</button>' +
             '</div>' +
             '<div class="workspace-binder-body">' +
@@ -799,6 +808,9 @@
                     '<div class="resources-detail" id="resourcesDetail"></div>' +
                   '</div>' +
                 '</div>' +
+              '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="layout" id="binderPaneLayout" hidden>' +
+                '<div class="game-ui-graph-host" id="gameUiGraphHost"></div>' +
               '</div>' +
             '</div>' +
           '</aside>' +
@@ -842,8 +854,11 @@
     this.episodeContextBtn = null;
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
+    this.layoutEditBtn = this.container.querySelector("#graphLayoutEditBtn");
     this.parallaxBtn = this.container.querySelector("#graphParallaxBtn");
     this.workspaceEditor = this.container.querySelector(".workspace-editor");
+    this.gameUiGraphHostEl = this.container.querySelector("#gameUiGraphHost");
+    this.binderLayoutTab = this.container.querySelector("#binderLayoutTab");
     this.mobileBlocksBtn = this.container.querySelector("#mobileBlocksBtn");
     this.mobilePlayBtn = this.container.querySelector("#mobilePlayBtn");
     this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
@@ -857,6 +872,12 @@
     if (this.playBtn) {
       this.playBtn.addEventListener("click", function () {
         self.togglePlay();
+      });
+    }
+
+    if (this.layoutEditBtn) {
+      this.layoutEditBtn.addEventListener("click", function () {
+        self.setLayoutEditMode(!self.layoutEditMode);
       });
     }
 
@@ -3031,12 +3052,115 @@
     this.syncInspectorPanel();
   };
 
+  ScenaGraphEditor.prototype.setLayoutEditMode = function (on, opts) {
+    opts = opts || {};
+    on = !!on;
+    if (this.layoutEditMode === on && window.ScenaGameUi && ScenaGameUi.isMounted() === on) {
+      this.syncLayoutEditChrome();
+      return;
+    }
+    this.layoutEditMode = on;
+    window.__scenaLayoutEdit = on;
+
+    if (on) {
+      if (this.playMode) this.togglePlay();
+      if (this.previewRatioBeforeLayoutEdit == null) this.previewRatioBeforeLayoutEdit = this.previewRatio;
+      this.previewRatio = Math.max(this.previewRatio, 0.55);
+      this.applyCenterSplit();
+      if (this.binderLayoutTab) this.binderLayoutTab.hidden = false;
+      this.openBinderTab("layout", { persist: false });
+      this.mountGameUiLayoutEditor();
+      if (!opts.skipHash) {
+        try {
+          history.replaceState(null, "", "#/series/" + encodeURIComponent(this.series.id) + "/graph/layout");
+        } catch (e) { /* ignore */ }
+      }
+    } else {
+      if (window.ScenaGameUi && ScenaGameUi.unmountFromGraph) ScenaGameUi.unmountFromGraph();
+      if (this.binderLayoutTab) this.binderLayoutTab.hidden = true;
+      if (this.binderTab === "layout") this.openBinderTab("details", { persist: false });
+      if (this.previewRatioBeforeLayoutEdit != null) {
+        this.previewRatio = this.previewRatioBeforeLayoutEdit;
+        this.previewRatioBeforeLayoutEdit = null;
+        this.applyCenterSplit();
+      }
+      if (!opts.skipHash) {
+        try {
+          history.replaceState(null, "", "#/series/" + encodeURIComponent(this.series.id) + "/graph");
+        } catch (e2) { /* ignore */ }
+      }
+      this.renderPreview();
+    }
+    this.syncLayoutEditChrome();
+  };
+
+  ScenaGraphEditor.prototype.syncLayoutEditChrome = function () {
+    if (this.layoutEditBtn) {
+      this.layoutEditBtn.classList.toggle("btn-primary", !!this.layoutEditMode);
+      this.layoutEditBtn.classList.toggle("is-active", !!this.layoutEditMode);
+      this.layoutEditBtn.setAttribute("aria-pressed", this.layoutEditMode ? "true" : "false");
+      this.layoutEditBtn.textContent = this.layoutEditMode ? "Done editing layout" : "Edit game layout";
+    }
+    if (this.playBtn) this.playBtn.disabled = !!this.layoutEditMode;
+    if (this.binderLayoutTab) this.binderLayoutTab.hidden = !this.layoutEditMode;
+    if (this.workspaceEditor) {
+      this.workspaceEditor.classList.toggle("is-layout-edit", !!this.layoutEditMode);
+    }
+    this.syncBinderChrome();
+  };
+
+  ScenaGraphEditor.prototype.mountGameUiLayoutEditor = function () {
+    var self = this;
+    if (!window.ScenaGameUi || !ScenaGameUi.mountInGraph || !this.previewEl) return;
+    ScenaGameUi.mountInGraph({
+      series: this.series,
+      frame: this.previewEl,
+      viewport: this.previewViewport,
+      panelEl: this.gameUiGraphHostEl || this.container.querySelector("#gameUiGraphHost"),
+      getStageHtml: function () { return self.buildLayoutEditStageHtml(); },
+      onLayoutChanged: function () {
+        self.markDirty();
+        if (typeof self.onChange === "function") self.onChange(self.series);
+      },
+    });
+  };
+
+  ScenaGraphEditor.prototype.buildLayoutEditStageHtml = function () {
+    var node = this.selectedId ? this.getNode(this.selectedId) : null;
+    if (!node && this.playNodeId) node = this.getNode(this.playNodeId);
+    if (!node || node.type !== "beat" || ScenaStore.isRouterNode(node) || ScenaStore.shouldAutoAdvance(node)) {
+      return '<div class="preview-stage preview-stage--layout-edit"><div class="preview-layer preview-layer-bg"></div></div>';
+    }
+    ScenaStore.migrateNode(node);
+    var resolved = this.effectivePresentation(node);
+    var bg = resolved.backgroundSceneId ? ScenaStore.getBackground(this.series, resolved.backgroundSceneId) : null;
+    var layers = (bg && bg.layers) || {};
+    var spriteUrl = "";
+    if (resolved.characterProfileId && resolved.spriteId) {
+      var sprites = ScenaStore.spritesForProfile(this.series, resolved.characterProfileId);
+      var sp = sprites.find(function (s) { return s.id === resolved.spriteId; });
+      if (sp) spriteUrl = sp.dataUrl || "";
+    }
+    var slot = resolved.slot || "center";
+    return (
+      '<div class="preview-stage preview-stage--layout-edit">' +
+        '<div class="preview-layer preview-layer-bg" style="' + (layers.bg ? "background-image:url(" + layers.bg + ")" : "") + '"></div>' +
+        '<div class="preview-layer preview-layer-mg" style="' + (layers.mg ? "background-image:url(" + layers.mg + ")" : "") + '"></div>' +
+        '<div class="preview-character preview-character--' + slot + '"' +
+          (spriteUrl ? ' style="background-image:url(' + spriteUrl + ')"' : "") + "></div>" +
+        '<div class="preview-layer preview-layer-fg" style="' + (layers.fg ? "background-image:url(" + layers.fg + ")" : "") + '"></div>' +
+      "</div>"
+    );
+  };
+
   ScenaGraphEditor.prototype.bindPreviewPlayfieldFit = function () {
+    if (this.layoutEditMode) return;
     if (!this.previewEl || !this.previewViewport || !window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
     ScenaStore.bindPlayfieldFit(this.previewEl, this.previewViewport, { pad: 0 });
   };
 
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
+    if (this.layoutEditMode) return;
     if (!this.previewEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
     var self = this;
     ScenaStore.applyReaderUiToFrame(this.previewEl, this.series, {
@@ -3049,6 +3173,11 @@
 
   ScenaGraphEditor.prototype.renderPreview = function () {
     if (!this.previewEl) return;
+    if (this.layoutEditMode) {
+      if (window.ScenaGameUi && ScenaGameUi.isMounted()) ScenaGameUi.refreshSurface();
+      else this.mountGameUiLayoutEditor();
+      return;
+    }
     this.applyPreviewUi();
     var self = this;
     var contentEl = this.ensurePreviewContentEl();
