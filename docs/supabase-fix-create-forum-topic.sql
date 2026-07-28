@@ -1,9 +1,7 @@
--- Arleco community forums (topic threads)
--- Run AFTER docs/supabase-setup.sql
+-- ONE-CLICK FIX: "Could not find the function public.create_forum_topic(p_author, p_body, p_category, p_title) in the schema cache"
+-- Run in Supabase SQL Editor (correct project — match Netlify SCENA_SUPABASE_URL).
+-- Same schema as docs/supabase-forums.sql + PostgREST reload. Safe to re-run.
 -- Prefer also running docs/supabase-content-policy.sql first (assert_content_allowed).
--- Safe to re-run.
--- Fixes: "Could not find the function public.create_forum_topic(...) in the schema cache"
---   (also creates list/get/reply RPCs). After running, PostgREST schema is reloaded.
 
 do $$
 begin
@@ -71,7 +69,6 @@ create policy "Anyone reads visible forum posts"
   on public.forum_posts for select
   using (hidden_at is null or auth.uid() = user_id);
 
--- Writes go through security-definer RPCs
 drop policy if exists "No direct forum topic insert" on public.forum_topics;
 create policy "No direct forum topic insert"
   on public.forum_topics for insert
@@ -196,6 +193,7 @@ begin
 end;
 $$;
 
+-- Parameter names match web/src/lib/forums.ts rpc("create_forum_topic", { p_title, p_body, p_category, p_author })
 create or replace function public.create_forum_topic(
   p_title text,
   p_body text,
@@ -320,7 +318,7 @@ grant execute on function public.create_forum_post(uuid, text, uuid, jsonb) to a
 
 notify pgrst, 'reload schema';
 
--- Verify create_forum_topic is visible:
+-- Verify (should return 1 row with p_title, p_body, p_category, p_author):
 -- select pg_get_function_identity_arguments(p.oid)
 -- from pg_proc p
 -- join pg_namespace n on n.oid = p.pronamespace

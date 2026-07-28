@@ -9,10 +9,18 @@
   ];
 
   var SIZE_PRESETS = [16, 24, 32, 48, 64, 96, 128, 160, 256];
+  var MAX_BRUSH = 32;
   var MAX_FRAMES = 32;
   var ONION_PREV = "rgba(220, 40, 40, 1)";
   var ONION_NEXT = "rgba(40, 180, 70, 1)";
   var ONION_ALPHA = 0.32;
+  var SHAPE_TOOLS = {
+    line: 1,
+    circle: 1,
+    circlefill: 1,
+    rect: 1,
+    rectfill: 1,
+  };
 
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -52,14 +60,51 @@
   }
 
   function createEditor(opts) {
-    var series = opts.series;
+    var series = opts.series || null;
+    var userId = opts.userId;
     var persist = opts.persist;
     var toast = opts.toast || function () {};
     var rootEl = opts.container;
+    var artApi = opts.artApi || null;
+
+    function listArt(kind) {
+      if (artApi && artApi.list) return artApi.list(kind);
+      if (series) return ScenaStore.listArtFolder(series, kind === "all" ? null : kind);
+      return ScenaStore.listUserArtFolder(userId, kind === "all" ? null : kind);
+    }
+    function getArt(id) {
+      if (artApi && artApi.get) return artApi.get(id);
+      if (series) return ScenaStore.getArtAsset(series, id);
+      return ScenaStore.getUserArtAsset(userId, id);
+    }
+    function upsertArt(asset) {
+      if (artApi && artApi.upsert) return artApi.upsert(asset);
+      if (series) return ScenaStore.upsertArtAsset(series, asset);
+      return ScenaStore.upsertUserArtAsset(userId, asset);
+    }
+    function removeArt(id) {
+      if (artApi && artApi.remove) return artApi.remove(id);
+      if (series) return ScenaStore.removeArtAsset(series, id);
+      return ScenaStore.removeUserArtAsset(userId, id);
+    }
+    function storeImage(dataUrl, assetId) {
+      if (artApi && artApi.storeImage) return artApi.storeImage(dataUrl, assetId);
+      return ScenaStore.storePixelDataUrl(dataUrl, {
+        purpose: "pixel-art",
+        seriesId: (series && series.id) || "_pixel",
+        assetId: assetId,
+      });
+    }
+    function afterSave() {
+      if (persist) return Promise.resolve(persist(series));
+      return Promise.resolve();
+    }
 
     var state = {
       tool: "pencil",
       color: "#000000",
+      opacity: 100,
+      brushSize: 1,
       width: 64,
       height: 64,
       zoom: 8,
@@ -67,6 +112,9 @@
       editingId: null,
       dirty: false,
       painting: false,
+      shapeStart: null,
+      strokeSnapshot: null,
+      lastPaint: null,
       undo: [],
       redo: [],
       frames: [null],
@@ -229,22 +277,164 @@
       };
     }
 
-    function setPixel(x, y, rgba) {
-      var img = ctx.getImageData(x, y, 1, 1);
-      img.data[0] = rgba.r;
-      img.data[1] = rgba.g;
-      img.data[2] = rgba.b;
-      img.data[3] = rgba.a;
-      ctx.putImageData(img, x, y);
-    }
-
     function getPixel(x, y) {
       var img = ctx.getImageData(x, y, 1, 1);
       return { r: img.data[0], g: img.data[1], b: img.data[2], a: img.data[3] };
     }
 
+    function currentRgba() {
+      var c = hexToRgba(state.color);
+      c.a = Math.max(0, Math.min(255, Math.round((state.opacity / 100) * 255)));
+      return c;
+    }
+
+    function brushSize() {
+      return Math.max(1, Math.min(MAX_BRUSH, parseInt(state.brushSize, 10) || 1));
+    }
+
+    function isShapeTool(tool) {
+      return !!SHAPE_TOOLS[tool];
+    }
+
     function colorsMatch(a, b) {
       return a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
+    }
+
+    function withPixels(fn) {
+      var w = canvas.width;
+      var h = canvas.height;
+      var data = ctx.getImageData(0, 0, w, h);
+      var px = data.data;
+      function write(x, y, rgba) {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        var o = (y * w + x) * 4;
+        px[o] = rgba.r;
+        px[o + 1] = rgba.g;
+        px[o + 2] = rgba.b;
+        px[o + 3] = rgba.a;
+      }
+      fn(write, w, h);
+      ctx.putImageData(data, 0, 0);
+    }
+
+    function stampBrush(write, cx, cy, rgba) {
+      var size = brushSize();
+      var half = Math.floor(size / 2);
+      var dy;
+      var dx;
+      for (dy = 0; dy < size; dy++) {
+        for (dx = 0; dx < size; dx++) {
+          write(cx - half + dx, cy - half + dy, rgba);
+        }
+      }
+    }
+
+    function plotLine(write, x0, y0, x1, y1, rgba) {
+      var dx = Math.abs(x1 - x0);
+      var dy = Math.abs(y1 - y0);
+      var sx = x0 < x1 ? 1 : -1;
+      var sy = y0 < y1 ? 1 : -1;
+      var err = dx - dy;
+      while (true) {
+        stampBrush(write, x0, y0, rgba);
+        if (x0 === x1 && y0 === y1) break;
+        var e2 = err * 2;
+        if (e2 > -dy) {
+          err -= dy;
+          x0 += sx;
+        }
+        if (e2 < dx) {
+          err += dx;
+          y0 += sy;
+        }
+      }
+    }
+
+    function plotRect(write, x0, y0, x1, y1, rgba, filled) {
+      var minX = Math.min(x0, x1);
+      var maxX = Math.max(x0, x1);
+      var minY = Math.min(y0, y1);
+      var maxY = Math.max(y0, y1);
+      var x;
+      var y;
+      if (filled) {
+        for (y = minY; y <= maxY; y++) {
+          for (x = minX; x <= maxX; x++) write(x, y, rgba);
+        }
+        return;
+      }
+      for (x = minX; x <= maxX; x++) {
+        stampBrush(write, x, minY, rgba);
+        stampBrush(write, x, maxY, rgba);
+      }
+      for (y = minY; y <= maxY; y++) {
+        stampBrush(write, minX, y, rgba);
+        stampBrush(write, maxX, y, rgba);
+      }
+    }
+
+    function plotCircle(write, cx, cy, x1, y1, rgba, filled) {
+      var rx = x1 - cx;
+      var ry = y1 - cy;
+      var r = Math.round(Math.sqrt(rx * rx + ry * ry));
+      var x;
+      var y;
+      if (r <= 0) {
+        stampBrush(write, cx, cy, rgba);
+        return;
+      }
+      if (filled) {
+        var r2 = r * r;
+        for (y = cy - r; y <= cy + r; y++) {
+          for (x = cx - r; x <= cx + r; x++) {
+            if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= r2) write(x, y, rgba);
+          }
+        }
+        return;
+      }
+      var half = brushSize() / 2;
+      var outer = r + half;
+      var inner = Math.max(0, r - half);
+      var outer2 = outer * outer;
+      var inner2 = inner * inner;
+      for (y = Math.floor(cy - outer); y <= Math.ceil(cy + outer); y++) {
+        for (x = Math.floor(cx - outer); x <= Math.ceil(cx + outer); x++) {
+          var d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+          if (d2 <= outer2 && d2 >= inner2) write(x, y, rgba);
+        }
+      }
+    }
+
+    function drawStrokeSegment(x0, y0, x1, y1, rgba) {
+      withPixels(function (write) {
+        plotLine(write, x0, y0, x1, y1, rgba);
+      });
+    }
+
+    function drawShape(x0, y0, x1, y1) {
+      var rgba = currentRgba();
+      withPixels(function (write) {
+        if (state.tool === "line") plotLine(write, x0, y0, x1, y1, rgba);
+        else if (state.tool === "rect") plotRect(write, x0, y0, x1, y1, rgba, false);
+        else if (state.tool === "rectfill") plotRect(write, x0, y0, x1, y1, rgba, true);
+        else if (state.tool === "circle") plotCircle(write, x0, y0, x1, y1, rgba, false);
+        else if (state.tool === "circlefill") plotCircle(write, x0, y0, x1, y1, rgba, true);
+      });
+    }
+
+    function captureStrokeSnapshot() {
+      state.strokeSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    }
+
+    function restoreStrokeSnapshot() {
+      if (state.strokeSnapshot) ctx.putImageData(state.strokeSnapshot, 0, 0);
+    }
+
+    function clearStrokeState() {
+      state.painting = false;
+      state.shapeStart = null;
+      state.strokeSnapshot = null;
+      state.lastPaint = null;
     }
 
     function floodFill(sx, sy, fill) {
@@ -283,28 +473,66 @@
       ctx.putImageData(data, 0, 0);
     }
 
-    function applyTool(e, isStart) {
+    function pickColorAt(p) {
+      var c = getPixel(p.x, p.y);
+      if (c.a < 8) return;
+      state.color = rgbaToHex(c.r, c.g, c.b);
+      state.opacity = Math.max(0, Math.min(100, Math.round((c.a / 255) * 100)));
+      var colorInput = rootEl.querySelector("#pixelColor");
+      if (colorInput) colorInput.value = state.color;
+      syncToolUi();
+    }
+
+    function beginPaint(e) {
       if (state.playing) stopPlayback();
       var p = pixelFromEvent(e);
       if (state.tool === "eyedropper") {
-        var c = getPixel(p.x, p.y);
-        if (c.a < 8) return;
-        state.color = rgbaToHex(c.r, c.g, c.b);
-        var colorInput = rootEl.querySelector("#pixelColor");
-        if (colorInput) colorInput.value = state.color;
-        syncToolUi();
+        pickColorAt(p);
         return;
       }
-      if (isStart) pushUndo();
+      pushUndo();
       state.dirty = true;
       if (state.tool === "fill") {
-        floodFill(p.x, p.y, hexToRgba(state.color));
-      } else if (state.tool === "eraser") {
-        setPixel(p.x, p.y, { r: 0, g: 0, b: 0, a: 0 });
-      } else {
-        setPixel(p.x, p.y, hexToRgba(state.color));
+        floodFill(p.x, p.y, currentRgba());
+        paintDisplay();
+        renderTimeline();
+        return;
       }
+      if (isShapeTool(state.tool)) {
+        state.painting = true;
+        state.shapeStart = p;
+        captureStrokeSnapshot();
+        drawShape(p.x, p.y, p.x, p.y);
+        paintDisplay();
+        return;
+      }
+      state.painting = true;
+      state.lastPaint = p;
+      var paintColor = state.tool === "eraser" ? { r: 0, g: 0, b: 0, a: 0 } : currentRgba();
+      drawStrokeSegment(p.x, p.y, p.x, p.y, paintColor);
       paintDisplay();
+      renderTimeline();
+    }
+
+    function continuePaint(e) {
+      if (!state.painting) return;
+      var p = pixelFromEvent(e);
+      if (isShapeTool(state.tool) && state.shapeStart) {
+        restoreStrokeSnapshot();
+        drawShape(state.shapeStart.x, state.shapeStart.y, p.x, p.y);
+        paintDisplay();
+        return;
+      }
+      if (!state.lastPaint) return;
+      var paintColor = state.tool === "eraser" ? { r: 0, g: 0, b: 0, a: 0 } : currentRgba();
+      drawStrokeSegment(state.lastPaint.x, state.lastPaint.y, p.x, p.y, paintColor);
+      state.lastPaint = p;
+      paintDisplay();
+    }
+
+    function endPaint() {
+      if (!state.painting) return;
+      clearStrokeState();
       renderTimeline();
     }
 
@@ -502,6 +730,16 @@
       });
       var zoomLabel = rootEl.querySelector("#pixelZoomVal");
       if (zoomLabel) zoomLabel.textContent = state.zoom + "×";
+      var brushLabel = rootEl.querySelector("#pixelBrushVal");
+      if (brushLabel) brushLabel.textContent = String(brushSize()) + "px";
+      var brushInput = rootEl.querySelector("#pixelBrushSize");
+      if (brushInput) brushInput.value = String(brushSize());
+      var opacityLabel = rootEl.querySelector("#pixelOpacityVal");
+      if (opacityLabel) opacityLabel.textContent = String(state.opacity) + "%";
+      var opacityInput = rootEl.querySelector("#pixelOpacity");
+      if (opacityInput) opacityInput.value = String(state.opacity);
+      var colorInput = rootEl.querySelector("#pixelColor");
+      if (colorInput) colorInput.value = state.color;
       var onionToggle = rootEl.querySelector("#pixelOnionToggle");
       if (onionToggle) onionToggle.checked = !!state.onionSkin;
       var delayInput = rootEl.querySelector("#pixelFrameDelay");
@@ -536,7 +774,7 @@
     function renderFolderList() {
       var list = rootEl.querySelector("#pixelArtList");
       if (!list) return;
-      var items = ScenaStore.listArtFolder(series, state.filter === "all" ? null : state.filter);
+      var items = listArt(state.filter === "all" ? "all" : state.filter);
       if (!items.length) {
         list.innerHTML = '<p class="field-hint pixel-art-empty">No sprites in this folder yet. Draw something and save it.</p>';
         return;
@@ -564,7 +802,7 @@
     }
 
     function loadArt(id) {
-      var item = ScenaStore.getArtAsset(series, id);
+      var item = getArt(id);
       if (!item || !item.dataUrl) return;
       if (state.playing) stopPlayback();
       state.editingId = item.id;
@@ -627,14 +865,10 @@
       }
       var baseId = state.editingId || ("art_" + Date.now().toString(36));
       var uploads = state.frames.map(function (frameUrl, i) {
-        return ScenaStore.storePixelDataUrl(frameUrl, {
-          purpose: "pixel-art",
-          seriesId: series.id,
-          assetId: baseId + "-f" + i,
-        });
+        return storeImage(frameUrl, baseId + "-f" + i);
       });
       Promise.all(uploads).then(function (urls) {
-        var saved = ScenaStore.upsertArtAsset(series, {
+        var saved = upsertArt({
           id: state.editingId || baseId,
           name: name,
           kind: kind,
@@ -648,7 +882,7 @@
         state.frames = urls.slice();
         state.dirty = false;
         frameImgCache = {};
-        return persist(series).then(function () {
+        return afterSave().then(function () {
           renderFolderList();
           renderTimeline();
           toast(urls.length > 1 ? "Saved " + urls.length + " frames to Art folder." : "Saved to Art folder.");
@@ -671,8 +905,8 @@
       }
       if (!window.confirm("Remove this sprite from the Art folder?")) return;
       if (state.playing) stopPlayback();
-      ScenaStore.removeArtAsset(series, state.editingId);
-      persist(series).then(function () {
+      removeArt(state.editingId);
+      afterSave().then(function () {
         newCanvas();
         toast("Removed from Art folder.");
       });
@@ -695,7 +929,7 @@
           '<header class="pixel-art-header">' +
             "<div>" +
               "<h1>Art</h1>" +
-              '<p class="page-lead">Draw pixel sprites and short animations. Onion skin shows the previous frame in red and the next in green.</p>' +
+              '<p class="page-lead">Draw pixel sprites and short animations for any project. Onion skin shows the previous frame in red and the next in green. Saved art lives in your Pixel editor library.</p>' +
             "</div>" +
           "</header>" +
           '<div class="pixel-art-workspace">' +
@@ -746,10 +980,24 @@
                 '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="eraser">Eraser</button>' +
                 '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="fill">Fill</button>' +
                 '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="eyedropper">Eyedrop</button>' +
+                '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="line">Line</button>' +
+                '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="circlefill">Circle</button>' +
+                '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="circle">Circle ○</button>' +
+                '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="rectfill">Box</button>' +
+                '<button type="button" class="btn btn-sm btn-ghost" data-pixel-tool="rect">Box □</button>' +
+              "</div>" +
+              '<div class="field pixel-brush-field"><label>Brush size <span id="pixelBrushVal">1px</span></label>' +
+                '<input type="range" id="pixelBrushSize" min="1" max="' + MAX_BRUSH + '" step="1" value="1">' +
+                '<p class="field-hint">Pencil, eraser, line, and stroke shapes use this size.</p>' +
               "</div>" +
               '<div class="field"><label>Color</label>' +
                 '<div class="pixel-color-row">' +
-                  '<input type="color" id="pixelColor" value="#000000">' +
+                  '<div class="pixel-color-controls">' +
+                    '<input type="color" id="pixelColor" value="#000000">' +
+                    '<div class="field pixel-opacity-field"><label>Opacity <span id="pixelOpacityVal">100%</span></label>' +
+                      '<input type="range" id="pixelOpacity" min="0" max="100" step="1" value="100">' +
+                    "</div>" +
+                  "</div>" +
                   '<div class="pixel-swatches">' + swatches + "</div>" +
                 "</div>" +
               "</div>" +
@@ -784,7 +1032,7 @@
                 '<button type="button" class="btn btn-primary" id="pixelSaveBtn">Save to Art folder</button>' +
                 '<button type="button" class="btn btn-ghost btn-sm" id="pixelDeleteBtn">Delete</button>' +
               "</div>" +
-              '<p class="field-hint">Multi-frame sprites save as short animations in the Art folder.</p>' +
+              '<p class="field-hint">Multi-frame sprites save as short animations in the Art folder. Drag shape tools from start to end to draw.</p>' +
             "</aside>" +
           "</div>" +
           '<canvas id="pixelBuffer" hidden></canvas>' +
@@ -801,13 +1049,18 @@
       rootEl.querySelectorAll("[data-pixel-tool]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           state.tool = btn.getAttribute("data-pixel-tool");
-          syncToolUi();
+          rootEl.querySelectorAll("[data-pixel-tool]").forEach(function (b) {
+            var on = b === btn;
+            b.classList.toggle("is-active", on);
+            b.classList.toggle("btn-ghost", !on);
+          });
         });
       });
 
       rootEl.querySelectorAll("[data-pixel-swatch]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           state.color = btn.getAttribute("data-pixel-swatch");
+          state.opacity = 100;
           var colorInput = rootEl.querySelector("#pixelColor");
           if (colorInput) colorInput.value = state.color;
           syncToolUi();
@@ -818,6 +1071,22 @@
       if (colorInput) {
         colorInput.addEventListener("input", function () {
           state.color = colorInput.value;
+          syncToolUi();
+        });
+      }
+
+      var opacity = rootEl.querySelector("#pixelOpacity");
+      if (opacity) {
+        opacity.addEventListener("input", function () {
+          state.opacity = Math.max(0, Math.min(100, parseInt(opacity.value, 10) || 0));
+          syncToolUi();
+        });
+      }
+
+      var brush = rootEl.querySelector("#pixelBrushSize");
+      if (brush) {
+        brush.addEventListener("input", function () {
+          state.brushSize = Math.max(1, Math.min(MAX_BRUSH, parseInt(brush.value, 10) || 1));
           syncToolUi();
         });
       }
@@ -856,18 +1125,16 @@
       }
 
       onWindowUp = function () {
-        state.painting = false;
+        endPaint();
       };
 
       display.addEventListener("mousedown", function (e) {
         if (e.button !== 0) return;
         e.preventDefault();
-        state.painting = state.tool === "pencil" || state.tool === "eraser";
-        applyTool(e, true);
+        beginPaint(e);
       });
       display.addEventListener("mousemove", function (e) {
-        if (!state.painting) return;
-        applyTool(e, false);
+        continuePaint(e);
       });
       window.addEventListener("mouseup", onWindowUp);
 
@@ -944,7 +1211,7 @@
 
     return {
       destroy: function () {
-        state.painting = false;
+        clearStrokeState();
         if (state.playTimer) clearInterval(state.playTimer);
         state.playTimer = null;
         if (onWindowUp) window.removeEventListener("mouseup", onWindowUp);
@@ -955,11 +1222,12 @@
 
   root.ScenaPixelArt = {
     mount: function (container, opts) {
-      if (!container || !opts || !opts.series) return null;
+      if (!container || !opts) return null;
       return createEditor({
         container: container,
-        series: opts.series,
+        series: opts.series || null,
         userId: opts.userId,
+        artApi: opts.artApi || null,
         persist: opts.persist || function () { return Promise.resolve(); },
         toast: opts.toast,
       });

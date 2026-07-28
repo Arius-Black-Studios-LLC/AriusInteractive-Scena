@@ -5923,16 +5923,32 @@ body.is-resizing-center {
 }
 
 /* ?? Pixel art / Art folder ?? */
-.pixel-art-page { display: flex; flex-direction: column; gap: 12px; min-height: 0; height: 100%; }
+#pixelArtRoot {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pixel-art-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
+  padding: 16px 20px 20px;
+  box-sizing: border-box;
+}
+.pixel-art-header { flex-shrink: 0; }
 .pixel-art-header h1 { margin: 0 0 4px; font-size: 1.35rem; }
 .pixel-art-header .page-lead { margin: 0; max-width: 52rem; }
 .pixel-art-workspace {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) minmax(240px, 280px);
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(240px, 280px);
   gap: 12px;
   align-items: stretch;
-  min-height: min(70vh, 640px);
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .pixel-art-folder,
 .pixel-art-tools {
@@ -5940,11 +5956,14 @@ body.is-resizing-center {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+  max-height: 100%;
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--scena-border);
   background: var(--scena-surface);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .pixel-art-filters { display: flex; flex-wrap: wrap; gap: 4px; }
 .pixel-art-list { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 120px; }
@@ -6003,6 +6022,7 @@ body.is-resizing-center {
   gap: 10px;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 .pixel-anim-bar {
   display: flex;
@@ -6104,6 +6124,33 @@ body.is-resizing-center {
   border-color: var(--scena-accent);
 }
 .pixel-color-row { display: flex; flex-direction: column; gap: 8px; }
+.pixel-color-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.pixel-color-controls input[type="color"] {
+  width: 44px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--scena-border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.pixel-opacity-field,
+.pixel-brush-field {
+  flex: 1;
+  min-width: 120px;
+}
+.pixel-opacity-field label,
+.pixel-brush-field label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .pixel-swatches { display: flex; flex-wrap: wrap; gap: 4px; }
 .pixel-swatch {
   width: 22px;
@@ -6122,5 +6169,30 @@ body.is-resizing-center {
   margin: 4px 0;
 }
 @media (max-width: 1100px) {
-  .pixel-art-workspace { grid-template-columns: 1fr; }
+  .studio-main:has(.pixel-art-page) {
+    overflow: auto;
+  }
+  .page-wide.pixel-art-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .pixel-art-workspace {
+    grid-template-columns: 1fr;
+    flex: none;
+    overflow: visible;
+    align-content: start;
+  }
+  .pixel-art-folder,
+  .pixel-art-tools {
+    overflow: visible;
+    max-height: none;
+  }
+  .pixel-art-center {
+    overflow: visible;
+  }
+  .pixel-art-stage-wrap {
+    min-height: 280px;
+    max-height: 55vh;
+  }
 }

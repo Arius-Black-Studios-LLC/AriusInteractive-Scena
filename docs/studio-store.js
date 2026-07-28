@@ -3638,6 +3638,92 @@
       series.artFolder = series.artFolder.filter(function (a) { return a.id !== artId; });
     },
 
+    /** User-scoped pixel art folder (Creator → Pixel editor). */
+    _pixelArtKey: function (userId) {
+      return "arleco_pixel_art_" + (userId || "guest");
+    },
+
+    readUserArtFolder: function (userId) {
+      try {
+        var raw = localStorage.getItem(this._pixelArtKey(userId));
+        var list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+      } catch (e) {
+        return [];
+      }
+    },
+
+    writeUserArtFolder: function (userId, list) {
+      try {
+        localStorage.setItem(this._pixelArtKey(userId), JSON.stringify(list || []));
+      } catch (e) { /* quota */ }
+    },
+
+    listUserArtFolder: function (userId, kind) {
+      var items = this.readUserArtFolder(userId);
+      if (!kind || kind === "all") return items.slice();
+      return items.filter(function (a) { return a.kind === kind; });
+    },
+
+    getUserArtAsset: function (userId, artId) {
+      return this.readUserArtFolder(userId).find(function (a) { return a.id === artId; }) || null;
+    },
+
+    upsertUserArtAsset: function (userId, asset) {
+      var list = this.readUserArtFolder(userId);
+      var kind = asset.kind === "background" || asset.kind === "ui" ? asset.kind : "character";
+      var frames = Array.isArray(asset.frames) && asset.frames.length
+        ? asset.frames.filter(function (f) { return !!f; })
+        : (asset.dataUrl ? [asset.dataUrl] : []);
+      if (!frames.length && asset.dataUrl) frames = [asset.dataUrl];
+      var next = {
+        id: asset.id || this.assetUid("art"),
+        name: String(asset.name || "Untitled").trim() || "Untitled",
+        kind: kind,
+        width: Math.max(1, parseInt(asset.width, 10) || 64),
+        height: Math.max(1, parseInt(asset.height, 10) || 64),
+        dataUrl: frames[0] || asset.dataUrl || "",
+        frames: frames,
+        frameDelay: Math.max(40, Math.min(1000, parseInt(asset.frameDelay, 10) || 120)),
+        updatedAt: new Date().toISOString(),
+        createdAt: asset.createdAt || new Date().toISOString(),
+      };
+      var idx = list.findIndex(function (a) { return a.id === next.id; });
+      if (idx >= 0) {
+        next.createdAt = list[idx].createdAt || next.createdAt;
+        list[idx] = next;
+      } else {
+        list.unshift(next);
+      }
+      this.writeUserArtFolder(userId, list);
+      return next;
+    },
+
+    removeUserArtAsset: function (userId, artId) {
+      var list = this.readUserArtFolder(userId).filter(function (a) { return a.id !== artId; });
+      this.writeUserArtFolder(userId, list);
+    },
+
+    /** One-time: pull any series.artFolder sprites into the user Pixel editor library. */
+    migrateSeriesArtToUser: function (userId, series) {
+      if (!userId || !series || !Array.isArray(series.artFolder) || !series.artFolder.length) return 0;
+      var existing = this.readUserArtFolder(userId);
+      var ids = {};
+      existing.forEach(function (a) { ids[a.id] = true; });
+      var added = 0;
+      series.artFolder.forEach(function (item) {
+        if (!item || !item.dataUrl || ids[item.id]) return;
+        existing.unshift(Object.assign({}, item, {
+          name: item.name || "Untitled",
+          migratedFromSeriesId: series.id,
+        }));
+        ids[item.id] = true;
+        added++;
+      });
+      if (added) this.writeUserArtFolder(userId, existing);
+      return added;
+    },
+
     /** Store a canvas/PNG data URL (keeps pixels; optional cloud upload). */
     storePixelDataUrl: function (dataUrl, options) {
       options = options || {};

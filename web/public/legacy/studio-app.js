@@ -73,6 +73,9 @@
       return { view: "library", libraryTab: libTab };
     }
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
+    if (parts[0] === "pixel" || parts[0] === "art") {
+      return { view: "pixel" };
+    }
     if (parts[0] === "jams") {
       if (parts[1] === "new") {
         return { view: "jams", jamMode: "new", jamType: parts[2] === "asset" ? "asset" : "game" };
@@ -93,13 +96,17 @@
         return { view: "settings", seriesId: seriesId, settingsTab: settingsTab };
       }
       if (parts[2] === "graph") return { view: "graph", seriesId: seriesId };
-      if (parts[2] === "art" || parts[2] === "pixel") return { view: "art", seriesId: seriesId };
+      if (parts[2] === "art" || parts[2] === "pixel") {
+        // Legacy series art route → global Pixel editor
+        return { view: "pixel", redirectFromSeriesArt: true };
+      }
       if (parts[2] === "resources") return { view: "resources", seriesId: seriesId, tab: parts[3] || "characters" };
       if (parts[2] === "episodes") return { view: "episodes", seriesId: seriesId };
       var savedView = "graph";
       try {
         var stored = sessionStorage.getItem("scena.studioView." + seriesId);
-        if (stored === "episodes" || stored === "settings" || stored === "graph" || stored === "art") savedView = stored;
+        if (stored === "episodes" || stored === "settings" || stored === "graph") savedView = stored;
+        if (stored === "art" || stored === "pixel") savedView = "graph";
       } catch (e) { /* ignore */ }
       return { view: savedView, seriesId: seriesId };
     }
@@ -107,8 +114,8 @@
   }
 
   function rememberStudioView(seriesId, view) {
-    if (!seriesId || !view || view === "resources") return;
-    try { sessionStorage.setItem("scena.studioView." + seriesId, view === "pixel" ? "art" : view); } catch (e) { /* ignore */ }
+    if (!seriesId || !view || view === "resources" || view === "art" || view === "pixel") return;
+    try { sessionStorage.setItem("scena.studioView." + seriesId, view); } catch (e) { /* ignore */ }
   }
 
   function navigate(hash) {
@@ -184,18 +191,18 @@
         '<div class="sidebar-section-label">Workspace</div>' +
         sidebarLink("#/series/" + series.id + "/graph", "Story editor", activeView === "graph") +
         sidebarLink("#/series/" + series.id + "/episodes", "Episodes", activeView === "episodes") +
-        sidebarLink("#/series/" + series.id + "/art", "Art", activeView === "art") +
+        sidebarLink("#/series/" + series.id + "/settings/ui", "Game UI", activeView === "settings" && window.__scenaSettingsTab === "ui") +
         '<div class="sidebar-section-label">Series</div>' +
         sidebarLink("#/series/" + series.id + "/settings", "Settings", activeView === "settings" && (!window.__scenaSettingsTab || window.__scenaSettingsTab === "basics")) +
         sidebarLink("#/series/" + series.id + "/settings/monetization", "Monetization", activeView === "settings" && window.__scenaSettingsTab === "monetization") +
-        sidebarLink("#/series/" + series.id + "/settings/promotion", "Promotion", activeView === "settings" && window.__scenaSettingsTab === "promotion") +
-        sidebarLink("#/series/" + series.id + "/settings/ui", "Game UI", activeView === "settings" && window.__scenaSettingsTab === "ui");
+        sidebarLink("#/series/" + series.id + "/settings/promotion", "Promotion", activeView === "settings" && window.__scenaSettingsTab === "promotion");
     }
 
     sidebar.innerHTML =
       '<div class="sidebar-section-label">Creator</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
       sidebarLink("#/library", "My assets", activeView === "library") +
+      sidebarLink("#/pixel", "Pixel editor", activeView === "pixel") +
       sidebarLink("#/jams", "Jams", activeView === "jams") +
       nav;
 
@@ -305,6 +312,17 @@
       return;
     }
 
+    if (route.view === "pixel") {
+      if (/^#?\/series\//.test(location.hash || "")) {
+        navigate("/pixel");
+        return;
+      }
+      ScenaStore.setActiveSeries(null);
+      renderShell("pixel", null);
+      mountGlobalPixelEditor(main);
+      return;
+    }
+
     if (route.view === "jams") {
       ScenaStore.setActiveSeries(null);
       renderShell("jams", null);
@@ -371,21 +389,26 @@
     } else if (route.view === "episodes") {
       main.innerHTML = renderEpisodes(series);
       bindEpisodes(series);
-    } else if (route.view === "art") {
-      main.innerHTML = '<div id="pixelArtRoot"></div>';
-      if (window.ScenaPixelArt && ScenaPixelArt.mount) {
-        if (pixelArtEditor && pixelArtEditor.destroy) pixelArtEditor.destroy();
-        pixelArtEditor = ScenaPixelArt.mount($("#pixelArtRoot"), {
-          series: series,
-          userId: userId,
-          toast: toast,
-          persist: function (updated) {
-            return persistSeries(updated);
-          },
-        });
-      } else {
-        main.innerHTML = '<div class="page"><p class="field-hint">Pixel art editor failed to load. Refresh the page.</p></div>';
-      }
+    }
+  }
+
+  function mountGlobalPixelEditor(main) {
+    main.innerHTML = '<div id="pixelArtRoot"></div>';
+    // Migrate any leftover series art folders into the user library once.
+    try {
+      ScenaStore.listSeries(userId).forEach(function (s) {
+        ScenaStore.migrateSeriesArtToUser(userId, s);
+      });
+    } catch (e) { /* ignore */ }
+    if (window.ScenaPixelArt && ScenaPixelArt.mount) {
+      if (pixelArtEditor && pixelArtEditor.destroy) pixelArtEditor.destroy();
+      pixelArtEditor = ScenaPixelArt.mount($("#pixelArtRoot"), {
+        userId: userId,
+        toast: toast,
+        persist: function () { return Promise.resolve(); },
+      });
+    } else {
+      main.innerHTML = '<div class="page"><p class="field-hint">Pixel art editor failed to load. Refresh the page.</p></div>';
     }
   }
 
@@ -795,12 +818,12 @@
   }
 
   function settingsPageChrome(series, tab, title, lede, bodyHtml) {
-    var tabs = [
+    var tabDefs = [
       { id: "basics", href: "#/series/" + series.id + "/settings", label: "Settings" },
       { id: "monetization", href: "#/series/" + series.id + "/settings/monetization", label: "Monetization" },
       { id: "promotion", href: "#/series/" + series.id + "/settings/promotion", label: "Promotion" },
-      { id: "ui", href: "#/series/" + series.id + "/settings/ui", label: "Game UI" },
-    ].map(function (t) {
+    ];
+    var tabs = tabDefs.map(function (t) {
       return '<a class="settings-subnav-link' + (t.id === tab ? " is-active" : "") + '" href="' + t.href + '">' +
         escapeHtml(t.label) + "</a>";
     }).join("");
@@ -815,7 +838,7 @@
             '<button type="button" class="btn btn-primary" id="saveSettingsBtn">Save</button>' +
           "</div>" +
         "</div>" +
-        '<nav class="settings-subnav" aria-label="Series settings">' + tabs + "</nav>" +
+        (tab === "ui" ? "" : '<nav class="settings-subnav" aria-label="Series settings">' + tabs + "</nav>") +
         bodyHtml +
       "</div>"
     );
@@ -1207,7 +1230,7 @@
           "</p>" +
           '<button type="button" class="btn btn-danger btn-sm" id="resetSeriesBtn">Reset to chapter 1 only</button>' +
         "</section>" +
-        '<p class="field-hint" style="margin-top:16px">Monetization, promotion, and game UI each have their own menu. Story metrics live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
+        '<p class="field-hint" style="margin-top:16px">Monetization and promotion each have their own menu. Game UI is under Workspace. Story metrics live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
       "</form>";
 
     return settingsPageChrome(
