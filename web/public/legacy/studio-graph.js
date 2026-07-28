@@ -508,7 +508,7 @@
         '<div class="field"><label>Thumbnail</label>' +
           '<div class="episode-thumb-row">' +
             '<div class="upload-preview episode-thumb-preview" id="episodeEditorThumbPreview">400×600</div>' +
-            '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden id="episodeEditorThumbInput"></label>' +
+            this.artImportActionsHtml({ inputId: "episodeEditorThumbInput", kind: "all", pixelBtnId: "episodeEditorThumbPixel" }) +
           '</div></div>' +
         '<div class="field episode-monetization-field" id="episodeEditorMonetizationField">' +
           '<label>Chapter access (optional overrides)</label>' +
@@ -3521,7 +3521,7 @@
         '<div class="field"><label>Name</label><input type="text" id="resCharName" value="' + escapeAttr(profile.name) + '"></div>' +
         '<div class="field"><label>Color</label><input type="color" id="resCharColor" value="' + escapeAttr(profile.color || "#888888") + '"></div>' +
         '<div class="field"><label>Sprites</label><div class="sprite-grid">' + (sprites || '<span class="field-hint">No sprites</span>') + '</div>' +
-        '<label class="btn btn-sm">+ Add sprite<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden id="resSpriteUpload"></label></div>' +
+        this.artImportActionsHtml({ inputId: "resSpriteUpload", kind: "character", pixelBtnId: "resSpritePixel", accept: IMAGE_UPLOAD_ACCEPT }) + '</div>' +
         '<button type="button" class="btn btn-sm btn-danger" id="resDeleteChar">Delete character</button>' +
         '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else if (tab === "stages") {
@@ -3573,7 +3573,7 @@
         '<div class="resource-keyitem-preview" id="resKeyItemPreview"' + (keyAsset.dataUrl ? ' style="background-image:url(' + keyAsset.dataUrl + ')"' : "") + '>' +
         (keyAsset.dataUrl ? "" : "◆") + '</div>' +
         this.renderKeyItemIconPicker(keyAsset.dataUrl, "resKeyItemIconPicker") +
-        '<label class="btn btn-sm">Upload custom<input type="file" accept="image/*" hidden id="resKeyItemIconUpload"></label></div>' +
+        this.artImportActionsHtml({ inputId: "resKeyItemIconUpload", kind: "ui", pixelBtnId: "resKeyItemIconPixel" }) + '</div>' +
         '<button type="button" class="btn btn-sm btn-danger" id="resDeleteKeyItem">Delete key item</button>' +
         '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else {
@@ -3592,7 +3592,7 @@
         '<div class="resource-keyitem-preview" id="resMetricPreview"' + (metric.dataUrl ? ' style="background-image:url(' + metric.dataUrl + ')"' : "") + '>' +
         (metric.dataUrl ? "" : "◎") + '</div>' +
         this.renderKeyItemIconPicker(metric.dataUrl, "resMetricIconPicker") +
-        '<label class="btn btn-sm">Upload custom<input type="file" accept="image/*" hidden id="resMetricIconUpload"></label></div>' +
+        this.artImportActionsHtml({ inputId: "resMetricIconUpload", kind: "ui", pixelBtnId: "resMetricIconPixel" }) + '</div>' +
         '<button type="button" class="btn btn-sm btn-danger" id="resDeleteMetric">Delete metric</button>';
     }
 
@@ -3656,6 +3656,25 @@
 
   var IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp,.png,.jpg,.jpeg,.webp,.gif,.bmp";
 
+  ScenaGraphEditor.prototype.artImportActionsHtml = function (opts) {
+    if (window.ScenaPixelArtPicker && ScenaPixelArtPicker.renderImportActions) {
+      return ScenaPixelArtPicker.renderImportActions(opts);
+    }
+    return opts.fallbackHtml || "";
+  };
+
+  ScenaGraphEditor.prototype.bindPixelArtImportBtn = function (btn, kind, onSelect, title) {
+    if (!btn || !window.ScenaPixelArtPicker || !this.feedbackUserId) return;
+    var self = this;
+    ScenaPixelArtPicker.bindPixelPickButton(btn, {
+      userId: self.feedbackUserId,
+      kind: kind || "all",
+      title: title,
+      onError: function (msg) { self.onSaveError(msg); },
+      onSelect: onSelect,
+    });
+  };
+
   ScenaGraphEditor.prototype.notifyUploadResult = function (okMessage) {
     var warn = ScenaStore.consumeUploadWarning && ScenaStore.consumeUploadWarning();
     var meta = ScenaStore.consumeUploadMeta && ScenaStore.consumeUploadMeta();
@@ -3701,7 +3720,13 @@
     return '<div class="layer-slot">' +
       '<span class="layer-slot-label">' + label + '</span>' +
       '<div class="layer-slot-preview" data-layer-preview="' + key + '">' + (dataUrl ? "" : "+") + '</div>' +
-      '<label class="btn btn-sm">Upload<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden data-layer-key="' + key + '"></label></div>';
+      this.artImportActionsHtml({
+        kind: "background",
+        accept: IMAGE_UPLOAD_ACCEPT,
+        pixelBtnAttrs: 'data-layer-pixel="' + key + '"',
+        inputAttrs: 'data-layer-key="' + key + '"',
+      }) +
+    '</div>';
   };
 
   ScenaGraphEditor.prototype.bindResourceDetail = function (tab, id, metricIdx) {
@@ -3754,6 +3779,16 @@
           self.onSaveError((err && err.message) || "Could not upload sprite.");
         });
       });
+      self.bindPixelArtImportBtn(self.resourcesDetail.querySelector("#resSpritePixel"), "character", function (url, meta) {
+        var defaultLabel = (meta && meta.name) ? meta.name.replace(/\.[^.]+$/, "") : "pose";
+        var label = self.spritePoseLabelFromFile({ name: defaultLabel + ".png" });
+        if (!label) return;
+        profile.sprites = profile.sprites || [];
+        profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label, dataUrl: url });
+        persist(function () {
+          self.notifyUploadResult("Sprite added from pixel editor");
+        });
+      }, "Choose character sprite");
       var del = this.resourcesDetail.querySelector("#resDeleteChar");
       if (del) del.addEventListener("click", function () {
         if (!window.confirm("Delete this character?")) return;
@@ -3787,6 +3822,16 @@
             self.onSaveError((err && err.message) || "Could not upload layer.");
           });
         });
+      });
+      this.resourcesDetail.querySelectorAll("[data-layer-pixel]").forEach(function (btn) {
+        self.bindPixelArtImportBtn(btn, "background", function (url) {
+          var layerKey = btn.getAttribute("data-layer-pixel");
+          if (!bg.layers) bg.layers = { bg: null, mg: null, fg: null };
+          bg.layers[layerKey] = url;
+          persist(function () {
+            self.notifyUploadResult("Layer applied from pixel editor");
+          });
+        }, "Choose background layer");
       });
       var delStage = this.resourcesDetail.querySelector("#resDeleteStage");
       if (delStage) delStage.addEventListener("click", function () {
@@ -3869,6 +3914,7 @@
       var iconUpload = this.resourcesDetail.querySelector("#resKeyItemIconUpload");
       if (iconUpload) iconUpload.addEventListener("change", function () {
         var file = iconUpload.files[0];
+        iconUpload.value = "";
         if (!file) return;
         ScenaStore.fileToDataUrl(file, { purpose: "key-item", seriesId: self.series.id }).then(function (url) {
           keyAsset.dataUrl = url;
@@ -3880,6 +3926,13 @@
           self.onSaveError((err && err.message) || "Could not upload icon.");
         });
       });
+      self.bindPixelArtImportBtn(self.resourcesDetail.querySelector("#resKeyItemIconPixel"), "ui", function (url) {
+        keyAsset.dataUrl = url;
+        var picker = self.resourcesDetail.querySelector("#resKeyItemIconPicker");
+        if (picker) picker.querySelectorAll(".keyitem-icon-option").forEach(function (b) { b.classList.remove("is-selected"); });
+        self.updateKeyItemIconPreview(previewEl, url);
+        persist();
+      }, "Choose key item icon");
       var delKey = this.resourcesDetail.querySelector("#resDeleteKeyItem");
       if (delKey) delKey.addEventListener("click", function () {
         if (!window.confirm("Delete this key item?")) return;
@@ -3914,6 +3967,7 @@
       var metricIconUpload = this.resourcesDetail.querySelector("#resMetricIconUpload");
       if (metricIconUpload) metricIconUpload.addEventListener("change", function () {
         var file = metricIconUpload.files[0];
+        metricIconUpload.value = "";
         if (!file) return;
         ScenaStore.fileToDataUrl(file, { purpose: "metric-icon", seriesId: self.series.id }).then(function (url) {
           metric.dataUrl = url;
@@ -3926,6 +3980,14 @@
           self.onSaveError((err && err.message) || "Could not upload icon.");
         });
       });
+      self.bindPixelArtImportBtn(self.resourcesDetail.querySelector("#resMetricIconPixel"), "ui", function (url) {
+        metric.dataUrl = url;
+        var picker = self.resourcesDetail.querySelector("#resMetricIconPicker");
+        if (picker) picker.querySelectorAll(".keyitem-icon-option").forEach(function (b) { b.classList.remove("is-selected"); });
+        self.updateKeyItemIconPreview(metricPreviewEl, url);
+        syncMetricFields();
+        persist();
+      }, "Choose metric icon");
       var delMetric = this.resourcesDetail.querySelector("#resDeleteMetric");
       if (delMetric) delMetric.addEventListener("click", function () {
         self.series.metrics.splice(metricIdx, 1);
@@ -4027,7 +4089,7 @@
         (this._modalKeyItemIconUrl ? ' style="background-image:url(' + this._modalKeyItemIconUrl + ')"' : "") + '>' +
         (this._modalKeyItemIconUrl ? "" : "◆") + '</div>' +
         this.renderKeyItemIconPicker(this._modalKeyItemIconUrl, "modalCreateKeyItemIconPicker") +
-        '<label class="btn btn-sm">Upload custom<input type="file" accept="image/*" hidden id="modalCreateKeyItemIconUpload"></label></div>';
+        this.artImportActionsHtml({ inputId: "modalCreateKeyItemIconUpload", kind: "ui", pixelBtnId: "modalCreateKeyItemIconPixel" }) + '</div>';
     } else {
       bodyEl.innerHTML =
         '<div class="field"><label>Name</label><input type="text" id="modalCreateName" placeholder="' + escapeAttr(placeholder) + '" autofocus></div>';
@@ -4059,6 +4121,7 @@
       var modalIconUpload = this.container.querySelector("#modalCreateKeyItemIconUpload");
       if (modalIconUpload) modalIconUpload.addEventListener("change", function () {
         var file = modalIconUpload.files[0];
+        modalIconUpload.value = "";
         if (!file) return;
         ScenaStore.fileToDataUrl(file, { purpose: "key-item", seriesId: self.series.id }).then(function (url) {
           self._modalKeyItemIconUrl = url;
@@ -4069,6 +4132,12 @@
           self.onSaveError((err && err.message) || "Could not upload icon.");
         });
       });
+      self.bindPixelArtImportBtn(self.container.querySelector("#modalCreateKeyItemIconPixel"), "ui", function (url) {
+        self._modalKeyItemIconUrl = url;
+        var picker = self.container.querySelector("#modalCreateKeyItemIconPicker");
+        if (picker) picker.querySelectorAll(".keyitem-icon-option").forEach(function (b) { b.classList.remove("is-selected"); });
+        self.updateKeyItemIconPreview(modalPreview, url);
+      }, "Choose key item icon");
     }
   };
 
@@ -4340,6 +4409,7 @@
     if (upload) {
       upload.addEventListener("change", function () {
         var file = upload.files[0];
+        upload.value = "";
         if (!file || !self.editingEpisodeId) return;
         var ep = (self.series.episodes || []).find(function (item) { return item.id === self.editingEpisodeId; });
         if (!ep) return;
@@ -4355,6 +4425,18 @@
         });
       });
     }
+
+    self.bindPixelArtImportBtn(modal.querySelector("#episodeEditorThumbPixel"), "all", function (url) {
+      if (!self.editingEpisodeId) return;
+      var ep = (self.series.episodes || []).find(function (item) { return item.id === self.editingEpisodeId; });
+      if (!ep) return;
+      ep.thumbnailDataUrl = url;
+      var preview = modal.querySelector("#episodeEditorThumbPreview");
+      if (preview) {
+        preview.style.backgroundImage = "url(" + url + ")";
+        preview.textContent = "";
+      }
+    }, "Choose episode thumbnail");
 
     if (playBtn) {
       playBtn.addEventListener("click", function () {

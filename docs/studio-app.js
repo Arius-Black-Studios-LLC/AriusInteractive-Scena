@@ -659,14 +659,14 @@
           '<div class="field">' +
             '<label>Custom dialogue box sprite</label>' +
             '<div class="ui-sprite-preview" id="uiDialogueSpritePreview" style="' + (ui.customSprites.dialogueBox ? "background-image:url(" + ui.customSprites.dialogueBox + ")" : "") + '"></div>' +
-            '<input type="file" accept="image/*" id="uiDialogueSpriteInput">' +
+            artImportActionsHtml({ inputId: "uiDialogueSpriteInput", kind: "ui", pixelBtnId: "uiDialogueSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiDialogueSpriteClear"' + (ui.customSprites.dialogueBox ? "" : " hidden") + '>Remove</button>' +
             '<p class="field-hint">PNG with transparency recommended. Best on Custom preset.</p>' +
           '</div>' +
           '<div class="field">' +
             '<label>Custom choice button sprite</label>' +
             '<div class="ui-sprite-preview" id="uiChoiceSpritePreview" style="' + (ui.customSprites.choiceButton ? "background-image:url(" + ui.customSprites.choiceButton + ")" : "") + '"></div>' +
-            '<input type="file" accept="image/*" id="uiChoiceSpriteInput">' +
+            artImportActionsHtml({ inputId: "uiChoiceSpriteInput", kind: "ui", pixelBtnId: "uiChoiceSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiChoiceSpriteClear"' + (ui.customSprites.choiceButton ? "" : " hidden") + '>Remove</button>' +
           '</div>' +
         '</div>' +
@@ -1077,7 +1077,7 @@
           '<div class="field"><label>Width (%)</label><input type="range" name="uiDialogueWidth" min="40" max="98" step="1" value="' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + '"><span class="field-hint" id="uiDialogueWidthVal">' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + "%</span></div>" +
           '<div class="field"><label>Custom sprite</label>' +
             '<div class="ui-sprite-preview" id="uiDialogueSpritePreview" style="' + (ui.customSprites.dialogueBox ? "background-image:url(" + ui.customSprites.dialogueBox + ")" : "") + '"></div>' +
-            '<input type="file" accept="image/*" id="uiDialogueSpriteInput">' +
+            artImportActionsHtml({ inputId: "uiDialogueSpriteInput", kind: "ui", pixelBtnId: "uiDialogueSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiDialogueSpriteClear"' + (ui.customSprites.dialogueBox ? "" : " hidden") + ">Remove</button>" +
           "</div>" +
         "</div>" +
@@ -1098,7 +1098,7 @@
           '<div class="field"><label>Width (%)</label><input type="range" name="uiChoicesWidth" min="24" max="70" step="1" value="' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + '"><span class="field-hint" id="uiChoicesWidthVal">' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + "%</span></div>" +
           '<div class="field"><label>Custom button sprite</label>' +
             '<div class="ui-sprite-preview" id="uiChoiceSpritePreview" style="' + (ui.customSprites.choiceButton ? "background-image:url(" + ui.customSprites.choiceButton + ")" : "") + '"></div>' +
-            '<input type="file" accept="image/*" id="uiChoiceSpriteInput">' +
+            artImportActionsHtml({ inputId: "uiChoiceSpriteInput", kind: "ui", pixelBtnId: "uiChoiceSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiChoiceSpriteClear"' + (ui.customSprites.choiceButton ? "" : " hidden") + ">Remove</button>" +
           "</div>" +
         "</div>" +
@@ -1201,12 +1201,12 @@
             '<div class="field">' +
               '<label>Thumbnail <span class="field-required">Required</span></label>' +
               '<div class="upload-preview' + (series.thumbnailDataUrl ? " upload-preview--filled" : "") + '" id="thumbPreview" style="' + (series.thumbnailDataUrl ? "background-image:url(" + series.thumbnailDataUrl + ")" : "") + '">' + (series.thumbnailDataUrl ? "" : "400×600") + "</div>" +
-              '<input type="file" accept="image/*" id="thumbInput">' +
+              artImportActionsHtml({ inputId: "thumbInput", kind: "all", pixelBtnId: "thumbPixelBtn" }) +
             "</div>" +
             '<div class="field">' +
               '<label>Banner <span class="field-required">Required</span></label>' +
               '<div class="upload-preview is-banner' + (series.bannerDataUrl ? " upload-preview--filled" : "") + '" id="bannerPreview" style="' + (series.bannerDataUrl ? "background-image:url(" + series.bannerDataUrl + ")" : "") + '">' + (series.bannerDataUrl ? "" : "800×400") + "</div>" +
-              '<input type="file" accept="image/*" id="bannerInput">' +
+              artImportActionsHtml({ inputId: "bannerInput", kind: "all", pixelBtnId: "bannerPixelBtn" }) +
             "</div>" +
           "</div>" +
         "</section>" +
@@ -1325,6 +1325,18 @@
 
     bindImageUpload("#thumbInput", "#thumbPreview", function (url) { series.thumbnailDataUrl = url; scheduleAutoSave(); }, "thumb", series.id);
     bindImageUpload("#bannerInput", "#bannerPreview", function (url) { series.bannerDataUrl = url; scheduleAutoSave(); }, "banner", series.id);
+    bindPixelArtImportBtn("#thumbPixelBtn", "all", function (url) {
+      series.thumbnailDataUrl = url;
+      applyImagePreview("#thumbPreview", url);
+      scheduleAutoSave();
+      toast("Pixel art applied");
+    }, "Choose listing thumbnail");
+    bindPixelArtImportBtn("#bannerPixelBtn", "all", function (url) {
+      series.bannerDataUrl = url;
+      applyImagePreview("#bannerPreview", url);
+      scheduleAutoSave();
+      toast("Pixel art applied");
+    }, "Choose listing banner");
 
     var titleField = form.querySelector('[name="title"]');
     var slugField = form.querySelector('[name="slug"]');
@@ -1425,6 +1437,28 @@
       $("#uiChoiceSpriteClear").hidden = false;
       scheduleAutoSave();
     }, "reader-ui-choice", series.id);
+    bindPixelArtImportBtn("#uiDialogueSpritePixel", "ui", function (url) {
+      series.readerUi.customSprites.dialogueBox = url;
+      series.readerUi.preset = "custom";
+      applyImagePreview("#uiDialogueSpritePreview", url);
+      document.querySelectorAll("#uiPresetCards .ui-preset-card").forEach(function (c) {
+        c.classList.toggle("is-active", c.getAttribute("data-ui-preset") === "custom");
+      });
+      $("#uiDialogueSpriteClear").hidden = false;
+      scheduleAutoSave();
+      toast("Pixel art applied");
+    }, "Choose dialogue box sprite");
+    bindPixelArtImportBtn("#uiChoiceSpritePixel", "ui", function (url) {
+      series.readerUi.customSprites.choiceButton = url;
+      series.readerUi.preset = "custom";
+      applyImagePreview("#uiChoiceSpritePreview", url);
+      document.querySelectorAll("#uiPresetCards .ui-preset-card").forEach(function (c) {
+        c.classList.toggle("is-active", c.getAttribute("data-ui-preset") === "custom");
+      });
+      $("#uiChoiceSpriteClear").hidden = false;
+      scheduleAutoSave();
+      toast("Pixel art applied");
+    }, "Choose choice button sprite");
 
     var clearDlg = $("#uiDialogueSpriteClear");
     if (clearDlg) clearDlg.addEventListener("click", function () {
@@ -1955,6 +1989,34 @@
     });
   }
 
+  function artImportActionsHtml(opts) {
+    if (window.ScenaPixelArtPicker && ScenaPixelArtPicker.renderImportActions) {
+      return ScenaPixelArtPicker.renderImportActions(opts);
+    }
+    var idAttr = opts.inputId ? ' id="' + escapeAttr(opts.inputId) + '"' : "";
+    return '<label class="btn btn-sm">Import from computer<input type="file" accept="image/*" hidden' + idAttr + "></label>";
+  }
+
+  function bindPixelArtImportBtn(btnSel, kind, onSelect, title) {
+    var btn = $(btnSel);
+    if (!btn || !window.ScenaPixelArtPicker) return;
+    ScenaPixelArtPicker.bindPixelPickButton(btn, {
+      userId: userId,
+      kind: kind || "all",
+      title: title,
+      onError: function (msg) { toast(msg); },
+      onSelect: onSelect,
+    });
+  }
+
+  function applyImagePreview(previewSel, url) {
+    var prev = $(previewSel);
+    if (!prev || !url) return;
+    prev.style.backgroundImage = "url(" + url + ")";
+    prev.textContent = "";
+    prev.classList.add("upload-preview--filled");
+  }
+
   function renderResources(series, tab) {
     var tabs = [
       { id: "characters", label: "Characters" },
@@ -1985,7 +2047,11 @@
             '<button type="button" class="btn btn-sm btn-ghost" data-delete-profile="' + p.id + '">Delete</button>' +
           '</div>' +
           '<div class="sprite-grid">' + (spriteGrid || '<span class="field-hint">No sprites yet</span>') + '</div>' +
-          '<label class="btn btn-sm">+ Add sprite <input type="file" accept="image/*" hidden data-sprite-upload="' + p.id + '"></label>' +
+          artImportActionsHtml({
+            kind: "character",
+            pixelBtnAttrs: 'data-sprite-pixel="' + p.id + '"',
+            inputAttrs: 'data-sprite-upload="' + p.id + '"',
+          }) +
         '</article>';
       });
     } else if (tab === "backgrounds") {
@@ -2038,7 +2104,11 @@
       '<div class="layer-slot-preview" style="' + (dataUrl ? "background-image:url(" + dataUrl + ")" : "") + '">' +
         (dataUrl ? "" : "+") +
       '</div>' +
-      '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden data-layer="' + key + '" data-bg-scene="' + sceneId + '"></label>' +
+      artImportActionsHtml({
+        kind: "background",
+        pixelBtnAttrs: 'data-layer-pixel="' + key + '" data-bg-scene="' + sceneId + '"',
+        inputAttrs: 'data-layer="' + key + '" data-bg-scene="' + sceneId + '"',
+      }) +
     '</div>';
   }
 
@@ -2097,6 +2167,7 @@
       document.querySelectorAll("[data-sprite-upload]").forEach(function (input) {
         input.addEventListener("change", function () {
           var file = input.files[0];
+          input.value = "";
           if (!file) return;
           var profileId = input.getAttribute("data-sprite-upload");
           var label = prompt("Pose name (e.g. happy, angry):", file.name.replace(/\.[^.]+$/, ""));
@@ -2110,6 +2181,28 @@
             toast("Sprite added");
             render();
           }).catch(function (err) { toast(err.message); });
+        });
+      });
+
+      document.querySelectorAll("[data-sprite-pixel]").forEach(function (btn) {
+        ScenaPixelArtPicker.bindPixelPickButton(btn, {
+          userId: userId,
+          kind: "character",
+          title: "Choose character sprite",
+          onError: function (msg) { toast(msg); },
+          onSelect: function (url, meta) {
+            var profileId = btn.getAttribute("data-sprite-pixel");
+            var defaultLabel = (meta && meta.name) ? meta.name.replace(/\.[^.]+$/, "") : "pose";
+            var label = prompt("Pose name (e.g. happy, angry):", defaultLabel);
+            if (!label) return;
+            var profile = ScenaStore.getCharacter(series, profileId);
+            if (!profile) return;
+            profile.sprites = profile.sprites || [];
+            profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label.trim(), dataUrl: url });
+            persist();
+            toast("Sprite added from pixel editor");
+            render();
+          },
         });
       });
       return;
@@ -2143,6 +2236,7 @@
       document.querySelectorAll("[data-layer]").forEach(function (input) {
         input.addEventListener("change", function () {
           var file = input.files[0];
+          input.value = "";
           if (!file) return;
           var sceneId = input.getAttribute("data-bg-scene");
           var layerKey = input.getAttribute("data-layer");
@@ -2155,6 +2249,26 @@
             toast("Layer uploaded");
             render();
           }).catch(function (err) { toast(err.message); });
+        });
+      });
+
+      document.querySelectorAll("[data-layer-pixel]").forEach(function (btn) {
+        ScenaPixelArtPicker.bindPixelPickButton(btn, {
+          userId: userId,
+          kind: "background",
+          title: "Choose background layer",
+          onError: function (msg) { toast(msg); },
+          onSelect: function (url) {
+            var sceneId = btn.getAttribute("data-bg-scene");
+            var layerKey = btn.getAttribute("data-layer-pixel");
+            var scene = ScenaStore.getBackground(series, sceneId);
+            if (!scene) return;
+            if (!scene.layers) scene.layers = { bg: null, mg: null, fg: null };
+            scene.layers[layerKey] = url;
+            persist();
+            toast("Layer applied from pixel editor");
+            render();
+          },
         });
       });
 

@@ -32,6 +32,7 @@ const LEGACY_JS = [
   "studio-app.js",
   "studio-graph.js",
   "studio-pixel.js",
+  "scena-pixel-art-picker.js",
   "learn-app.js",
   "learn-lessons.js",
   "learn-sandbox.js",

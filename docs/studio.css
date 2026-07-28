@@ -6196,3 +6196,51 @@ body.is-resizing-center {
     max-height: 55vh;
   }
 }
+
+/* ?? Dual art import + pixel art picker modal ?? */
+.art-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.pixel-art-picker-backdrop .pixel-art-picker-modal {
+  max-width: 520px;
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.pixel-art-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: min(52vh, 420px);
+  margin: 8px 0 4px;
+  padding-right: 4px;
+}
+
+.pixel-art-picker-item {
+  width: 100%;
+  text-align: left;
+}
+
+.pixel-art-picker-empty {
+  margin: 12px 0;
+}
+
+.pixel-art-picker-hint {
+  margin: 0 0 4px;
+}
+
+.layer-slot .art-import-actions {
+  margin-top: 4px;
+}
+
+.episode-thumb-row .art-import-actions {
+  flex: 1;
+  margin-top: 0;
+}
