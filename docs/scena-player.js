@@ -534,8 +534,28 @@
           self.readerMenu.mount();
           self.readerMenu.sync();
         }
+        self.bindReaderPlayfieldFit();
       },
     });
+  };
+
+  ScenaPlayer.prototype.bindReaderPlayfieldFit = function () {
+    if (!window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
+    var story = this.storyEl;
+    if (!story) return;
+    var inner = story.querySelector(".player-story-inner");
+    if (!inner) return;
+    if (this._playfieldFitObserver) {
+      try { this._playfieldFitObserver.disconnect(); } catch (e) { /* ignore */ }
+      this._playfieldFitObserver = null;
+    }
+    var aw = parseInt(this.frameEl && this.frameEl.dataset.playfieldAw, 10) || 16;
+    var ah = parseInt(this.frameEl && this.frameEl.dataset.playfieldAh, 10) || 9;
+    inner.dataset.playfieldAw = String(aw);
+    inner.dataset.playfieldAh = String(ah);
+    var scale = parseFloat(this.frameEl && this.frameEl.style.getPropertyValue("--ui-dialogue-scale")) || 1;
+    inner.style.setProperty("--ui-dialogue-scale", String(scale));
+    this._playfieldFitObserver = ScenaStore.bindPlayfieldFit(inner, story, { pad: 8, aspectW: aw, aspectH: ah });
   };
 
   ScenaPlayer.prototype.ensureShell = function () {
@@ -1132,6 +1152,7 @@
     this.storyEl.className = this.readingStoryClassName();
     this.storyEl.innerHTML = '<div class="player-story-inner">' + this.frozenBeatHtml + "</div>";
     if (this.readerMenu && this.readerMenu.attachToPlayfield) this.readerMenu.attachToPlayfield();
+    this.bindReaderPlayfieldFit();
     this.applyTypingEffect();
     this.refreshCommentsUI();
     if (canParallax && this.parallaxEnabled) this.bindParallax();

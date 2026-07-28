@@ -93,7 +93,11 @@
   flex: none;
   position: relative;
   box-sizing: border-box;
-  /* Width-only sizing + aspect-ratio — never clamp height separately (that warps). */
+  container-type: inline-size;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  /* Fallback before JS fit; fitted class overrides with exact px. */
   width: min(
     100%,
     calc((100dvh - 72px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)),
@@ -102,11 +106,13 @@
   height: auto;
   max-height: none;
   aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
-  container-type: inline-size;
   font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
-  overflow: hidden;
-  background: #1a1a1a;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+#playerRoot .player-story--reading .player-story-inner.preview-frame--fitted {
+  aspect-ratio: unset;
+  max-width: none;
+  max-height: none;
 }
 
 .player-story--discuss-hint::after {
@@ -1049,23 +1055,22 @@
 }
 
 .preview-dialogue:not(.preview-dialogue--choices) {
-  opacity: var(--ui-dialogue-opacity, 1);
   border: var(--ui-dialogue-border-width, 0px) solid var(--ui-dialogue-border-color, transparent);
   box-shadow: 0 0 var(--ui-dialogue-glow-size, 0px) var(--ui-dialogue-glow-color, transparent);
 }
 .player-dialogue-text {
+  position: relative;
+  z-index: 1;
   font-size: var(--ui-dialogue-font-size, 100%);
 }
 .preview-speaker {
+  position: relative;
+  z-index: 1;
   font-size: var(--ui-nameplate-font-size, 100%);
-  opacity: var(--ui-nameplate-opacity, 1);
   border: var(--ui-nameplate-border-width, 0px) solid var(--ui-nameplate-border-color, transparent);
   box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
-  background-image: var(--ui-nameplate-sprite, none);
-  background-size: 100% 100%;
 }
 .preview-choice-btn {
-  opacity: var(--ui-choices-opacity, 1);
   border-width: var(--ui-choices-border-width, 1px);
   border-color: var(--ui-choices-border-color, var(--ui-choice-border));
   box-shadow: 0 0 var(--ui-choices-glow-size, 0px) var(--ui-choices-glow-color, transparent);

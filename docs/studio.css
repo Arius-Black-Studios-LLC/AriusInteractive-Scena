@@ -1036,7 +1036,7 @@ body.is-resizing-binder {
   background: #050505;
 }
 
-/* Always letterbox to 16:9 (1920×1080). Never set width+height independently — that warps. */
+/* Always letterbox to 16:9 (1920×1080). JS fitPlayfield sets exact px when available. */
 .preview-frame {
   position: relative;
   container-type: inline-size;
@@ -1052,6 +1052,7 @@ body.is-resizing-binder {
   overflow: hidden;
   background: #1a1a1a;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  /* Font size uses the frame's own width via children — see .preview-content / fitted JS. */
   font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
   --preview-aspect-w: 16;
   --preview-aspect-h: 9;
@@ -1064,6 +1065,18 @@ body.is-resizing-binder {
   --ui-speaker: #2a9d8f;
   --ui-corner-radius: 6px;
   --ui-choice-scale: 1;
+}
+
+.preview-frame--fitted {
+  aspect-ratio: unset;
+  max-width: none;
+  max-height: none;
+}
+
+/* Size type against the playfield itself, not the outer viewport. */
+.preview-frame > .preview-content,
+.preview-frame .player-story-inner {
+  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
 }
 
 .preview-content {
@@ -1259,15 +1272,28 @@ body.is-resizing-center {
 }
 
 .preview-dialogue {
-  background: var(--ui-dialogue-bg);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
   color: var(--ui-dialogue-text);
   padding: 0.75em 1em;
   border-top: 2px solid var(--ui-accent);
   flex-shrink: 0;
 }
 
+.preview-dialogue:not(.preview-dialogue--choices)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--ui-dialogue-bg);
+  opacity: var(--ui-dialogue-opacity, 1);
+}
+
 .preview-frame[data-custom-dialogue="1"] .preview-dialogue:not(.preview-dialogue--choices) {
-  background: var(--ui-dialogue-sprite) center / 100% 100% no-repeat;
+  background: transparent;
   border: none !important;
   border-top: none !important;
   border-radius: 0 !important;
@@ -1276,12 +1302,47 @@ body.is-resizing-center {
   padding: 1em 1.1em 0.85em;
 }
 
+.preview-frame[data-custom-dialogue="1"] .preview-dialogue:not(.preview-dialogue--choices)::before {
+  background: var(--ui-dialogue-sprite) center / 100% 100% no-repeat;
+  opacity: var(--ui-dialogue-opacity, 1);
+}
+
+.preview-choice-btn {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  color: var(--ui-choice-text);
+  border: 1px solid var(--ui-choice-border);
+  border-radius: var(--ui-corner-radius);
+  padding: 0.55em 0.75em;
+  font-size: calc(0.88em * var(--ui-choice-scale, 1));
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.preview-choice-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--ui-choice-bg);
+  opacity: var(--ui-choices-opacity, 1);
+}
+
 .preview-frame[data-custom-choice="1"] .preview-choice-btn {
-  background: var(--ui-choice-sprite) center / 100% 100% no-repeat;
+  background: transparent;
   border: none !important;
   border-bottom: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+}
+
+.preview-frame[data-custom-choice="1"] .preview-choice-btn::before {
+  background: var(--ui-choice-sprite) center / 100% 100% no-repeat;
+  opacity: var(--ui-choices-opacity, 1);
 }
 
 .preview-speaker {
@@ -1302,16 +1363,8 @@ body.is-resizing-center {
   background: transparent;
 }
 
-.preview-choice-btn {
-  background: var(--ui-choice-bg);
-  color: var(--ui-choice-text);
-  border: 1px solid var(--ui-choice-border);
-  border-radius: var(--ui-corner-radius);
-  padding: 0.55em 0.75em;
-  font-size: calc(0.88em * var(--ui-choice-scale, 1));
-  font-family: inherit;
-  text-align: left;
-  width: 100%;
+.preview-dialogue--choices::before {
+  display: none;
 }
 
 .preview-choice-btn.is-clickable {
@@ -1840,7 +1893,7 @@ body.is-resizing-center {
 .ui-mock-nameplate {
   padding: 0.2em 0.55em;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.55);
+  background: transparent;
   border-left: 3px solid var(--ui-accent);
   min-width: 0;
   overflow: hidden;
@@ -1853,7 +1906,7 @@ body.is-resizing-center {
   font-weight: 600;
 }
 .ui-mock-dialogue {
-  background: var(--ui-dialogue-bg);
+  background: transparent;
   color: var(--ui-dialogue-text);
   padding: 0.75em 1em;
   border-top: 2px solid var(--ui-accent);
@@ -1863,7 +1916,7 @@ body.is-resizing-center {
   min-height: 0;
 }
 .ui-mock-frame[data-custom-dialogue="1"] .ui-mock-dialogue {
-  background: var(--ui-dialogue-sprite) center / 100% 100% no-repeat;
+  background: transparent !important;
   border: none !important;
   border-top: none !important;
   border-radius: 0 !important;
@@ -1871,7 +1924,7 @@ body.is-resizing-center {
   margin: 0 !important;
 }
 .ui-mock-frame[data-custom-choice="1"] .ui-mock-choice {
-  background: var(--ui-choice-sprite) center / 100% 100% no-repeat;
+  background: transparent !important;
   border: none !important;
   border-bottom: none !important;
   border-radius: 0 !important;
@@ -1890,7 +1943,7 @@ body.is-resizing-center {
   min-height: 0;
 }
 .ui-mock-choice {
-  background: var(--ui-choice-bg);
+  background: transparent;
   color: var(--ui-choice-text);
   border: 1px solid var(--ui-choice-border);
   border-radius: var(--ui-corner-radius);
@@ -1917,28 +1970,76 @@ body.is-resizing-center {
 .ui-mock-frame[data-smooth-inventory-item="1"] .ui-mock-inventory-item { image-rendering: auto; }
 
 .ui-mock-dialogue {
-  opacity: var(--ui-dialogue-opacity, 1);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
   border: var(--ui-dialogue-border-width, 0px) solid var(--ui-dialogue-border-color, transparent);
   box-shadow: 0 0 var(--ui-dialogue-glow-size, 0px) var(--ui-dialogue-glow-color, transparent);
 }
+.ui-mock-dialogue::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--ui-dialogue-bg);
+  background-image: var(--ui-dialogue-sprite, none);
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--ui-dialogue-opacity, 1);
+}
 .ui-mock-dialogue-text {
+  position: relative;
+  z-index: 1;
   font-size: var(--ui-dialogue-font-size, 100%);
 }
 .ui-mock-frame[data-bestfit-dialogue="1"] .ui-mock-dialogue-text { font-size: clamp(0.8rem, 1.1vw, 1.1rem); }
 .ui-mock-nameplate {
-  opacity: var(--ui-nameplate-opacity, 1);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
   border: var(--ui-nameplate-border-width, 0px) solid var(--ui-nameplate-border-color, transparent);
   box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
+}
+.ui-mock-nameplate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.55);
   background-image: var(--ui-nameplate-sprite, none);
   background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--ui-nameplate-opacity, 1);
 }
-.ui-mock-speaker { font-size: var(--ui-nameplate-font-size, 100%); }
+.ui-mock-speaker { position: relative; z-index: 1; font-size: var(--ui-nameplate-font-size, 100%); }
 .ui-mock-choice {
-  opacity: var(--ui-choices-opacity, 1);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
   border-width: var(--ui-choices-border-width, 1px);
   border-color: var(--ui-choices-border-color, var(--ui-choice-border));
   box-shadow: 0 0 var(--ui-choices-glow-size, 0px) var(--ui-choices-glow-color, transparent);
   font-size: var(--ui-choices-font-size, 100%);
+}
+.ui-mock-choice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--ui-choice-bg);
+  background-image: var(--ui-choice-sprite, none);
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--ui-choices-opacity, 1);
 }
 .ui-mock-menu {
   opacity: var(--ui-menu-opacity, 1);
@@ -2176,22 +2277,35 @@ body.is-resizing-center {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  background: rgba(0, 0, 0, 0.55);
+  isolation: isolate;
+  background: transparent;
   border-left: 3px solid var(--ui-accent);
   border-radius: 4px;
   color: var(--ui-speaker);
   font-size: var(--ui-nameplate-font-size, 0.85em);
   font-family: var(--ui-nameplate-font-family, inherit);
-  opacity: var(--ui-nameplate-opacity, 1);
   border-width: var(--ui-nameplate-border-width, 0px);
   border-style: solid;
   border-color: var(--ui-nameplate-border-color, transparent);
   border-left-width: max(3px, var(--ui-nameplate-border-width, 0px));
   border-left-color: var(--ui-accent);
   box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
+  pointer-events: none;
+}
+
+.preview-frame--laid-out .preview-nameplate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.55);
   background-image: var(--ui-nameplate-sprite, none);
   background-size: 100% 100%;
-  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--ui-nameplate-opacity, 1);
 }
 
 .preview-frame--laid-out .preview-dialogue .preview-speaker {

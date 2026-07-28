@@ -2371,6 +2371,8 @@
       el.style.setProperty("--preview-aspect-w", String(aw));
       el.style.setProperty("--preview-aspect-h", String(ah));
       if (series.readerUi) series.readerUi.aspectRatio = "16:9";
+      el.dataset.playfieldAw = String(aw);
+      el.dataset.playfieldAh = String(ah);
       el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
       el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
       el.style.setProperty("--ui-accent", ui.colors.accent);
@@ -2497,6 +2499,64 @@
       el.classList.add("preview-frame--laid-out");
       if (typeof opts.onApplied === "function") opts.onApplied(ui);
       return ui;
+    },
+
+    /**
+     * Letterbox el into viewport at a fixed aspect (default 16:9 / 1920×1080).
+     * Sets exact pixel size so UI % and stage art never warp when the pane resizes.
+     * Font size is derived from the fitted width (not the outer viewport).
+     */
+    fitPlayfield: function (el, viewportEl, opts) {
+      opts = opts || {};
+      if (!el || !viewportEl) return null;
+      var aw = opts.aspectW || parseInt(el.dataset.playfieldAw, 10) || 16;
+      var ah = opts.aspectH || parseInt(el.dataset.playfieldAh, 10) || 9;
+      var pad = opts.pad != null ? opts.pad : 0;
+      var pw = Math.max(0, viewportEl.clientWidth - pad * 2);
+      var ph = Math.max(0, viewportEl.clientHeight - pad * 2);
+      if (pw < 2 || ph < 2) return null;
+      var scale = Math.min(pw / aw, ph / ah);
+      var w = Math.max(1, Math.floor(aw * scale));
+      var h = Math.max(1, Math.floor(ah * scale));
+      var dialogueScale = parseFloat(el.style.getPropertyValue("--ui-dialogue-scale")) || 1;
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+      el.style.maxWidth = "none";
+      el.style.maxHeight = "none";
+      el.style.aspectRatio = "unset";
+      el.style.flex = "0 0 auto";
+      el.style.fontSize = ((7 + 0.52 * (w / 100)) * dialogueScale).toFixed(3) + "px";
+      el.classList.add("preview-frame--fitted");
+      el.dataset.playfieldW = String(w);
+      el.dataset.playfieldH = String(h);
+      return { width: w, height: h, scale: scale };
+    },
+
+    bindPlayfieldFit: function (el, viewportEl, opts) {
+      opts = opts || {};
+      if (!el || !viewportEl || typeof ResizeObserver === "undefined") {
+        if (el && viewportEl) this.fitPlayfield(el, viewportEl, opts);
+        return null;
+      }
+      var self = this;
+      if (el._scenaFitObserver) {
+        try { el._scenaFitObserver.disconnect(); } catch (e) { /* ignore */ }
+        el._scenaFitObserver = null;
+      }
+      var pending = null;
+      var run = function () {
+        pending = null;
+        self.fitPlayfield(el, viewportEl, opts);
+      };
+      var schedule = function () {
+        if (pending) return;
+        pending = requestAnimationFrame(run);
+      };
+      var ro = new ResizeObserver(schedule);
+      ro.observe(viewportEl);
+      el._scenaFitObserver = ro;
+      run();
+      return ro;
     },
 
     resolveReaderMenu: function (series) {

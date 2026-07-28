@@ -828,6 +828,7 @@
     this.edgesTemp = this.container.querySelector("#graphEdgesTemp");
     this.inspector = this.container.querySelector("#graphInspector");
     this.previewEl = this.container.querySelector("#gamePreview");
+    this.previewViewport = this.container.querySelector(".preview-viewport");
     this.panelCenter = this.container.querySelector("#panelCenter");
     this.resourcesList = this.container.querySelector("#resourcesList");
     this.resourcesDetail = this.container.querySelector("#resourcesDetail");
@@ -865,6 +866,8 @@
       });
       this.updateParallaxToggle();
     }
+
+    this.bindPreviewPlayfieldFit();
 
     this.bindEpisodeEditorModal();
 
@@ -3022,12 +3025,18 @@
     this.syncInspectorPanel();
   };
 
+  ScenaGraphEditor.prototype.bindPreviewPlayfieldFit = function () {
+    if (!this.previewEl || !this.previewViewport || !window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
+    ScenaStore.bindPlayfieldFit(this.previewEl, this.previewViewport, { pad: 0 });
+  };
+
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
     if (!this.previewEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
     var self = this;
     ScenaStore.applyReaderUiToFrame(this.previewEl, this.series, {
       onApplied: function () {
         self.syncReaderMenu();
+        self.bindPreviewPlayfieldFit();
       },
     });
   };

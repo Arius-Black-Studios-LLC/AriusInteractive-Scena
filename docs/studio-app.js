@@ -1287,7 +1287,7 @@
     var prefix = "uiAp" + key.charAt(0).toUpperCase() + key.slice(1);
     var defaultBg = opts.defaultBgColor || "#2a2a2a";
     return (
-      '<div class="field"><label>Opacity</label><input type="range" name="' + prefix + 'Opacity" min="0" max="100" step="1" value="' + (ap.opacity || 100) + '"></div>' +
+      '<div class="field"><label>Background opacity</label><input type="range" name="' + prefix + 'Opacity" min="0" max="100" step="1" value="' + (ap.opacity || 100) + '"></div>' +
       '<div class="field"><label class="field-inline"><input type="checkbox" name="' + prefix + 'Smooth"' + (ap.smooth ? " checked" : "") + '> Smooth edges</label></div>' +
       '<div class="field"><label>Background color</label><input type="color" name="' + prefix + 'BgColor" value="' +
         escapeAttr(toColorInput(ap.bgColor) || defaultBg) + '"></div>' +
