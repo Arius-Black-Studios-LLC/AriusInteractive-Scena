@@ -305,6 +305,7 @@
 
 .featured-body {
   padding: 20px 22px 22px;
+  background: var(--surface);
 }
 
 .featured-eyebrow {
@@ -322,6 +323,7 @@
   font-size: 1.375rem;
   line-height: 1.25;
   margin: 0 0 8px;
+  color: var(--ink);
 }
 
 .featured-card--hero .featured-title {

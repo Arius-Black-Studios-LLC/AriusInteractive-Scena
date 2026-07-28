@@ -53,6 +53,7 @@
 
 .series-card-body {
   padding: 16px 18px 18px;
+  background: var(--surface);
 }
 
 .series-card-title {
@@ -60,6 +61,7 @@
   font-size: 1.0625rem;
   font-weight: 600;
   margin-bottom: 6px;
+  color: var(--ink);
 }
 
 .series-card-desc {

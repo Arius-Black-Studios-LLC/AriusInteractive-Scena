@@ -796,11 +796,11 @@
 
             (series.bannerDataUrl
 
-              ? ('<div class="series-banner" style="background-image:url(' + escapeHtml(series.bannerDataUrl) + ')"></div>')
+              ? ('<div class="series-banner-block"><div class="series-banner" style="background-image:url(' + escapeHtml(series.bannerDataUrl) + ')"></div></div>')
 
               : "") +
 
-            '<div class="series-hero-text">' +
+            '<div class="series-hero-heading">' +
 
               '<h1>' + escapeHtml(series.title || "Story") + "</h1>" +
 

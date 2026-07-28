@@ -8,6 +8,7 @@
 
 .series-shell {
   min-height: 100vh;
+  padding-bottom: 64px;
 }
 
 .series-header {
@@ -16,46 +17,43 @@
   margin: 0 auto;
 }
 
-.series-hero {
-  position: relative;
-  margin-top: 20px;
+.series-banner-block {
+  margin-top: 16px;
   border-radius: 16px;
   overflow: hidden;
-  min-height: 0;
-  background: linear-gradient(135deg, #1a2438, #0c1220);
-}
-
-.series-hero--banner {
-  min-height: 200px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .series-banner {
-  position: absolute;
-  inset: 0;
+  width: 100%;
+  aspect-ratio: 21 / 9;
+  max-height: 280px;
   background-size: cover;
   background-position: center;
-  opacity: 0.45;
+  background-repeat: no-repeat;
 }
 
-.series-hero-text {
-  position: relative;
-  padding: 28px 24px 32px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.15));
+.series-hero-heading {
+  padding: 20px 4px 0;
 }
 
-.series-hero-text h1 {
+.series-hero-heading h1 {
   margin: 0;
   font-family: "Fraunces", Georgia, serif;
   font-size: clamp(1.75rem, 4vw, 2.5rem);
   font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
 }
 
 .series-about {
   margin-bottom: 36px;
 }
 
-.series-about-body {
-  color: var(--muted);
+.series-page .series-about-body {
+  color: var(--ink, #141414);
+  font-size: 1rem;
   line-height: 1.65;
   max-width: 42rem;
   white-space: pre-wrap;
@@ -68,25 +66,19 @@
   font-size: 0.875rem;
 }
 
+.series-back:hover,
+.series-account-link:hover {
+  color: var(--ink);
+}
+
 .series-header-actions {
   float: right;
 }
 
-.series-hero h1 {
-  font-family: "Fraunces", Georgia, serif;
-  margin: 20px 0 8px;
-}
-
-.series-hero p {
-  color: var(--muted);
-  line-height: 1.6;
-  max-width: 42rem;
-}
-
-/* legacy selectors — prefer .series-hero-text h1 in React overview */
-
 .series-main {
-  padding: 32px 20px 64px;
+  padding: 32px 20px 0;
+  max-width: 920px;
+  margin: 0 auto;
 }
 
 .series-saves,
@@ -94,11 +86,19 @@
   margin-bottom: 36px;
 }
 
-.series-saves-toolbar {
+.series-saves-toolbar,
+.series-chapters h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.series-chapters h2 {
+  margin-bottom: 14px;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.25rem;
+  color: var(--ink);
 }
 
 .series-save-list {
@@ -114,6 +114,7 @@
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
+  color: var(--ink);
   cursor: pointer;
   font: inherit;
 }
@@ -138,6 +139,7 @@
   border-radius: 12px;
   padding: 16px 18px;
   background: var(--surface);
+  color: var(--ink);
 }
 
 .series-chapter--locked {
@@ -155,6 +157,7 @@
 .series-chapter h3 {
   margin: 0 0 10px;
   font-family: "Fraunces", Georgia, serif;
+  color: var(--ink);
 }
 
 .series-chapter-lock {

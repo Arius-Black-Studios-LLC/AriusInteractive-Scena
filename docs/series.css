@@ -118,15 +118,21 @@
 
 .series-hero {
 
-  position: relative;
+  margin-top: 16px;
+
+}
+
+
+
+.series-banner-block {
 
   border-radius: 16px;
 
   overflow: hidden;
 
-  min-height: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 
-  background: linear-gradient(135deg, #1a2438, #0c1220);
+  background: rgba(255, 255, 255, 0.04);
 
 }
 
@@ -134,33 +140,31 @@
 
 .series-banner {
 
-  position: absolute;
+  width: 100%;
 
-  inset: 0;
+  aspect-ratio: 21 / 9;
+
+  max-height: 280px;
 
   background-size: cover;
 
   background-position: center;
 
-  opacity: 0.45;
+  background-repeat: no-repeat;
 
 }
 
 
 
-.series-hero-text {
+.series-hero-heading {
 
-  position: relative;
-
-  padding: 28px 24px 32px;
-
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.15));
+  padding: 20px 4px 0;
 
 }
 
 
 
-.series-hero-text h1 {
+.series-hero-heading h1 {
 
   margin: 0;
 
@@ -169,6 +173,18 @@
   font-size: clamp(1.75rem, 4vw, 2.5rem);
 
   font-weight: 600;
+
+  line-height: 1.2;
+
+  color: rgba(255, 255, 255, 0.96);
+
+}
+
+
+
+.series-hero-text {
+
+  display: none;
 
 }
 
@@ -198,7 +214,7 @@
 
 
 
-.series-about-body {
+.series-body .series-about-body {
 
   color: rgba(255, 255, 255, 0.72);
 

@@ -759,7 +759,10 @@
       to { transform: scale(1); opacity: 1; }
     }
 
-    .featured-body { padding: 20px 22px 22px; }
+    .featured-body {
+      padding: 20px 22px 22px;
+      background: var(--scena-surface);
+    }
 
     .featured-eyebrow {
       font-size: 0.75rem;
@@ -776,6 +779,7 @@
       font-size: 1.375rem;
       line-height: 1.25;
       margin-bottom: 8px;
+      color: var(--scena-text);
     }
 
     .featured-card--hero .featured-title { font-size: 1.75rem; }
@@ -875,13 +879,17 @@
       backdrop-filter: blur(4px);
     }
 
-    .card-body { padding: 14px 16px 16px; }
+    .card-body {
+      padding: 14px 16px 16px;
+      background: var(--scena-surface);
+    }
 
     .card-title {
       font-weight: 600;
       font-size: 0.9375rem;
       line-height: 1.35;
       margin-bottom: 6px;
+      color: var(--scena-text);
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;

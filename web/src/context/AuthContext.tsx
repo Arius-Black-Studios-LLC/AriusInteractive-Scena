@@ -20,6 +20,7 @@ type AuthContextValue = {
   signIn: (email: string, role?: string, postLogin?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -82,6 +83,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
+  const refreshProfile = useCallback(async () => {
+    const userId = session?.user?.id;
+    if (!userId || !session) {
+      setIsAdmin(false);
+      return;
+    }
+    setProfileLoading(true);
+    try {
+      await loadLegacyScripts(["scena-auth.js", "scena-profile.js"]);
+      window.ScenaProfile?.clearCache?.(userId);
+      const profile = await window.ScenaProfile?.get(userId, session);
+      setIsAdmin(!!profile?.isAdmin);
+    } catch {
+      setIsAdmin(false);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [session]);
+
   const signIn = useCallback(
     async (email: string, role?: string, postLogin?: string) => {
       if (postLogin) {
@@ -116,8 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       refresh,
+      refreshProfile,
     }),
-    [session, loading, profileLoading, isAdmin, configured, signIn, signOut, refresh],
+    [session, loading, profileLoading, isAdmin, configured, signIn, signOut, refresh, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

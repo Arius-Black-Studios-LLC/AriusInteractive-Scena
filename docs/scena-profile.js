@@ -31,6 +31,50 @@
     return /does not exist|could not find the function|schema cache|PGRST202/i.test(msg);
   }
 
+  function schemaColumnError(err) {
+    var msg = String((err && (err.message || err.details || err.hint)) || err || "");
+    return /could not find.*column|column.*does not exist|schema cache|PGRST204/i.test(msg);
+  }
+
+  var PROFILE_SELECT_FULL =
+    "id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin";
+  var PROFILE_SELECT_STANDARD =
+    "id, email, display_name, username, pronouns, avatar_url, is_admin";
+  var PROFILE_SELECT_BASE =
+    "id, email, display_name, username, pronouns, avatar_url";
+
+  var profileColumnsTier = "full";
+
+  function queryProfileRow(sb, userId, columns) {
+    return sb.from("profiles").select(columns).eq("id", userId).maybeSingle();
+  }
+
+  function fetchProfileRow(sb, userId) {
+    return queryProfileRow(sb, userId, PROFILE_SELECT_FULL).then(function (result) {
+      if (!result.error) {
+        profileColumnsTier = "full";
+        return result.data;
+      }
+      if (!schemaColumnError(result.error)) {
+        return Promise.reject(result.error);
+      }
+      return queryProfileRow(sb, userId, PROFILE_SELECT_STANDARD).then(function (retry) {
+        if (!retry.error) {
+          profileColumnsTier = "standard";
+          return retry.data;
+        }
+        if (!schemaColumnError(retry.error)) {
+          return Promise.reject(retry.error);
+        }
+        return queryProfileRow(sb, userId, PROFILE_SELECT_BASE).then(function (base) {
+          if (base.error) return Promise.reject(base.error);
+          profileColumnsTier = "base";
+          return base.data;
+        });
+      });
+    });
+  }
+
   function oauthAvatarFromUser(user) {
     var meta = (user && user.user_metadata) || {};
     return meta.avatar_url || meta.picture || meta.photo || "";
@@ -185,13 +229,14 @@
         return Promise.resolve(cache[userId]);
       }
 
-      return sb.from("profiles")
-        .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin")
-        .eq("id", userId)
-        .maybeSingle()
-        .then(function (r) {
-          if (!r.error && r.data) {
-            return finishProfile(r.data);
+      return fetchProfileRow(sb, userId)
+        .then(function (row) {
+          return finishProfile(row);
+        })
+        .catch(function (err) {
+          if (!schemaColumnError(err)) {
+            cache[userId] = cache[userId] || fallback;
+            return cache[userId];
           }
           return sb.rpc("ensure_auth_profile").then(function (ensureRes) {
             if (!ensureRes.error) {
@@ -204,20 +249,14 @@
               return refetchProfile();
             });
           });
-        })
-        .catch(function () {
-          cache[userId] = cache[userId] || fallback;
-          return cache[userId];
         });
 
       function refetchProfile() {
-        return sb.from("profiles")
-          .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin")
-          .eq("id", userId)
-          .maybeSingle()
-          .then(function (retry) {
-            return finishProfile(retry.error ? null : retry.data);
-          });
+        return fetchProfileRow(sb, userId).then(function (row) {
+          return finishProfile(row);
+        }, function () {
+          return finishProfile(null);
+        });
       }
 
       function insertProfileFallback() {
@@ -267,6 +306,7 @@
           birthYear: patch.birthYear != null
             ? parseInt(patch.birthYear, 10) || null
             : current.birthYear || null,
+          isAdmin: !!current.isAdmin,
         };
 
         if (next.birthYear && (next.birthYear < 1900 || next.birthYear > new Date().getFullYear())) {
@@ -309,14 +349,30 @@
             row.avatar_url = next.avatarUrl || null;
           }
         }
-        if (patch.birthYear != null) row.birth_year = next.birthYear;
-        if (patch.adultVerifiedAt != null) {
-          row.adult_verified_at = next.adultVerifiedAt ? next.adultVerifiedAt : null;
+        if (profileColumnsTier === "full") {
+          if (patch.birthYear != null) row.birth_year = next.birthYear;
+          if (patch.adultVerifiedAt != null) {
+            row.adult_verified_at = next.adultVerifiedAt ? next.adultVerifiedAt : null;
+          }
         }
 
-        return sb.from("profiles").update(row).eq("id", userId).then(function (r) {
-          if (r.error) throw r.error;
-          return next;
+        function runUpdate(payload) {
+          return sb.from("profiles").update(payload).eq("id", userId).then(function (r) {
+            if (r.error) throw r.error;
+            return next;
+          });
+        }
+
+        return runUpdate(row).catch(function (err) {
+          if (!schemaColumnError(err)) throw err;
+          var minimal = {
+            display_name: next.displayName,
+            username: next.username || null,
+            pronouns: next.pronouns || null,
+          };
+          if (row.avatar_url !== undefined) minimal.avatar_url = row.avatar_url;
+          profileColumnsTier = "base";
+          return runUpdate(minimal);
         });
       });
     },

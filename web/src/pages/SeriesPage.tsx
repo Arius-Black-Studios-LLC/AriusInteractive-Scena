@@ -26,8 +26,6 @@ export function SeriesPage() {
   const seriesId = params.get("series");
   const lockedEp = params.get("locked");
   const { ready, error: loadError } = useLegacyBundle("reader", [
-    "studio.css",
-    "series.css",
     "scena-logo.css",
     "arleco-theme.css",
   ]);
@@ -171,7 +169,7 @@ export function SeriesPage() {
   }
 
   return (
-    <div className="series-shell">
+    <div className="series-shell series-page">
       <header className="series-header">
         <Link className="series-back" to="/">
           ← Discover
@@ -183,18 +181,18 @@ export function SeriesPage() {
             </Link>
           </div>
         ) : null}
-        <div className={`series-hero${bannerUrl ? " series-hero--banner" : ""}`}>
-          {bannerUrl ? (
+        {bannerUrl ? (
+          <div className="series-banner-block">
             <div
               className="series-banner"
               style={{ backgroundImage: `url(${bannerUrl})` }}
               role="img"
               aria-label=""
             />
-          ) : null}
-          <div className="series-hero-text">
-            <h1>{title}</h1>
           </div>
+        ) : null}
+        <div className="series-hero-heading">
+          <h1>{title}</h1>
         </div>
       </header>
 

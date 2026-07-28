@@ -6,7 +6,7 @@ import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import "./AccountPage.css";
 
 export function AccountPage() {
-  const { session, userId, loading: authLoading, signOut } = useAuth();
+  const { session, userId, loading: authLoading, signOut, isAdmin, profileLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const mainRef = useRef<HTMLElement>(null);
   const { ready, error } = useLegacyBundle("account", [
@@ -15,6 +15,10 @@ export function AccountPage() {
     "arleco-theme.css",
   ]);
   const [bootError, setBootError] = useState<string | null>(null);
+
+  useEffect(() => {
+    refreshProfile().catch(() => undefined);
+  }, [refreshProfile]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -89,6 +93,16 @@ export function AccountPage() {
         </div>
         <div className="account-topbar-right">
           <DucatBalance className="ducat-hud--studio" />
+          {!profileLoading && isAdmin ? (
+            <>
+              <Link className="btn btn-ghost btn-sm" to="/admin/featured">
+                Staff picks
+              </Link>
+              <Link className="btn btn-ghost btn-sm" to="/admin/moderation">
+                Moderation
+              </Link>
+            </>
+          ) : null}
           <span className="user-email" id="accountUserEmail" />
           <Link className="btn btn-ghost btn-sm" to="/">
             Discover
