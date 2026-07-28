@@ -55,7 +55,7 @@ window.ARLECO_CONFIG = {
 |------|-----|
 | Discover + log in | `https://arleco.app/` |
 | Creator studio | `https://arleco.app/studio` |
-| Conservatory | `https://arleco.app/learn` |
+| Tutorials | `https://arleco.app/tutorials` |
 | Help | `https://arleco.app/help` |
 
 ## 5. Local preview

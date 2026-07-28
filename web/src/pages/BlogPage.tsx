@@ -102,7 +102,7 @@ export function BlogPage() {
         </section>
 
         <p className="blog-foot">
-          <Link to="/studio">Open creator studio</Link> · <Link to="/">Discover stories</Link>
+          <Link to="/studio">Open creator studio</Link> · <Link to="/discover">Discover stories</Link>
       </p>
     </main>
   );

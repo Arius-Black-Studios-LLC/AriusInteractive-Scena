@@ -511,7 +511,7 @@
             '<div class="studio-badges-head">' +
               '<h2>Your laurels</h2>' +
               '<div id="studioBadgeSummary"></div>' +
-              '<a class="btn btn-sm btn-ghost" href="/learn">The Conservatory →</a>' +
+              '<a class="btn btn-sm btn-ghost" href="/tutorials">Tutorials →</a>' +
             '</div>' +
             '<div class="studio-badges-scroll">' +
               '<div id="studioBadgeGrid"></div>' +

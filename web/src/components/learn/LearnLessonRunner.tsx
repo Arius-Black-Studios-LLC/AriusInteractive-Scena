@@ -60,16 +60,16 @@ export function LearnLessonRunner({ lesson }: Props) {
     const lessons = learnAdapter.listLessons();
     const idx = lessons.findIndex((l) => l.id === lesson.id);
     if (idx >= 0 && idx < lessons.length - 1) {
-      navigate(`/learn/${lessons[idx + 1]!.id}`);
+      navigate(`/tutorials/${lessons[idx + 1]!.id}`);
     } else {
-      navigate("/learn");
+      navigate("/tutorials");
     }
   }
 
   return (
     <div className="learn-lesson">
       <nav className="learn-lesson-nav">
-        <Link to="/learn" className="learn-back">
+        <Link to="/tutorials" className="learn-back">
           ← All acts
         </Link>
         <span className="learn-lesson-category">{lesson.category}</span>
@@ -99,7 +99,7 @@ export function LearnLessonRunner({ lesson }: Props) {
               <button type="button" className="btn btn-primary" onClick={goNext}>
                 Next act →
               </button>
-              <Link to="/learn" className="btn btn-ghost">
+              <Link to="/tutorials" className="btn btn-ghost">
                 Back to catalog
               </Link>
             </div>

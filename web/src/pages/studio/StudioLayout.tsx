@@ -39,7 +39,7 @@ function StudioDesktopGate() {
           app and <strong>Arleco Reader</strong> are on the roadmap — this web studio stays desktop-first.
         </p>
         <div className="studio-desktop-gate-actions">
-          <Link className="btn btn-primary" to="/">
+          <Link className="btn btn-primary" to="/discover">
             Discover stories
           </Link>
           <Link className="btn btn-ghost" to="/account">

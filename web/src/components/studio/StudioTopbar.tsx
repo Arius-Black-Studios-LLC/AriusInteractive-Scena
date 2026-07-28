@@ -36,10 +36,10 @@ export function StudioTopbar() {
         <Link className="btn btn-ghost btn-sm" to="/account">
           Account
         </Link>
-        <Link className="btn btn-ghost btn-sm" to="/learn">
-          Conservatory
+        <Link className="btn btn-ghost btn-sm" to="/tutorials">
+          Tutorials
         </Link>
-        <Link className="btn btn-ghost btn-sm" to="/">
+        <Link className="btn btn-ghost btn-sm" to="/discover">
           View site
         </Link>
         <button

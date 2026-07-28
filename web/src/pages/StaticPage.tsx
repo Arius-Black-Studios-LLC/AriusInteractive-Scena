@@ -26,7 +26,7 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
         items: [
           "Open Creator studio to draft chapters on the graph editor.",
           "Validate your graph before publishing a chapter live.",
-          "Visit the Conservatory for interactive lessons on stagecraft.",
+          "Visit Tutorials for interactive lessons on branching stories.",
         ],
       },
       { type: "p", text: "Need more help? Email hello@arleco.app or join our Discord community." },
@@ -109,7 +109,7 @@ export function StaticPage({ page }: { page: keyof typeof PAGES }) {
           return <p key={i}>{block.text}</p>;
         })}
         <p className="static-foot">
-          <Link to="/">Discover</Link> · <Link to="/help">Help</Link>
+          <Link to="/discover">Discover</Link> · <Link to="/help">Help</Link>
       </p>
     </main>
   );

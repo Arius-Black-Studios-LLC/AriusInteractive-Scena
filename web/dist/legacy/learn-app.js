@@ -63,7 +63,7 @@
     main.innerHTML =
       '<div class="learn-catalog">' +
         '<header class="learn-hero">' +
-          '<p class="learn-eyebrow">The Conservatory</p>' +
+          '<p class="learn-eyebrow">Tutorials</p>' +
           '<h1>Stagecraft for the digital house</h1>' +
           '<p class="learn-lede">Rehearse in the real editor. Complete each scene to earn laurels — badges drawn from classical theatre.</p>' +
           '<div class="learn-progress-bar">' +

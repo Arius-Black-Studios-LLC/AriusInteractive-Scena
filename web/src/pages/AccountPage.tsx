@@ -124,7 +124,7 @@ export function AccountPage() {
             </>
           ) : null}
           <span className="user-email" id="accountUserEmail" />
-          <Link className="btn btn-ghost btn-sm" to="/">
+          <Link className="btn btn-ghost btn-sm" to="/discover">
             Discover
           </Link>
           <Link className="btn btn-ghost btn-sm" to="/studio">

@@ -45,11 +45,10 @@ export function SiteHeader({ onOpenLogin }: Props) {
           <span className="logo-text">Arleco</span>
         </Link>
         <nav className="site-nav" aria-label="Primary">
-          <a href="/#discover">Discover</a>
-          <a href="/#featured">Featured</a>
+          <Link to="/discover">Discover</Link>
+          <Link to="/tutorials">Tutorials</Link>
           <Link to="/blog">Blog</Link>
           <Link to="/forums">Forums</Link>
-          <Link to="/learn">Conservatory</Link>
           <Link to="/jams">Game jams</Link>
         </nav>
         <div className="site-header-actions">

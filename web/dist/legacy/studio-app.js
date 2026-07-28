@@ -6,6 +6,7 @@
   var userEmail = "";
   var userProfile = null;
   var graphEditor = null;
+  var pixelArtEditor = null;
   var toastTimer = null;
 
   function $(sel, root) {
@@ -72,6 +73,9 @@
       return { view: "library", libraryTab: libTab };
     }
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
+    if (parts[0] === "pixel" || parts[0] === "art") {
+      return { view: "pixel" };
+    }
     if (parts[0] === "jams") {
       if (parts[1] === "new") {
         return { view: "jams", jamMode: "new", jamType: parts[2] === "asset" ? "asset" : "game" };
@@ -92,12 +96,17 @@
         return { view: "settings", seriesId: seriesId, settingsTab: settingsTab };
       }
       if (parts[2] === "graph") return { view: "graph", seriesId: seriesId };
+      if (parts[2] === "art" || parts[2] === "pixel") {
+        // Legacy series art route → global Pixel editor
+        return { view: "pixel", redirectFromSeriesArt: true };
+      }
       if (parts[2] === "resources") return { view: "resources", seriesId: seriesId, tab: parts[3] || "characters" };
       if (parts[2] === "episodes") return { view: "episodes", seriesId: seriesId };
       var savedView = "graph";
       try {
         var stored = sessionStorage.getItem("scena.studioView." + seriesId);
         if (stored === "episodes" || stored === "settings" || stored === "graph") savedView = stored;
+        if (stored === "art" || stored === "pixel") savedView = "graph";
       } catch (e) { /* ignore */ }
       return { view: savedView, seriesId: seriesId };
     }
@@ -105,7 +114,7 @@
   }
 
   function rememberStudioView(seriesId, view) {
-    if (!seriesId || !view || view === "resources") return;
+    if (!seriesId || !view || view === "resources" || view === "art" || view === "pixel") return;
     try { sessionStorage.setItem("scena.studioView." + seriesId, view); } catch (e) { /* ignore */ }
   }
 
@@ -182,17 +191,18 @@
         '<div class="sidebar-section-label">Workspace</div>' +
         sidebarLink("#/series/" + series.id + "/graph", "Story editor", activeView === "graph") +
         sidebarLink("#/series/" + series.id + "/episodes", "Episodes", activeView === "episodes") +
+        sidebarLink("#/series/" + series.id + "/settings/ui", "Game UI", activeView === "settings" && window.__scenaSettingsTab === "ui") +
         '<div class="sidebar-section-label">Series</div>' +
         sidebarLink("#/series/" + series.id + "/settings", "Settings", activeView === "settings" && (!window.__scenaSettingsTab || window.__scenaSettingsTab === "basics")) +
         sidebarLink("#/series/" + series.id + "/settings/monetization", "Monetization", activeView === "settings" && window.__scenaSettingsTab === "monetization") +
-        sidebarLink("#/series/" + series.id + "/settings/promotion", "Promotion", activeView === "settings" && window.__scenaSettingsTab === "promotion") +
-        sidebarLink("#/series/" + series.id + "/settings/ui", "Game UI", activeView === "settings" && window.__scenaSettingsTab === "ui");
+        sidebarLink("#/series/" + series.id + "/settings/promotion", "Promotion", activeView === "settings" && window.__scenaSettingsTab === "promotion");
     }
 
     sidebar.innerHTML =
       '<div class="sidebar-section-label">Creator</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
       sidebarLink("#/library", "My assets", activeView === "library") +
+      sidebarLink("#/pixel", "Pixel editor", activeView === "pixel") +
       sidebarLink("#/jams", "Jams", activeView === "jams") +
       nav;
 
@@ -215,6 +225,13 @@
     graphEditor = null;
   }
 
+  function destroyPixelArtEditor() {
+    if (pixelArtEditor && pixelArtEditor.destroy) {
+      pixelArtEditor.destroy();
+    }
+    pixelArtEditor = null;
+  }
+
   function mountGraphEditor(container, opts) {
     if (window.ScenaGraphEditorBridge && window.ScenaGraphEditorBridge.create) {
       return window.ScenaGraphEditorBridge.create(container, opts);
@@ -227,6 +244,7 @@
     var main = $("#studioMain");
     if (!main) return;
     destroyGraphEditor();
+    destroyPixelArtEditor();
     updateTopbarForRoute(route);
 
     try {
@@ -291,6 +309,17 @@
       ScenaStore.setActiveSeries(null);
       renderShell("library", null);
       renderLibraryPage(main, route.libraryTab || "assets");
+      return;
+    }
+
+    if (route.view === "pixel") {
+      if (/^#?\/series\//.test(location.hash || "")) {
+        navigate("/pixel");
+        return;
+      }
+      ScenaStore.setActiveSeries(null);
+      renderShell("pixel", null);
+      mountGlobalPixelEditor(main);
       return;
     }
 
@@ -360,6 +389,26 @@
     } else if (route.view === "episodes") {
       main.innerHTML = renderEpisodes(series);
       bindEpisodes(series);
+    }
+  }
+
+  function mountGlobalPixelEditor(main) {
+    main.innerHTML = '<div id="pixelArtRoot"></div>';
+    // Migrate any leftover series art folders into the user library once.
+    try {
+      ScenaStore.listSeries(userId).forEach(function (s) {
+        ScenaStore.migrateSeriesArtToUser(userId, s);
+      });
+    } catch (e) { /* ignore */ }
+    if (window.ScenaPixelArt && ScenaPixelArt.mount) {
+      if (pixelArtEditor && pixelArtEditor.destroy) pixelArtEditor.destroy();
+      pixelArtEditor = ScenaPixelArt.mount($("#pixelArtRoot"), {
+        userId: userId,
+        toast: toast,
+        persist: function () { return Promise.resolve(); },
+      });
+    } else {
+      main.innerHTML = '<div class="page"><p class="field-hint">Pixel art editor failed to load. Refresh the page.</p></div>';
     }
   }
 
@@ -462,7 +511,7 @@
             '<div class="studio-badges-head">' +
               '<h2>Your laurels</h2>' +
               '<div id="studioBadgeSummary"></div>' +
-              '<a class="btn btn-sm btn-ghost" href="/learn">The Conservatory →</a>' +
+              '<a class="btn btn-sm btn-ghost" href="/tutorials">Tutorials →</a>' +
             '</div>' +
             '<div class="studio-badges-scroll">' +
               '<div id="studioBadgeGrid"></div>' +
@@ -581,12 +630,9 @@
         '<p class="field-hint">Presets, colors, shapes, and sprites. Drag layout on the mockup to the left.</p>' +
         '<div class="ui-preset-cards" id="uiPresetCards">' + presetCards + '</div>' +
         '<div class="ui-settings-grid">' +
-          '<div class="field"><label>Aspect ratio</label>' +
-            '<select name="uiAspectRatio">' +
-              '<option value="16:9"' + (ui.aspectRatio === "16:9" ? " selected" : "") + '>16:9 landscape</option>' +
-              '<option value="9:16"' + (ui.aspectRatio === "9:16" ? " selected" : "") + '>9:16 portrait</option>' +
-              '<option value="4:3"' + (ui.aspectRatio === "4:3" ? " selected" : "") + '>4:3 classic</option>' +
-            '</select></div>' +
+          '<div class="field"><label>Display</label>' +
+            '<p class="field-hint" style="margin:0">Always 1920×1080 (16:9)</p>' +
+            '<input type="hidden" name="uiAspectRatio" value="16:9"></div>' +
           '<div class="field"><label>Dialogue shape</label>' +
             '<select name="uiDialogueShape">' +
               ["bar", "minimal", "frame", "box"].map(function (s) {
@@ -672,7 +718,8 @@
     var presetActive = document.querySelector("#uiPresetCards .ui-preset-card.is-active");
     if (presetActive) ui.preset = presetActive.getAttribute("data-ui-preset");
     var aspect = form.querySelector('[name="uiAspectRatio"]');
-    if (aspect) ui.aspectRatio = aspect.value;
+    if (aspect) ui.aspectRatio = "16:9";
+    else ui.aspectRatio = "16:9";
     var dialogueShape = form.querySelector('[name="uiDialogueShape"]');
     var choiceShape = form.querySelector('[name="uiChoiceShape"]');
     var uiAccent = form.querySelector('[name="uiAccent"]');
@@ -707,6 +754,10 @@
       showAudioSettings: true,
       inventoryDisplay: "grid",
       showInventoryHud: false,
+      panelSide: "right",
+      panelWidth: 42,
+      panelBg: "#12100e",
+      panelText: "#f5f0e6",
     };
     var clickSel = form.querySelector('[name="uiClickAsset"]');
     if (clickSel) ui.sounds.clickAssetId = clickSel.value || null;
@@ -722,6 +773,14 @@
     if (invDisplay) ui.menu.inventoryDisplay = invDisplay.value === "list" ? "list" : "grid";
     var invHud = form.querySelector('[name="uiShowInventoryHud"]');
     if (invHud) ui.menu.showInventoryHud = invHud.checked;
+    var panelSide = form.querySelector('[name="uiMenuPanelSide"]');
+    if (panelSide) ui.menu.panelSide = panelSide.value === "left" ? "left" : "right";
+    var panelWidth = form.querySelector('[name="uiMenuPanelWidth"]');
+    if (panelWidth) ui.menu.panelWidth = Math.max(28, Math.min(70, parseInt(panelWidth.value, 10) || 42));
+    var panelBg = form.querySelector('[name="uiMenuPanelBg"]');
+    if (panelBg) ui.menu.panelBg = panelBg.value;
+    var panelText = form.querySelector('[name="uiMenuPanelText"]');
+    if (panelText) ui.menu.panelText = panelText.value;
   }
 
   function toColorInput(value) {
@@ -759,12 +818,12 @@
   }
 
   function settingsPageChrome(series, tab, title, lede, bodyHtml) {
-    var tabs = [
+    var tabDefs = [
       { id: "basics", href: "#/series/" + series.id + "/settings", label: "Settings" },
       { id: "monetization", href: "#/series/" + series.id + "/settings/monetization", label: "Monetization" },
       { id: "promotion", href: "#/series/" + series.id + "/settings/promotion", label: "Promotion" },
-      { id: "ui", href: "#/series/" + series.id + "/settings/ui", label: "Game UI" },
-    ].map(function (t) {
+    ];
+    var tabs = tabDefs.map(function (t) {
       return '<a class="settings-subnav-link' + (t.id === tab ? " is-active" : "") + '" href="' + t.href + '">' +
         escapeHtml(t.label) + "</a>";
     }).join("");
@@ -779,7 +838,7 @@
             '<button type="button" class="btn btn-primary" id="saveSettingsBtn">Save</button>' +
           "</div>" +
         "</div>" +
-        '<nav class="settings-subnav" aria-label="Series settings">' + tabs + "</nav>" +
+        (tab === "ui" ? "" : '<nav class="settings-subnav" aria-label="Series settings">' + tabs + "</nav>") +
         bodyHtml +
       "</div>"
     );
@@ -816,26 +875,37 @@
   function renderGameUiPage(series) {
     ScenaStore.ensureReaderUi(series);
     var ui = ScenaStore.resolveReaderUi(series);
-    var mock = renderUiMockupMarkup(ui);
+    var selected = gameUiSelectedEl || "dialogue";
+    var mock = renderUiMockupMarkup(ui, selected);
     return settingsPageChrome(
       series,
       "ui",
       "Game UI",
-      "Customize the in-game look — drag elements on the mockup, tweak colors, then save as an asset or sell in the UI marketplace.",
+      "Click a UI element on the canvas to edit it — like a simple scene canvas.",
       '<form id="settingsForm" class="game-ui-form">' +
-        '<div class="game-ui-layout">' +
-          '<div class="game-ui-mock-col">' +
+        '<div class="game-ui-workspace">' +
+          '<aside class="game-ui-hierarchy" aria-label="UI elements">' +
+            '<p class="game-ui-pane-label">Elements</p>' +
+            renderUiHierarchy(selected) +
+          "</aside>" +
+          '<div class="game-ui-canvas-col">' +
             '<div class="game-ui-mock-toolbar">' +
-              '<span class="field-hint">Drag dialogue, nameplate, and choices. Double-click an element to focus its settings.</span>' +
-              '<button type="button" class="btn btn-sm btn-ghost" id="uiResetLayoutBtn">Reset layout</button>' +
+              '<span class="field-hint">Preview is locked to 1920×1080 (16:9), same as the game. Select an element, then edit below. Drag to reposition.</span>' +
+              '<div class="game-ui-mock-toolbar-actions">' +
+                '<button type="button" class="btn btn-sm' + (gameUiMenuOpen ? " btn-primary" : " btn-ghost") +
+                  '" id="uiToggleMenuBtn">' + (gameUiMenuOpen ? "Close menu" : "Open menu") + "</button>" +
+                '<button type="button" class="btn btn-sm btn-ghost" id="uiResetLayoutBtn">Reset layout</button>' +
+              "</div>" +
             "</div>" +
             mock +
           "</div>" +
-          '<div class="game-ui-controls-col">' +
-            renderReaderUiSection(series) +
-            '<section class="form-section" id="uiAssetActions">' +
+          '<aside class="game-ui-inspector" aria-label="Inspector">' +
+            '<div class="game-ui-inspector-main">' +
+              '<p class="game-ui-pane-label">Inspector</p>' +
+              renderUiInspector(series, selected) +
+            "</div>" +
+            '<section class="form-section game-ui-export" id="uiAssetActions">' +
               "<h2>Save &amp; sell</h2>" +
-              '<p class="field-hint">Save this UI setup to My assets for other projects, or publish it under the new <strong>UI</strong> shop category.</p>' +
               '<div class="field"><label>Asset title</label>' +
                 '<input type="text" id="uiAssetTitle" maxlength="80" placeholder="e.g. Soft romance dialogue kit" value="' +
                   escapeAttr((series.title || "Series") + " UI") + '"></div>' +
@@ -848,33 +918,104 @@
                 '<button type="button" class="btn btn-primary" id="uiPublishAssetBtn">Publish to shop</button>' +
               "</div>" +
             "</section>" +
-          "</div>" +
+          "</aside>" +
         "</div>" +
       "</form>"
     );
   }
 
-  function renderUiMockupMarkup(ui) {
+  var gameUiSelectedEl = "dialogue";
+  var gameUiMenuOpen = false;
+
+  function renderUiHierarchy(selected) {
+    var items = [
+      { id: "scene", label: "Scene", hint: "Preset & look" },
+      { id: "dialogue", label: "Dialogue box", hint: "Text panel" },
+      { id: "nameplate", label: "Nameplate", hint: "Speaker name" },
+      { id: "choices", label: "Choices", hint: "Option buttons" },
+      { id: "menu", label: "Menu button", hint: "☰ position" },
+      { id: "menuPanel", label: "Menu panel", hint: "Open menu UI" },
+    ];
+    return (
+      '<div class="game-ui-hierarchy-list" id="uiHierarchyList">' +
+      items.map(function (item) {
+        return (
+          '<button type="button" class="game-ui-hierarchy-item' + (selected === item.id ? " is-active" : "") +
+            '" data-ui-select="' + item.id + '">' +
+            "<strong>" + escapeHtml(item.label) + "</strong>" +
+            "<span>" + escapeHtml(item.hint) + "</span>" +
+          "</button>"
+        );
+      }).join("") +
+      "</div>"
+    );
+  }
+
+  function renderUiMockMenuTabs(ui) {
+    var menu = ui.menu || {};
+    var tabs = [];
+    if (menu.showTranscript !== false) tabs.push({ id: "log", label: "Transcript" });
+    if (menu.showInventory !== false) tabs.push({ id: "inventory", label: "Inventory" });
+    if (menu.showAudioSettings !== false) tabs.push({ id: "settings", label: "Audio" });
+    if (!tabs.length) {
+      return '<p class="player-menu-empty">No menu tabs enabled.</p>';
+    }
+    return tabs.map(function (t, i) {
+      return '<button type="button" class="player-menu-tab' + (i === 0 ? " is-active" : "") +
+        '" tabindex="-1">' + escapeHtml(t.label) + "</button>";
+    }).join("");
+  }
+
+  function renderUiMockupMarkup(ui, selected) {
+    selected = selected || gameUiSelectedEl || "dialogue";
     var layout = ui.layout || defaultUiLayout();
     var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
     var name = layout.nameplate || { x: 6, y: 62 };
     var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    var menuPos = layout.menu || { x: 92, y: 4 };
+    var menuOn = !(ui.menu && ui.menu.enabled === false);
+    var menuOpen = gameUiMenuOpen || selected === "menuPanel";
+    var panelSide = (ui.menu && ui.menu.panelSide === "left") ? "left" : "right";
     return (
-      '<div class="ui-mock-stage" id="uiMockStage" data-aspect="' + escapeAttr(ui.aspectRatio || "16:9") + '">' +
+      '<div class="ui-mock-stage" id="uiMockStage" data-aspect="16:9">' +
         '<div class="ui-mock-frame preview-frame player-frame preview-ui--' + escapeAttr(ui.preset || "scena-classic") +
           " preview-shape-dialogue--" + escapeAttr(ui.shapes.dialogue || "bar") +
           " preview-shape-choice--" + escapeAttr(ui.shapes.choice || "rounded") +
-          '" id="uiMockFrame">' +
+          (menuOpen ? " is-menu-open" : "") +
+          '" id="uiMockFrame" style="--preview-aspect-w:16;--preview-aspect-h:9">' +
           '<div class="ui-mock-bg" aria-hidden="true"></div>' +
-          '<div class="ui-mock-layer ui-mock-nameplate" data-ui-drag="nameplate" style="left:' + name.x + "%;top:" + name.y + '%">' +
+          '<button type="button" class="ui-mock-layer ui-mock-menu' + (selected === "menu" ? " is-selected" : "") +
+            (menuOn ? "" : " is-hidden-ui") +
+            '" data-ui-select="menu" data-ui-drag="menu" title="Reader menu button" style="left:' +
+            menuPos.x + "%;top:" + menuPos.y + '%">☰</button>' +
+          '<div class="ui-mock-layer ui-mock-nameplate' + (selected === "nameplate" ? " is-selected" : "") +
+            '" data-ui-select="nameplate" data-ui-drag="nameplate" style="left:' + name.x + "%;top:" + name.y + '%">' +
             '<span class="ui-mock-speaker">Character</span>' +
           "</div>" +
-          '<div class="ui-mock-layer ui-mock-dialogue" data-ui-drag="dialogue" style="left:' + dlg.x + "%;top:" + dlg.y + "%;width:" + dlg.w + '%">' +
-            '<p class="ui-mock-dialogue-text">Dialogue text appears here — drag to reposition.</p>' +
+          '<div class="ui-mock-layer ui-mock-dialogue' + (selected === "dialogue" ? " is-selected" : "") +
+            '" data-ui-select="dialogue" data-ui-drag="dialogue" style="left:' + dlg.x + "%;top:" + dlg.y + "%;width:" + dlg.w + '%">' +
+            '<p class="ui-mock-dialogue-text">Dialogue text appears here.</p>' +
           "</div>" +
-          '<div class="ui-mock-layer ui-mock-choices" data-ui-drag="choices" style="left:' + ch.x + "%;top:" + ch.y + "%;width:" + ch.w + '%">' +
+          '<div class="ui-mock-layer ui-mock-choices' + (selected === "choices" ? " is-selected" : "") +
+            '" data-ui-select="choices" data-ui-drag="choices" style="left:' + ch.x + "%;top:" + ch.y + "%;width:" + ch.w + '%">' +
             '<button type="button" class="ui-mock-choice" tabindex="-1">Choice A</button>' +
             '<button type="button" class="ui-mock-choice" tabindex="-1">Choice B</button>' +
+          "</div>" +
+          '<div class="ui-mock-menu-backdrop" id="uiMockMenuBackdrop" data-side="' + panelSide +
+            '" data-ui-select="menuPanel" title="Click panel to edit menu">' +
+            '<div class="ui-mock-menu-panel player-menu-panel' + (selected === "menuPanel" ? " is-selected" : "") +
+              '" data-ui-select="menuPanel" id="uiMockMenuPanel">' +
+              '<header class="player-menu-header">' +
+                '<h2 class="player-menu-title">Menu</h2>' +
+                '<button type="button" class="player-menu-close ui-mock-menu-close" id="uiMockMenuClose" aria-label="Close menu preview">×</button>' +
+              "</header>" +
+              '<nav class="player-menu-tabs" id="uiMockMenuTabs" aria-label="Menu sections">' +
+                renderUiMockMenuTabs(ui) +
+              "</nav>" +
+              '<div class="player-menu-body">' +
+                '<p class="player-menu-empty">Sample transcript and inventory appear here during play. Edit tabs and panel look in the inspector.</p>' +
+              "</div>" +
+            "</div>" +
           "</div>" +
         "</div>" +
       "</div>"
@@ -886,7 +1027,151 @@
       dialogue: { x: 4, y: 68, w: 92 },
       nameplate: { x: 6, y: 62 },
       choices: { x: 52, y: 28, w: 42 },
+      menu: { x: 92, y: 4 },
     };
+  }
+
+  function renderUiInspector(series, selected) {
+    ScenaStore.ensureReaderUi(series);
+    var ui = series.readerUi;
+    var resolved = ScenaStore.resolveReaderUi(series);
+    var presets = [
+      { id: "scena-classic", name: "Classic", desc: "Teal accent, dark dialogue bar" },
+      { id: "scena-minimal", name: "Minimal", desc: "Clean lines, subtle UI" },
+      { id: "scena-frame", name: "Stage frame", desc: "Gold proscenium look" },
+      { id: "custom", name: "Custom", desc: "Full control + your sprites" },
+    ];
+    var presetCards = presets.map(function (p) {
+      return '<button type="button" class="ui-preset-card' + (ui.preset === p.id ? " is-active" : "") +
+        '" data-ui-preset="' + p.id + '"><strong>' + escapeHtml(p.name) + '</strong><span>' + escapeHtml(p.desc) + '</span></button>';
+    }).join("");
+    var uiAssets = ScenaStore.listAudioAssets(series, "ui");
+    var clickOpts = '<option value="">— Default (Button tap) —</option>' + uiAssets.map(function (a) {
+      return '<option value="' + a.id + '"' + (ui.sounds.clickAssetId === a.id ? " selected" : "") + '>' + escapeHtml(a.label) + '</option>';
+    }).join("");
+
+    return (
+      '<div id="readerUiSection" class="game-ui-inspector-body">' +
+        '<div class="game-ui-inspector-panel" data-ui-panel="scene"' + (selected === "scene" ? "" : " hidden") + ">" +
+          "<h2>Scene</h2>" +
+          '<p class="field-hint">Game canvas is always <strong>1920×1080</strong> (16:9 landscape). Overall look and accents.</p>' +
+          '<div class="ui-preset-cards" id="uiPresetCards">' + presetCards + "</div>" +
+          '<input type="hidden" name="uiAspectRatio" value="16:9">' +
+          '<div class="field"><label>Corner radius</label><input type="range" name="uiCornerRadius" min="0" max="24" step="1" value="' + (ui.sizes.cornerRadius || 6) + '"><span class="field-hint" id="uiCornerRadiusVal">' + (ui.sizes.cornerRadius || 6) + "px</span></div>" +
+          '<div class="field"><label>Accent color</label><input type="color" name="uiAccent" value="' + escapeAttr(resolved.colors.accent || "#2a9d8f") + '"></div>' +
+          '<div class="field"><label>Button click sound</label>' +
+            '<div class="sound-field-row">' +
+              '<select name="uiClickAsset">' + clickOpts + "</select>" +
+              '<button type="button" class="btn btn-sm" id="uiClickPreviewBtn">▶</button>' +
+            "</div></div>" +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="dialogue"' + (selected === "dialogue" ? "" : " hidden") + ">" +
+          "<h2>Dialogue box</h2>" +
+          '<div class="field"><label>Shape</label><select name="uiDialogueShape">' +
+            ["bar", "minimal", "frame", "box"].map(function (s) {
+              return '<option value="' + s + '"' + (ui.shapes.dialogue === s ? " selected" : "") + ">" + s + "</option>";
+            }).join("") +
+          "</select></div>" +
+          '<div class="field"><label>Text color</label><input type="color" name="uiDialogueText" value="' + escapeAttr(toColorInput(resolved.colors.dialogueText) || "#ffffff") + '"></div>' +
+          '<div class="field"><label>Scale</label><input type="range" name="uiDialogueScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.dialogueScale || 1) + '"><span class="field-hint" id="uiDialogueScaleVal">' + (ui.sizes.dialogueScale || 1) + "×</span></div>" +
+          '<div class="field"><label>Width (%)</label><input type="range" name="uiDialogueWidth" min="40" max="98" step="1" value="' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + '"><span class="field-hint" id="uiDialogueWidthVal">' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + "%</span></div>" +
+          '<div class="field"><label>Custom sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiDialogueSpritePreview" style="' + (ui.customSprites.dialogueBox ? "background-image:url(" + ui.customSprites.dialogueBox + ")" : "") + '"></div>' +
+            '<input type="file" accept="image/*" id="uiDialogueSpriteInput">' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiDialogueSpriteClear"' + (ui.customSprites.dialogueBox ? "" : " hidden") + ">Remove</button>" +
+          "</div>" +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="nameplate"' + (selected === "nameplate" ? "" : " hidden") + ">" +
+          "<h2>Nameplate</h2>" +
+          '<p class="field-hint">Drag on the canvas to place the speaker name. Color follows the accent/speaker setting.</p>' +
+          '<div class="field"><label>Speaker color</label><input type="color" name="uiSpeaker" value="' + escapeAttr(resolved.colors.speaker || "#2a9d8f") + '"></div>' +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="choices"' + (selected === "choices" ? "" : " hidden") + ">" +
+          "<h2>Choices</h2>" +
+          '<div class="field"><label>Shape</label><select name="uiChoiceShape">' +
+            ["rounded", "pill", "underline", "frame"].map(function (s) {
+              return '<option value="' + s + '"' + (ui.shapes.choice === s ? " selected" : "") + ">" + s + "</option>";
+            }).join("") +
+          "</select></div>" +
+          '<div class="field"><label>Text color</label><input type="color" name="uiChoiceText" value="' + escapeAttr(resolved.colors.choiceText || "#ffffff") + '"></div>' +
+          '<div class="field"><label>Scale</label><input type="range" name="uiChoiceScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.choiceScale || 1) + '"><span class="field-hint" id="uiChoiceScaleVal">' + (ui.sizes.choiceScale || 1) + "×</span></div>" +
+          '<div class="field"><label>Width (%)</label><input type="range" name="uiChoicesWidth" min="24" max="70" step="1" value="' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + '"><span class="field-hint" id="uiChoicesWidthVal">' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + "%</span></div>" +
+          '<div class="field"><label>Custom button sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiChoiceSpritePreview" style="' + (ui.customSprites.choiceButton ? "background-image:url(" + ui.customSprites.choiceButton + ")" : "") + '"></div>' +
+            '<input type="file" accept="image/*" id="uiChoiceSpriteInput">' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiChoiceSpriteClear"' + (ui.customSprites.choiceButton ? "" : " hidden") + ">Remove</button>" +
+          "</div>" +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="menu"' + (selected === "menu" ? "" : " hidden") + ">" +
+          "<h2>Menu button</h2>" +
+          '<p class="field-hint">Drag the ☰ on the canvas to place it. Click it (without dragging) to open the menu panel.</p>' +
+          '<div class="field"><label class="field-inline">' +
+            '<input type="checkbox" name="uiMenuEnabled"' + (ui.menu && ui.menu.enabled !== false ? " checked" : "") + "> " +
+            "Show ☰ menu during play</label></div>" +
+          '<div class="modal-actions" style="justify-content:flex-start;margin-top:4px">' +
+            '<button type="button" class="btn btn-sm btn-secondary" id="uiOpenMenuFromInspector">Open menu panel</button>' +
+          "</div>" +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="menuPanel"' + (selected === "menuPanel" ? "" : " hidden") + ">" +
+          "<h2>Menu panel</h2>" +
+          '<p class="field-hint">This is the open reader menu players see after tapping ☰.</p>' +
+          '<div class="field"><label class="field-inline">' +
+            '<input type="checkbox" name="uiShowTranscript"' + (ui.menu && ui.menu.showTranscript !== false ? " checked" : "") + "> " +
+            "Transcript tab</label></div>" +
+          '<div class="field"><label class="field-inline">' +
+            '<input type="checkbox" name="uiShowInventory"' + (ui.menu && ui.menu.showInventory !== false ? " checked" : "") + "> " +
+            "Inventory tab</label></div>" +
+          '<div class="field"><label class="field-inline">' +
+            '<input type="checkbox" name="uiShowAudioSettings"' + (ui.menu && ui.menu.showAudioSettings !== false ? " checked" : "") + "> " +
+            "Audio settings tab</label></div>" +
+          '<div class="field"><label>Inventory layout</label>' +
+            '<select name="uiInventoryDisplay">' +
+              '<option value="grid"' + ((ui.menu && ui.menu.inventoryDisplay === "grid") ? " selected" : "") + ">Grid</option>" +
+              '<option value="list"' + ((ui.menu && ui.menu.inventoryDisplay === "list") ? " selected" : "") + ">List</option>" +
+            "</select></div>" +
+          '<div class="field"><label class="field-inline">' +
+            '<input type="checkbox" name="uiShowInventoryHud"' + (ui.menu && ui.menu.showInventoryHud ? " checked" : "") + "> " +
+            "Show compact inventory HUD</label></div>" +
+          '<div class="field"><label>Panel side</label>' +
+            '<select name="uiMenuPanelSide">' +
+              '<option value="right"' + (!(ui.menu && ui.menu.panelSide === "left") ? " selected" : "") + ">Right</option>" +
+              '<option value="left"' + ((ui.menu && ui.menu.panelSide === "left") ? " selected" : "") + ">Left</option>" +
+            "</select></div>" +
+          '<div class="field"><label>Panel width (%)</label><input type="range" name="uiMenuPanelWidth" min="28" max="70" step="1" value="' +
+            ((ui.menu && ui.menu.panelWidth) || 42) + '"><span class="field-hint" id="uiMenuPanelWidthVal">' +
+            ((ui.menu && ui.menu.panelWidth) || 42) + "%</span></div>" +
+          '<div class="field"><label>Panel background</label><input type="color" name="uiMenuPanelBg" value="' +
+            escapeAttr(toColorInput((ui.menu && ui.menu.panelBg) || "#12100e") || "#12100e") + '"></div>' +
+          '<div class="field"><label>Panel text</label><input type="color" name="uiMenuPanelText" value="' +
+            escapeAttr(toColorInput((ui.menu && ui.menu.panelText) || "#f5f0e6") || "#f5f0e6") + '"></div>' +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function setGameUiSelection(id) {
+    if (!id) return;
+    gameUiSelectedEl = id;
+    if (id === "menuPanel") gameUiMenuOpen = true;
+    document.querySelectorAll("[data-ui-select]").forEach(function (el) {
+      var match = el.getAttribute("data-ui-select") === id;
+      if (el.classList.contains("game-ui-hierarchy-item") || el.classList.contains("ui-mock-layer") ||
+          el.classList.contains("ui-mock-menu-panel")) {
+        el.classList.toggle("is-selected", match);
+        el.classList.toggle("is-active", match && el.classList.contains("game-ui-hierarchy-item"));
+      }
+    });
+    document.querySelectorAll("[data-ui-panel]").forEach(function (panel) {
+      panel.hidden = panel.getAttribute("data-ui-panel") !== id;
+    });
+    var frame = $("#uiMockFrame");
+    if (frame) frame.classList.toggle("is-menu-open", !!gameUiMenuOpen);
+    var toggleBtn = $("#uiToggleMenuBtn");
+    if (toggleBtn) {
+      toggleBtn.textContent = gameUiMenuOpen ? "Close menu" : "Open menu";
+      toggleBtn.classList.toggle("btn-primary", !!gameUiMenuOpen);
+      toggleBtn.classList.toggle("btn-ghost", !gameUiMenuOpen);
+    }
   }
 
   function renderSettingsForm(series) {
@@ -945,7 +1230,7 @@
           "</p>" +
           '<button type="button" class="btn btn-danger btn-sm" id="resetSeriesBtn">Reset to chapter 1 only</button>' +
         "</section>" +
-        '<p class="field-hint" style="margin-top:16px">Monetization, promotion, and game UI each have their own menu. Story metrics live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
+        '<p class="field-hint" style="margin-top:16px">Monetization and promotion each have their own menu. Game UI is under Workspace. Story metrics live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
       "</form>";
 
     return settingsPageChrome(
@@ -1106,6 +1391,8 @@
           $("#uiDialogueWidthVal").textContent = el.value + "%";
         } else if (el.name === "uiChoicesWidth") {
           $("#uiChoicesWidthVal").textContent = el.value + "%";
+        } else if (el.name === "uiMenuPanelWidth") {
+          $("#uiMenuPanelWidthVal").textContent = el.value + "%";
         }
         scheduleAutoSave();
       });
@@ -1287,9 +1574,69 @@
     var series = ScenaStore.getSeries(userId, route.seriesId);
     if (!series) return;
     ScenaStore.ensureReaderUi(series);
+    if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
+    if (!series.readerUi.layout.menu) series.readerUi.layout.menu = { x: 92, y: 4 };
+    if (gameUiSelectedEl === "menuPanel") gameUiMenuOpen = true;
     bindSettingsForm();
     refreshUiMockup(series);
     bindUiMockupDrag(series);
+    setGameUiSelection(gameUiSelectedEl || "dialogue");
+
+    document.querySelectorAll("#uiHierarchyList [data-ui-select]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        setGameUiSelection(btn.getAttribute("data-ui-select"));
+      });
+    });
+
+    var toggleMenu = $("#uiToggleMenuBtn");
+    if (toggleMenu) {
+      toggleMenu.addEventListener("click", function () {
+        gameUiMenuOpen = !gameUiMenuOpen;
+        if (gameUiMenuOpen) setGameUiSelection("menuPanel");
+        else {
+          var frame = $("#uiMockFrame");
+          if (frame) frame.classList.remove("is-menu-open");
+          toggleMenu.textContent = "Open menu";
+          toggleMenu.classList.add("btn-ghost");
+          toggleMenu.classList.remove("btn-primary");
+          if (gameUiSelectedEl === "menuPanel") setGameUiSelection("menu");
+        }
+      });
+    }
+    var openFromInspector = $("#uiOpenMenuFromInspector");
+    if (openFromInspector) {
+      openFromInspector.addEventListener("click", function () {
+        gameUiMenuOpen = true;
+        setGameUiSelection("menuPanel");
+      });
+    }
+    var mockClose = $("#uiMockMenuClose");
+    if (mockClose) {
+      mockClose.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        gameUiMenuOpen = false;
+        var frame = $("#uiMockFrame");
+        if (frame) frame.classList.remove("is-menu-open");
+        if (gameUiSelectedEl === "menuPanel") setGameUiSelection("menu");
+        else setGameUiSelection(gameUiSelectedEl);
+      });
+    }
+    var mockBackdrop = $("#uiMockMenuBackdrop");
+    if (mockBackdrop) {
+      mockBackdrop.addEventListener("click", function (e) {
+        if (e.target === mockBackdrop) {
+          gameUiMenuOpen = false;
+          var frame = $("#uiMockFrame");
+          if (frame) frame.classList.remove("is-menu-open");
+          if (gameUiSelectedEl === "menuPanel") setGameUiSelection("menu");
+          else setGameUiSelection(gameUiSelectedEl);
+          return;
+        }
+        setGameUiSelection("menuPanel");
+      });
+    }
+
     var resetLayout = $("#uiResetLayoutBtn");
     if (resetLayout) {
       resetLayout.addEventListener("click", function () {
@@ -1327,9 +1674,10 @@
   function applyUiMockFrameStyles(frame, series) {
     if (!frame) return;
     var ui = ScenaStore.resolveReaderUi(series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
-    frame.style.setProperty("--preview-aspect-w", String(parseInt(parts[0], 10) || 16));
-    frame.style.setProperty("--preview-aspect-h", String(parseInt(parts[1], 10) || 9));
+    // Game playfield is always 1920×1080 (16:9).
+    frame.style.setProperty("--preview-aspect-w", "16");
+    frame.style.setProperty("--preview-aspect-h", "9");
+    if (series && series.readerUi) series.readerUi.aspectRatio = "16:9";
     frame.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
     frame.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
     frame.style.setProperty("--ui-accent", ui.colors.accent);
@@ -1340,9 +1688,20 @@
     frame.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
     frame.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
     frame.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
+    var panelW = Math.max(28, Math.min(70, parseInt(ui.menu && ui.menu.panelWidth, 10) || 42));
+    frame.style.setProperty("--ui-menu-panel-w", panelW + "%");
+    if (ui.menu && ui.menu.panelBg) frame.style.setProperty("--ui-menu-panel-bg", ui.menu.panelBg);
+    if (ui.menu && ui.menu.panelText) frame.style.setProperty("--ui-menu-panel-text", ui.menu.panelText);
+    var accent = String(ui.colors.accent || "#2a9d8f");
+    var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (rgb) {
+      frame.style.setProperty("--ui-accent-rgb",
+        parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
+    }
     frame.className = "ui-mock-frame preview-frame player-frame preview-ui--" + ui.preset +
       " preview-shape-dialogue--" + ui.shapes.dialogue +
-      " preview-shape-choice--" + ui.shapes.choice;
+      " preview-shape-choice--" + ui.shapes.choice +
+      (gameUiMenuOpen ? " is-menu-open" : "");
     if (ui.customSprites.dialogueBox) {
       frame.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
       frame.dataset.customDialogue = "1";
@@ -1361,6 +1720,7 @@
     var dlg = frame.querySelector('[data-ui-drag="dialogue"]');
     var name = frame.querySelector('[data-ui-drag="nameplate"]');
     var ch = frame.querySelector('[data-ui-drag="choices"]');
+    var menu = frame.querySelector('[data-ui-drag="menu"]');
     if (dlg) {
       dlg.style.left = layout.dialogue.x + "%";
       dlg.style.top = layout.dialogue.y + "%";
@@ -1375,8 +1735,25 @@
       ch.style.top = layout.choices.y + "%";
       ch.style.width = layout.choices.w + "%";
     }
+    if (menu) {
+      var m = layout.menu || { x: 92, y: 4 };
+      menu.style.left = m.x + "%";
+      menu.style.top = m.y + "%";
+      menu.classList.toggle("is-hidden-ui", ui.menu && ui.menu.enabled === false);
+      menu.classList.toggle("is-selected", gameUiSelectedEl === "menu");
+    }
+    var backdrop = frame.querySelector("#uiMockMenuBackdrop");
+    if (backdrop) {
+      backdrop.setAttribute("data-side", (ui.menu && ui.menu.panelSide === "left") ? "left" : "right");
+    }
+    var panel = frame.querySelector("#uiMockMenuPanel");
+    if (panel) panel.classList.toggle("is-selected", gameUiSelectedEl === "menuPanel");
+    var tabsEl = frame.querySelector("#uiMockMenuTabs");
+    if (tabsEl) tabsEl.innerHTML = renderUiMockMenuTabs(ui);
     var stage = $("#uiMockStage");
-    if (stage) stage.setAttribute("data-aspect", ui.aspectRatio || "16:9");
+    if (stage) stage.setAttribute("data-aspect", "16:9");
+    var widthHint = $("#uiMenuPanelWidthVal");
+    if (widthHint) widthHint.textContent = panelW + "%";
   }
 
   function refreshUiMockup(series) {
@@ -1388,6 +1765,7 @@
     if (!frame || frame.dataset.dragBound === "1") return;
     frame.dataset.dragBound = "1";
     var drag = null;
+    var moved = false;
 
     function onMove(e) {
       if (!drag) return;
@@ -1397,6 +1775,7 @@
       var y = ((e.clientY - rect.top) / rect.height) * 100 - drag.oy;
       x = Math.max(0, Math.min(90, x));
       y = Math.max(0, Math.min(90, y));
+      if (Math.abs(x - (drag.startX || x)) > 0.4 || Math.abs(y - (drag.startY || y)) > 0.4) moved = true;
       ScenaStore.ensureReaderUi(series);
       if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
       var key = drag.key;
@@ -1409,16 +1788,31 @@
       } else if (key === "choices") {
         series.readerUi.layout.choices.x = Math.round(x * 10) / 10;
         series.readerUi.layout.choices.y = Math.round(y * 10) / 10;
+      } else if (key === "menu") {
+        if (!series.readerUi.layout.menu) series.readerUi.layout.menu = { x: 92, y: 4 };
+        series.readerUi.layout.menu.x = Math.round(x * 10) / 10;
+        series.readerUi.layout.menu.y = Math.round(y * 10) / 10;
       }
       applyUiMockFrameStyles(frame, series);
     }
 
     function onUp() {
       if (!drag) return;
+      var key = drag.key;
       drag = null;
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
-      persistSeries(series);
+      if (!moved) {
+        if (key === "menu") {
+          gameUiMenuOpen = true;
+          setGameUiSelection("menuPanel");
+        } else {
+          setGameUiSelection(key);
+        }
+      } else {
+        persistSeries(series);
+      }
+      moved = false;
     }
 
     frame.querySelectorAll("[data-ui-drag]").forEach(function (el) {
@@ -1432,10 +1826,24 @@
         var node = layout[key] || { x: 0, y: 0 };
         var curX = ((e.clientX - rect.left) / rect.width) * 100;
         var curY = ((e.clientY - rect.top) / rect.height) * 100;
-        drag = { key: key, ox: curX - (node.x || 0), oy: curY - (node.y || 0) };
+        moved = false;
+        drag = {
+          key: key,
+          ox: curX - (node.x || 0),
+          oy: curY - (node.y || 0),
+          startX: node.x || 0,
+          startY: node.y || 0,
+        };
+        setGameUiSelection(key);
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
       });
+    });
+
+    frame.addEventListener("mousedown", function (e) {
+      if (e.target === frame || e.target.classList.contains("ui-mock-bg")) {
+        setGameUiSelection("scene");
+      }
     });
   }
 
@@ -2307,10 +2715,6 @@
         e.stopPropagation();
         removeMarketplaceListing(btn.getAttribute("data-listing-id"));
       });
-    });
-    var createPackBtns = root.querySelectorAll("#libraryCreatePackBtn");
-    createPackBtns.forEach(function (btn) {
-      btn.addEventListener("click", openLibraryPackModal);
     });
   }
 

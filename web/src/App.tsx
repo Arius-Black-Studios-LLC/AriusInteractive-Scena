@@ -6,6 +6,7 @@ import {
   Outlet,
   Route,
   Routes,
+  useParams,
   useSearchParams,
 } from "react-router-dom";
 import { LoginModal } from "./components/LoginModal";
@@ -18,6 +19,7 @@ import { AccountPage } from "./pages/AccountPage";
 import { BlogPage } from "./pages/BlogPage";
 import { ForumsPage } from "./pages/ForumsPage";
 import { ForumTopicPage } from "./pages/ForumTopicPage";
+import { DiscoverPage } from "./pages/DiscoverPage";
 import { HomePage } from "./pages/HomePage";
 import { JamsPage, JamDetailPage } from "./pages/JamPages";
 import { LearnLayout } from "./pages/learn/LearnLayout";
@@ -62,11 +64,17 @@ function ShellLayout() {
   );
 }
 
+function LearnRedirect() {
+  const { lessonId } = useParams();
+  return <Navigate to={lessonId ? `/tutorials/${lessonId}` : "/tutorials"} replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route element={<ShellLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/help" element={<StaticPage page="help" />} />
         <Route path="/about" element={<StaticPage page="about" />} />
@@ -88,10 +96,12 @@ function AppRoutes() {
         <Route path="featured" element={<AdminFeaturedPage />} />
       </Route>
       <Route path="/admin/featured" element={<Navigate to="/admin/moderation/featured" replace />} />
-      <Route path="/learn" element={<LearnLayout />}>
+      <Route path="/tutorials" element={<LearnLayout />}>
         <Route index element={<LearnCatalogPage />} />
         <Route path=":lessonId" element={<LearnLessonPage />} />
       </Route>
+      <Route path="/learn" element={<LearnRedirect />} />
+      <Route path="/learn/:lessonId" element={<LearnRedirect />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

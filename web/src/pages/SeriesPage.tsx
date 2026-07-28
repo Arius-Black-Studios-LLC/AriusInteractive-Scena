@@ -155,7 +155,7 @@ export function SeriesPage() {
     return (
       <div className="series-loading">
         <p>Missing series link.</p>
-        <Link to="/">Discover</Link>
+        <Link to="/discover">Discover</Link>
       </div>
     );
   }
@@ -164,7 +164,7 @@ export function SeriesPage() {
     return (
       <div className="series-loading">
         <p>{loadError || error}</p>
-        <Link to="/">Discover</Link>
+        <Link to="/discover">Discover</Link>
       </div>
     );
   }
@@ -176,7 +176,7 @@ export function SeriesPage() {
   return (
     <div className="series-shell series-page">
       <header className="series-header">
-        <Link className="series-back" to="/">
+        <Link className="series-back" to="/discover">
           ← Discover
         </Link>
         {userId ? (

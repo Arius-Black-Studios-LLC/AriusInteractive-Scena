@@ -521,12 +521,13 @@
   ScenaPlayer.prototype.applyReaderUi = function () {
     if (!this.frameEl) return;
     var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
+    var parts = String("16:9").split(":");
     var aw = parseInt(parts[0], 10) || 16;
     var ah = parseInt(parts[1], 10) || 9;
     var el = this.frameEl;
     el.style.setProperty("--preview-aspect-w", String(aw));
     el.style.setProperty("--preview-aspect-h", String(ah));
+    if (this.series && this.series.readerUi) this.series.readerUi.aspectRatio = "16:9";
     el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
     el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
     el.style.setProperty("--ui-accent", ui.colors.accent);
@@ -566,6 +567,21 @@
     el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
     el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
     el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    var menuPos = layout.menu || { x: 92, y: 4 };
+    el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
+    el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
+    el.style.setProperty("--ui-layout-menu-right", "auto");
+    var menuCfg = ui.menu || {};
+    var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
+    el.style.setProperty("--ui-menu-panel-w", panelW + "%");
+    if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
+    if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
+    var accent = String(ui.colors.accent || "#2a9d8f");
+    var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (rgb) {
+      el.style.setProperty("--ui-accent-rgb",
+        parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
+    }
     el.classList.add("preview-frame--laid-out");
     this.initReaderMenu();
     if (this.readerMenu) {

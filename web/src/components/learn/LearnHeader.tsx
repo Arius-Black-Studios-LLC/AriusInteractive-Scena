@@ -9,10 +9,10 @@ export function LearnHeader() {
         <span className="logo-text">Arleco</span>
       </Link>
       <nav className="learn-header-nav" aria-label="Learn navigation">
-        <Link to="/learn" className="is-active">
-          Conservatory
+        <Link to="/tutorials" className="is-active">
+          Tutorials
         </Link>
-        <Link to="/">Discover</Link>
+        <Link to="/discover">Discover</Link>
         <Link to="/account">Account</Link>
         <Link to="/studio">Creator studio</Link>
       </nav>

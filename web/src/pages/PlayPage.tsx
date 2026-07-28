@@ -165,7 +165,7 @@ export function PlayPage() {
     return (
       <div className="player-loading">
         <p>{loadError || error}</p>
-        <Link to="/">Back to Discover</Link>
+        <Link to="/discover">Back to Discover</Link>
       </div>
     );
   }

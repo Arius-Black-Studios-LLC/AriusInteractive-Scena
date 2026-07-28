@@ -10,11 +10,11 @@ export function LearnCatalog() {
   return (
     <div className="learn-catalog">
       <header className="learn-hero">
-        <p className="learn-eyebrow">The Conservatory</p>
-        <h1>Stagecraft for the digital house</h1>
+        <p className="learn-eyebrow">Tutorials</p>
+        <h1>Learn the editor step by step</h1>
         <p className="learn-lede">
-          Rehearse in the real editor. Complete each scene to earn laurels — badges drawn from
-          classical theatre.
+          Practice in the real creator studio. Complete each lesson to earn badges as you master
+          branching stories.
         </p>
         <LearnProgressBar completed={doneCount} total={lessons.length} />
       </header>

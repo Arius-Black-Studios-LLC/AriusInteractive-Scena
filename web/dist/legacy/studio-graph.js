@@ -84,6 +84,7 @@
       ? "audio"
       : (this.learnKeyItemsPanel ? "keyitems" : (this.learnResourcesTab || "characters"));
     this.selectedResourceId = null;
+    this.resourceListScope = "owned"; // "owned" | "defaults" — which list fills the bottom assets pane
     this.connectFrom = null;
     this.connectChoiceId = null;
     this.tempLine = null;
@@ -947,6 +948,8 @@
       btn.addEventListener("click", function () {
         self.resourceTab = btn.getAttribute("data-resource-tab");
         self.selectedResourceId = null;
+        if (self.resourceTab === "audio") self.resourceListScope = "defaults";
+        else self.resourceListScope = "owned";
         self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
           b.classList.toggle("is-active", b === btn);
         });
@@ -3332,6 +3335,8 @@
     if (split) split.classList.remove("resources-split--store");
 
     var listHtml = "";
+    var scope = this.resourceListScope === "defaults" ? "defaults" : "owned";
+    var showScopeToggle = tab === "audio";
 
     if (tab === "characters") {
       ScenaStore.ensureProfiles(this.series).forEach(function (p) {
@@ -3354,20 +3359,14 @@
       ScenaStore.ensureDefaultAudio(this.series);
       var defaults = ScenaStore.listAudioAssets(this.series).filter(function (a) { return a.isDefault; });
       var custom = ScenaStore.listAudioAssets(this.series).filter(function (a) { return !a.isDefault; });
-      if (defaults.length) {
-        listHtml += '<p class="resource-list-heading">Arleco defaults</p>';
-        defaults.forEach(function (a) {
-          listHtml += self.renderAudioListItem(a);
-        });
-      }
-      if (custom.length) {
-        listHtml += '<p class="resource-list-heading">Your library</p>';
-        custom.forEach(function (a) {
-          listHtml += self.renderAudioListItem(a);
-        });
-      }
-      if (!defaults.length && !custom.length) {
-        listHtml = '<p class="resource-list-empty">No audio yet — click <strong>+ Upload</strong> to add your own clips.</p>';
+      var scoped = scope === "defaults" ? defaults : custom;
+      scoped.forEach(function (a) {
+        listHtml += self.renderAudioListItem(a);
+      });
+      if (!listHtml) {
+        listHtml = scope === "defaults"
+          ? '<p class="resource-list-empty">No Arleco default clips in this project.</p>'
+          : '<p class="resource-list-empty">No owned clips yet — click <strong>+ Upload</strong> to add your own.</p>';
       }
     } else if (tab === "keyitems") {
       ScenaStore.listKeyItemAssets(this.series).forEach(function (asset) {
@@ -3406,7 +3405,24 @@
       listHtml = '<p class="resource-list-empty">Select a tab above.</p>';
     }
 
-    this.resourcesList.innerHTML = listHtml;
+    var toggleHtml = showScopeToggle
+      ? '<div class="resources-scope-toggle" role="tablist" aria-label="Asset source">' +
+          '<button type="button" class="resources-scope-btn' + (scope === "defaults" ? " is-active" : "") +
+            '" data-resource-scope="defaults" role="tab" aria-selected="' + (scope === "defaults" ? "true" : "false") + '">Arleco defaults</button>' +
+          '<button type="button" class="resources-scope-btn' + (scope === "owned" ? " is-active" : "") +
+            '" data-resource-scope="owned" role="tab" aria-selected="' + (scope === "owned" ? "true" : "false") + '">Owned assets</button>' +
+        "</div>"
+      : "";
+
+    this.resourcesList.innerHTML = toggleHtml + listHtml;
+
+    this.resourcesList.querySelectorAll("[data-resource-scope]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        self.resourceListScope = btn.getAttribute("data-resource-scope") === "defaults" ? "defaults" : "owned";
+        self.selectedResourceId = null;
+        self.renderResourcesPanel();
+      });
+    });
     var createBtn = this.container.querySelector("#resourceCreateBtn");
     if (createBtn) createBtn.textContent = tab === "audio" ? "+ Upload" : "+ Create";
     this.resourcesList.querySelectorAll(".resource-list-item").forEach(function (btn) {

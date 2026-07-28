@@ -15,7 +15,7 @@ export function LearnLessonCard({ lesson, completed }: Props) {
   return (
     <Link
       className={`learn-lesson-card${completed ? " is-complete" : ""}`}
-      to={`/learn/${lesson.id}`}
+      to={`/tutorials/${lesson.id}`}
     >
       <span className="learn-lesson-category">{lesson.category}</span>
       <h2>{lesson.title}</h2>

@@ -4,10 +4,10 @@ import { learnAdapter } from "../../legacy/adapters";
 export function LearnLessonPage() {
   const { lessonId } = useParams<{ lessonId: string }>();
 
-  if (!lessonId) return <Navigate to="/learn" replace />;
+  if (!lessonId) return <Navigate to="/tutorials" replace />;
 
   const lesson = learnAdapter.getLesson(lessonId);
-  if (!lesson) return <Navigate to="/learn" replace />;
+  if (!lesson) return <Navigate to="/tutorials" replace />;
 
   return <LearnLessonRunner key={lesson.id} lesson={lesson} />;
 }

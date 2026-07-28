@@ -404,6 +404,38 @@
 
 
 
+    (series.artFolder || []).forEach(function (art) {
+
+      queue("art", art.id, function () { return art.dataUrl; }, function (url) {
+
+        art.dataUrl = url;
+
+      });
+
+      if (Array.isArray(art.frames)) {
+
+        art.frames.forEach(function (frameUrl, frameIndex) {
+
+          queue("art", art.id + "-f" + frameIndex, function () {
+
+            return art.frames[frameIndex];
+
+          }, function (url) {
+
+            art.frames[frameIndex] = url;
+
+            if (frameIndex === 0) art.dataUrl = url;
+
+          });
+
+        });
+
+      }
+
+    });
+
+
+
     if (!tasks.length) return Promise.resolve(series);
 
 
