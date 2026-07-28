@@ -25,6 +25,18 @@ type HeroStats = {
   chaptersRead: number;
 };
 
+type ContinueRow = {
+  entry: CatalogEntryExt;
+  href: string;
+  resumeLabel: string;
+};
+
+type LikedUpdateRow = {
+  entry: CatalogEntryExt;
+  href: string;
+  updatedAt: string;
+};
+
 function formatChaptersRead(count: number): string {
   if (count <= 0) return "0";
   if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -39,6 +51,18 @@ function mapEntry(entry: CatalogEntryExt & { readersThisWeekLabel?: string; live
   };
 }
 
+function genreOverlapScore(entry: CatalogEntryExt, tasteKeys: Set<string>): number {
+  const keys = entry.genreKeys || [];
+  let score = 0;
+  keys.forEach((k) => {
+    if (tasteKeys.has(k)) score += 3;
+  });
+  (entry.flags || []).forEach((f) => {
+    if (tasteKeys.has(String(f).toLowerCase())) score += 1;
+  });
+  return score;
+}
+
 export function HomePage() {
   const { userId, session } = useAuth();
   const [filter, setFilter] = useState("all");
@@ -51,6 +75,8 @@ export function HomePage() {
     featured: null,
     others: [],
   });
+  const [continueRows, setContinueRows] = useState<ContinueRow[]>([]);
+  const [likedUpdates, setLikedUpdates] = useState<LikedUpdateRow[]>([]);
   const [heroWordIdx, setHeroWordIdx] = useState(0);
   const [heroWordChanging, setHeroWordChanging] = useState(false);
   const [stats, setStats] = useState<HeroStats>({
@@ -140,6 +166,46 @@ export function HomePage() {
   }, [ready, viewerIsAdult]);
 
   useEffect(() => {
+    if (!ready || !userId || !entries.length || !window.ScenaProgress?.listContinueReading) {
+      setContinueRows([]);
+      return;
+    }
+    const scope = window.ScenaProgress.scopeFromUser?.(userId) || userId;
+    window.ScenaProgress.listContinueReading(scope, entries)
+      .then((rows) => setContinueRows((rows as ContinueRow[]) || []))
+      .catch(() => setContinueRows([]));
+  }, [ready, userId, entries]);
+
+  useEffect(() => {
+    if (!ready || !userId || !entries.length || !window.ScenaHearts?.listMyHeartedSeries) {
+      setLikedUpdates([]);
+      return;
+    }
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    window.ScenaHearts.listMyHeartedSeries(userId)
+      .then((hearted) => {
+        const rows: LikedUpdateRow[] = [];
+        (hearted || []).forEach((h: { seriesId: string; lastHeartedAt?: string }) => {
+          const entry = byId.get(h.seriesId);
+          if (!entry) return;
+          const updatedAt = entry.updatedAt || "";
+          if (!updatedAt) return;
+          const heartedAt = h.lastHeartedAt ? new Date(h.lastHeartedAt).getTime() : 0;
+          const updatedMs = new Date(updatedAt).getTime();
+          if (!updatedMs || updatedMs <= heartedAt) return;
+          rows.push({
+            entry,
+            href: entry.href,
+            updatedAt,
+          });
+        });
+        rows.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+        setLikedUpdates(rows.slice(0, 8));
+      })
+      .catch(() => setLikedUpdates([]));
+  }, [ready, userId, entries]);
+
+  useEffect(() => {
     if (!ready) return;
     mountHomepageReviews("creatorReviewsMount");
   }, [ready]);
@@ -153,6 +219,28 @@ export function HomePage() {
     () => entries.filter((e) => viewerIsAdult || !e.isAgeRestricted),
     [entries, viewerIsAdult],
   );
+
+  const recommended = useMemo(() => {
+    const taste = new Set<string>();
+    [...continueRows.map((r) => r.entry), ...likedUpdates.map((r) => r.entry), ...safeFeatured].forEach(
+      (entry) => {
+        (entry.genreKeys || []).forEach((k) => taste.add(k));
+        (entry.flags || []).forEach((f) => taste.add(String(f).toLowerCase()));
+      },
+    );
+    const skip = new Set([
+      ...continueRows.map((r) => r.entry.id),
+      ...likedUpdates.map((r) => r.entry.id),
+      ...safeFeatured.map((e) => e.id),
+    ]);
+    const scored = safeEntries
+      .filter((e) => !skip.has(e.id))
+      .map((e) => ({ e, score: genreOverlapScore(e, taste) }))
+      .filter((x) => (taste.size ? x.score > 0 : true))
+      .sort((a, b) => b.score - a.score || String(b.e.updatedAt || "").localeCompare(String(a.e.updatedAt || "")));
+    const picks = (scored.length ? scored : safeEntries.map((e) => ({ e, score: 0 }))).slice(0, 8);
+    return picks.map((p) => p.e);
+  }, [safeEntries, continueRows, likedUpdates, safeFeatured]);
 
   const filtered = useMemo(
     () =>
@@ -237,13 +325,68 @@ export function HomePage() {
 
       <JamHomeFeed spotlight={jamSpotlight} />
 
-      {CATEGORY_SECTIONS.map((section) => {
+      {continueRows.length ? (
+        <section className="section container" id="continue-reading">
+          <div className="section-head">
+            <div>
+              <h2>Continue reading</h2>
+              <span className="section-meta">Pick up where you left off</span>
+            </div>
+          </div>
+          <div className="discover-grid discover-grid--rail">
+            {continueRows.map((row) => (
+              <div className="home-continue-card" key={row.entry.id}>
+                <SeriesCard entry={row.entry} />
+                <Link className="btn btn-sm btn-primary home-continue-btn" to={row.href}>
+                  Continue · {row.resumeLabel}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {likedUpdates.length ? (
+        <section className="section container" id="liked-updates">
+          <div className="section-head">
+            <div>
+              <h2>New chapters in series you liked</h2>
+              <span className="section-meta">Sorted by newest updates</span>
+            </div>
+          </div>
+          <div className="discover-grid discover-grid--rail">
+            {likedUpdates.map((row) => (
+              <SeriesCard key={`liked-${row.entry.id}`} entry={row.entry} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {recommended.length ? (
+        <section className="section container" id="recommended">
+          <div className="section-head">
+            <div>
+              <h2>Recommended for you</h2>
+              <span className="section-meta">
+                {userId ? "Based on what you’ve been reading and liking" : "Popular stories to start with"}
+              </span>
+            </div>
+          </div>
+          <div className="discover-grid discover-grid--rail">
+            {recommended.map((entry) => (
+              <SeriesCard key={`rec-${entry.id}`} entry={entry} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {CATEGORY_SECTIONS.slice(0, 2).map((section) => {
         const picks = entriesForCategory(safeEntries, section.id, 4);
         if (picks.length < 1) return null;
         return (
           <section className="section container home-category-section" key={section.id}>
             <div className="section-head">
-              <h2>Recommended in {section.label}</h2>
+              <h2>More in {section.label}</h2>
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -252,7 +395,7 @@ export function HomePage() {
                   document.getElementById("discover")?.scrollIntoView({ behavior: "smooth" });
                 }}
               >
-                See all
+                Search {section.label}
               </button>
             </div>
             <div className="discover-grid discover-grid--rail">
@@ -270,10 +413,18 @@ export function HomePage() {
 
       <section className="section container" id="discover">
         <div className="section-head section-head--center">
-          <h2>Discover</h2>
-          <span className="section-meta">Human-written · Indie creators</span>
+          <h2>Search & browse</h2>
+          <span className="section-meta">Refine by category · Human-written · Indie creators</span>
         </div>
         <div className="discover-toolbar">
+          <input
+            className="search-input"
+            type="search"
+            placeholder="Search series, genres, tags…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search series"
+          />
           <div className="filter-bar">
             {GENRE_FILTERS.map((chip) => (
               <button
@@ -286,14 +437,6 @@ export function HomePage() {
               </button>
             ))}
           </div>
-          <input
-            className="search-input"
-            type="search"
-            placeholder="Search series, genres, tags…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Search series"
-          />
         </div>
         <div className="discover-grid">
           {filtered.length ? (
@@ -341,7 +484,7 @@ export function HomePage() {
       <section className="section container home-links">
         <Link to="/blog">Creator guides on the blog</Link>
         <Link to="/learn">Learn in the Conservatory</Link>
-        <a href="/studio#/jams">Browse game jams</a>
+        <Link to="/jams">Browse game jams</Link>
       </section>
     </>
   );

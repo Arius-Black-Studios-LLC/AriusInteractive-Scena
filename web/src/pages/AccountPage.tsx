@@ -15,10 +15,33 @@ export function AccountPage() {
     "arleco-theme.css",
   ]);
   const [bootError, setBootError] = useState<string | null>(null);
+  const [modNotices, setModNotices] = useState<
+    Array<{ noticeId: string; title: string; reason: string; createdAt?: string; readAt?: string | null }>
+  >([]);
 
   useEffect(() => {
     refreshProfile().catch(() => undefined);
   }, [refreshProfile]);
+
+  useEffect(() => {
+    if (!ready || !userId || !window.ScenaAdmin?.listMyModerationNotices) {
+      setModNotices([]);
+      return;
+    }
+    window.ScenaAdmin.listMyModerationNotices(20)
+      .then((rows) => {
+        setModNotices(
+          (rows || []).map((r) => ({
+            noticeId: String(r.noticeId || ""),
+            title: String(r.title || "Your content"),
+            reason: String(r.reason || ""),
+            createdAt: r.createdAt ? String(r.createdAt) : "",
+            readAt: r.readAt ? String(r.readAt) : null,
+          })),
+        );
+      })
+      .catch(() => setModNotices([]));
+  }, [ready, userId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -95,9 +118,6 @@ export function AccountPage() {
           <DucatBalance className="ducat-hud--studio" />
           {!profileLoading && isAdmin ? (
             <>
-              <Link className="btn btn-ghost btn-sm" to="/admin/featured">
-                Staff picks
-              </Link>
               <Link className="btn btn-ghost btn-sm" to="/admin/moderation">
                 Moderation
               </Link>
@@ -121,6 +141,41 @@ export function AccountPage() {
         </div>
       </header>
       <div className="account-body">
+        {modNotices.length ? (
+          <section className="account-mod-notices container">
+            <h2>Moderation notices</h2>
+            <p className="field-hint">Content taken down by platform moderation.</p>
+            <ul>
+              {modNotices.map((n) => (
+                <li key={n.noticeId} className={n.readAt ? "is-read" : ""}>
+                  <strong>{n.title}</strong>
+                  <span> was removed. Reason: {n.reason}</span>
+                  {!n.readAt ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        window.ScenaAdmin?.markModerationNoticeRead?.(n.noticeId)
+                          .then(() =>
+                            setModNotices((prev) =>
+                              prev.map((x) =>
+                                x.noticeId === n.noticeId
+                                  ? { ...x, readAt: new Date().toISOString() }
+                                  : x,
+                              ),
+                            ),
+                          )
+                          .catch(() => undefined);
+                      }}
+                    >
+                      Mark read
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <main className="account-main" id="accountMain" ref={mainRef}>
           <div className="page">
             <p className="field-hint">Loading profile…</p>

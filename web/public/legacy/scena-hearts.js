@@ -123,5 +123,52 @@
         });
       }).catch(function () { return null; });
     },
+
+    /** Distinct series the user has hearted (for “liked with updates” home rail). */
+    listMyHeartedSeries: function (userId) {
+      if (!userId) return Promise.resolve([]);
+      if (!useCloud()) {
+        var found = {};
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (!key || key.indexOf("scena.hearts.") !== 0) continue;
+            var parts = key.split(".");
+            if (parts.length < 4) continue;
+            var seriesId = parts[2];
+            var list = readLocal(key);
+            if (list.some(function (h) { return h.userId === userId; })) {
+              var latest = list.reduce(function (max, h) {
+                return h.userId === userId && h.createdAt > max ? h.createdAt : max;
+              }, "");
+              if (!found[seriesId] || latest > found[seriesId]) found[seriesId] = latest;
+            }
+          }
+        } catch (e) { /* ignore */ }
+        return Promise.resolve(Object.keys(found).map(function (id) {
+          return { seriesId: id, lastHeartedAt: found[id] };
+        }));
+      }
+      var sb = getClient();
+      return sb.from("episode_hearts")
+        .select("series_id, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(200)
+        .then(function (res) {
+          if (res.error) throw res.error;
+          var bySeries = {};
+          (res.data || []).forEach(function (row) {
+            if (!row.series_id) return;
+            if (!bySeries[row.series_id]) {
+              bySeries[row.series_id] = row.created_at || "";
+            }
+          });
+          return Object.keys(bySeries).map(function (id) {
+            return { seriesId: id, lastHeartedAt: bySeries[id] };
+          });
+        })
+        .catch(function () { return []; });
+    },
   };
 })();

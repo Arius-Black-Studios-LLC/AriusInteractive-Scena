@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import "./AdminFeaturedPage.css";
@@ -33,8 +33,7 @@ function draftFromRow(row: AdminSeriesRow): DraftRow {
 }
 
 export function AdminFeaturedPage() {
-  const { session, userId, loading: authLoading, isAdmin, profileLoading } = useAuth();
-  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const { ready, error } = useLegacyBundle("admin", [
     "studio.css",
     "scena-logo.css",
@@ -47,6 +46,7 @@ export function AdminFeaturedPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -74,17 +74,6 @@ export function AdminFeaturedPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || profileLoading) return;
-    if (!userId || !session) {
-      navigate("/?login=account", { replace: true });
-      return;
-    }
-    if (!isAdmin) {
-      navigate("/", { replace: true });
-    }
-  }, [authLoading, profileLoading, userId, session, isAdmin, navigate]);
-
-  useEffect(() => {
     if (!ready || !isAdmin || !window.ScenaAdmin) return;
     loadRows();
   }, [ready, isAdmin, loadRows]);
@@ -93,6 +82,26 @@ export function AdminFeaturedPage() {
     () => Object.values(drafts).filter((d) => d.featured).length,
     [drafts],
   );
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = !q
+      ? rows.slice()
+      : rows.filter((row) => {
+          const title = (row.title || "").toLowerCase();
+          const desc = (row.description || "").toLowerCase();
+          const id = (row.seriesId || "").toLowerCase();
+          return title.includes(q) || desc.includes(q) || id.includes(q);
+        });
+    list.sort((a, b) => {
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      const ao = a.featuredOrder ?? 99;
+      const bo = b.featuredOrder ?? 99;
+      if (ao !== bo) return ao - bo;
+      return (a.title || "").localeCompare(b.title || "");
+    });
+    return list;
+  }, [rows, query]);
 
   function updateDraft(seriesId: string, patch: Partial<DraftRow>) {
     setDrafts((prev) => ({
@@ -140,25 +149,24 @@ export function AdminFeaturedPage() {
 
   if (error || loadError) {
     return (
-      <div className="admin-featured-page container">
+      <div>
         <p className="admin-featured-error">{error || loadError}</p>
         <Link to="/">Home</Link>
       </div>
     );
   }
 
-  if (authLoading || profileLoading || !ready || loading) {
+  if (!ready || loading) {
     return <div className="admin-featured-loading">Loading staff picks…</div>;
   }
 
   if (!isAdmin) return null;
 
   return (
-    <div className="admin-featured-page container">
-      <header className="admin-featured-head">
+    <div className="admin-featured-section">
+      <div className="admin-featured-section-head">
         <div>
-          <p className="admin-featured-eyebrow">Platform admin</p>
-          <h1>Staff picks</h1>
+          <h2 className="admin-featured-section-title">Staff picks</h2>
           <p className="admin-featured-lede">
             Choose up to three published series for the home page Featured section. Order{" "}
             <strong>1</strong> is the hero card; <strong>2–3</strong> appear beside it.
@@ -167,16 +175,41 @@ export function AdminFeaturedPage() {
         <Link className="btn btn-ghost btn-sm" to="/">
           View home page
         </Link>
-      </header>
+      </div>
+
+      <label className="admin-featured-lookup">
+        <span>Look up series</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by series name…"
+          autoComplete="off"
+          aria-label="Search series by name"
+        />
+        {query.trim() ? (
+          <span className="admin-featured-lookup-meta">
+            {filteredRows.length} match{filteredRows.length === 1 ? "" : "es"}
+          </span>
+        ) : (
+          <span className="admin-featured-lookup-meta">
+            {featuredCount} featured · {rows.length} published
+          </span>
+        )}
+      </label>
 
       {rows.length === 0 ? (
         <p className="admin-featured-empty">
           No published series yet. Creators need at least one live chapter before you can feature
           them.
         </p>
+      ) : filteredRows.length === 0 ? (
+        <p className="admin-featured-empty">
+          No series match “{query.trim()}”. Try another title.
+        </p>
       ) : (
         <div className="admin-featured-list">
-          {rows.map((row) => {
+          {filteredRows.map((row) => {
             const draft = drafts[row.seriesId] || draftFromRow(row);
             const imageUrl = row.bannerDataUrl || row.thumbnailDataUrl;
             return (

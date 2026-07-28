@@ -31,8 +31,8 @@ export function JamHomeFeed({ spotlight }: Props) {
           <h2>Jams</h2>
           <span className="section-meta">Live game jam entries</span>
         </div>
-        <a className="btn btn-ghost btn-sm" href="/studio#/jams">
-          Browse all jams
+        <a className="btn btn-ghost btn-sm" href="/jams">
+          Check other jams
         </a>
       </div>
 
@@ -40,9 +40,9 @@ export function JamHomeFeed({ spotlight }: Props) {
         <div className="jam-home-featured-cover" style={featuredCoverStyle} aria-hidden="true" />
         <header className="jam-home-featured-head">
           <div>
-            <a className="jam-home-featured-title" href={featured.href}>
+            <Link className="jam-home-featured-title" to={featured.href}>
               {featured.jamTitle}
-            </a>
+            </Link>
             <p className="jam-home-meta">
               <span className={"jam-type-badge jam-type-badge--" + (featured.jamType || "game")}>
                 {jamTypeLabel(featured.jamType)}
@@ -63,9 +63,9 @@ export function JamHomeFeed({ spotlight }: Props) {
               </span>
             </p>
           </div>
-          <a className="btn btn-sm btn-primary" href={featured.href}>
-            Full jam post
-          </a>
+          <Link className="btn btn-sm btn-primary" to={featured.href}>
+            View submissions
+          </Link>
         </header>
 
         <ul className="jam-home-entries">
@@ -99,9 +99,9 @@ export function JamHomeFeed({ spotlight }: Props) {
         </ul>
         {featured.totalSubmissions > featured.submissions.length ? (
           <footer className="jam-home-featured-foot">
-            <a className="btn btn-ghost btn-sm" href={featured.href}>
+            <Link className="btn btn-ghost btn-sm" to={featured.href}>
               See all {featured.totalSubmissions} submissions
-            </a>
+            </Link>
           </footer>
         ) : null}
       </article>
@@ -202,12 +202,12 @@ function JamPreviewPanel({
         <p className="jam-home-preview-theme">Theme: {jam.theme}</p>
       ) : null}
       <div className="jam-home-preview-actions">
-        <a className="btn btn-sm btn-primary" href={jam.href}>
+        <Link className="btn btn-sm btn-primary" to={jam.href}>
           See all submissions
-        </a>
-        <a className="btn btn-sm btn-ghost" href={jam.href}>
-          Read full post
-        </a>
+        </Link>
+        <Link className="btn btn-sm btn-ghost" to={jam.href}>
+          Open jam page
+        </Link>
       </div>
     </article>
   );

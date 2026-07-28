@@ -96,6 +96,9 @@
     this.pinchState = null;
     this.ignoreMouseUntil = 0;
     this.mobileDrawer = null;
+    this.binderTab = null;
+    this.binderWidth = 320;
+    this.isResizingBinder = false;
     this.pendingNodePointer = null;
     this.dragNode = null;
     this.dragStart = null;
@@ -230,49 +233,172 @@
     return "scena.blockShelfOpen." + (this.series && this.series.id ? this.series.id : "default");
   };
 
+  ScenaGraphEditor.prototype.binderWidthPrefKey = function () {
+    return "scena.binderWidth." + (this.series && this.series.id ? this.series.id : "default");
+  };
+
+  ScenaGraphEditor.prototype.binderTabPrefKey = function () {
+    return "scena.binderTab." + (this.series && this.series.id ? this.series.id : "default");
+  };
+
   ScenaGraphEditor.prototype.applyBlockShelfState = function (open, opts) {
     opts = opts || {};
-    var centerGraph = this.container.querySelector(".center-graph");
-    if (!this.blockShelf || !this.blockShelfToggle || !centerGraph) return;
     this.blockShelfOpen = !!open;
-    centerGraph.classList.toggle("is-block-shelf-open", this.blockShelfOpen);
-    this.blockShelf.classList.toggle("block-shelf--collapsed", !this.blockShelfOpen);
-    this.blockShelfToggle.setAttribute("aria-expanded", this.blockShelfOpen ? "true" : "false");
-    this.blockShelfToggle.title = this.blockShelfOpen ? "Hide block palette" : "Show block palette";
-    var icon = this.blockShelfToggle.querySelector(".block-shelf-toggle-icon");
-    if (icon) icon.textContent = this.blockShelfOpen ? "◂" : "▸";
-    if (!this.isMobileLayout()) {
+    if (this.isMobileLayout()) {
+      if (!opts.skipChrome) {
+        this.mobileDrawer = this.blockShelfOpen ? "blocks" : (this.mobileDrawer === "blocks" ? null : this.mobileDrawer);
+        this.syncMobileChrome();
+      }
+      return;
+    }
+    if (open) this.openBinderTab("blocks", { persist: !opts.skipPersist });
+    else if (this.binderTab === "blocks") this.closeBinder({ persist: !opts.skipPersist });
+  };
+
+  ScenaGraphEditor.prototype.getBinderWidth = function () {
+    var w = parseInt(this.binderWidth, 10);
+    if (!w || isNaN(w)) w = 320;
+    return Math.max(220, Math.min(560, w));
+  };
+
+  ScenaGraphEditor.prototype.applyBinderWidth = function (width) {
+    this.binderWidth = Math.max(220, Math.min(560, parseInt(width, 10) || 320));
+    if (this.workspaceBinder) {
+      this.workspaceBinder.style.setProperty("--binder-width", this.binderWidth + "px");
+    }
+    try {
+      localStorage.setItem(this.binderWidthPrefKey(), String(this.binderWidth));
+    } catch (e) { /* ignore */ }
+  };
+
+  ScenaGraphEditor.prototype.syncBinderChrome = function () {
+    if (!this.workspaceEditor || this.learnMode) return;
+    var tab = this.binderTab || null;
+    var open = !!tab;
+    this.workspaceEditor.classList.toggle("is-binder-open", open);
+    this.workspaceEditor.classList.toggle("is-binder-blocks", tab === "blocks");
+    this.workspaceEditor.classList.toggle("is-binder-details", tab === "details");
+    this.workspaceEditor.classList.toggle("is-binder-assets", tab === "assets");
+    if (this.workspaceBinder) {
+      this.workspaceBinder.classList.toggle("is-open", open);
+      this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
+        var active = btn.getAttribute("data-binder-tab") === tab;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      this.workspaceBinder.querySelectorAll("[data-binder-pane]").forEach(function (pane) {
+        var show = pane.getAttribute("data-binder-pane") === tab;
+        pane.hidden = !show;
+      });
+    }
+    if (this.binderClose) this.binderClose.hidden = !open;
+    this.blockShelfOpen = tab === "blocks";
+  };
+
+  ScenaGraphEditor.prototype.openBinderTab = function (tab, opts) {
+    opts = opts || {};
+    if (this.learnMode) return;
+    if (this.isMobileLayout()) {
+      var mobileMap = { blocks: "blocks", details: "inspector", assets: "assets" };
+      this.setMobileDrawer(mobileMap[tab] || null);
+      return;
+    }
+    if (tab !== "blocks" && tab !== "details" && tab !== "assets") return;
+    this.binderTab = tab;
+    this.syncBinderChrome();
+    if (opts.persist !== false) {
+      try { localStorage.setItem(this.binderTabPrefKey(), tab); } catch (e) { /* ignore */ }
+      if (tab === "blocks") {
+        try { localStorage.setItem(this.blockShelfPrefKey(), "1"); } catch (e2) { /* ignore */ }
+      }
+    }
+  };
+
+  ScenaGraphEditor.prototype.closeBinder = function (opts) {
+    opts = opts || {};
+    if (this.learnMode) return;
+    if (this.isMobileLayout()) {
+      this.setMobileDrawer(null);
+      return;
+    }
+    this.binderTab = null;
+    this.syncBinderChrome();
+    if (opts.persist !== false) {
       try {
-        localStorage.setItem(this.blockShelfPrefKey(), this.blockShelfOpen ? "1" : "0");
+        localStorage.setItem(this.binderTabPrefKey(), "");
+        localStorage.setItem(this.blockShelfPrefKey(), "0");
       } catch (e) { /* ignore */ }
     }
-    if (!opts.skipChrome && this.isMobileLayout()) {
-      this.mobileDrawer = this.blockShelfOpen ? "blocks" : (this.mobileDrawer === "blocks" ? null : this.mobileDrawer);
-      this.syncMobileChrome();
-    }
+  };
+
+  ScenaGraphEditor.prototype.toggleBinderTab = function (tab) {
+    if (this.binderTab === tab) this.closeBinder();
+    else this.openBinderTab(tab);
   };
 
   ScenaGraphEditor.prototype.bindBlockShelfToggle = function () {
     var self = this;
     if (this.learnMode) return;
-    this.blockShelfToggle = this.container.querySelector("#blockShelfToggle");
-    if (!this.blockShelfToggle || this.blockShelfToggle.dataset.bound === "1") return;
-    this.blockShelfToggle.dataset.bound = "1";
-    var stored = null;
-    try { stored = localStorage.getItem(this.blockShelfPrefKey()); } catch (e) { /* ignore */ }
+    this.bindWorkspaceBinder();
+  };
+
+  ScenaGraphEditor.prototype.bindWorkspaceBinder = function () {
+    var self = this;
+    if (this.learnMode) return;
+    this.workspaceBinder = this.container.querySelector("#workspaceBinder");
+    this.binderClose = this.container.querySelector("#binderClose");
+    this.binderResize = this.container.querySelector("#binderResize");
+    if (!this.workspaceBinder || this.workspaceBinder.dataset.bound === "1") return;
+    this.workspaceBinder.dataset.bound = "1";
+
+    var storedWidth = null;
+    try { storedWidth = localStorage.getItem(this.binderWidthPrefKey()); } catch (e) { /* ignore */ }
+    this.applyBinderWidth(storedWidth || 320);
+
+    var storedTab = null;
+    try { storedTab = localStorage.getItem(this.binderTabPrefKey()); } catch (e2) { /* ignore */ }
     if (this.isMobileLayout()) {
-      this.applyBlockShelfState(false, { skipChrome: true });
+      this.binderTab = null;
+      this.syncBinderChrome();
+    } else if (storedTab === "blocks" || storedTab === "details" || storedTab === "assets") {
+      this.openBinderTab(storedTab, { persist: false });
     } else {
-      this.applyBlockShelfState(stored === "1");
+      var shelfPref = null;
+      try { shelfPref = localStorage.getItem(this.blockShelfPrefKey()); } catch (e3) { /* ignore */ }
+      if (shelfPref === "1") this.openBinderTab("blocks", { persist: false });
+      else this.closeBinder({ persist: false });
     }
-    this.blockShelfToggle.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (self.isMobileLayout()) {
-        self.setMobileDrawer(self.mobileDrawer === "blocks" ? null : "blocks");
-      } else {
-        self.applyBlockShelfState(!self.blockShelfOpen);
-      }
+
+    this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tab = btn.getAttribute("data-binder-tab");
+        if (self.isMobileLayout()) {
+          var mobileMap = { blocks: "blocks", details: "inspector", assets: "assets" };
+          self.setMobileDrawer(self.mobileDrawer === mobileMap[tab] ? null : mobileMap[tab]);
+          return;
+        }
+        self.toggleBinderTab(tab);
+      });
     });
+
+    if (this.binderClose) {
+      this.binderClose.addEventListener("click", function () {
+        self.closeBinder();
+      });
+    }
+
+    if (this.binderResize) {
+      this.binderResize.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        self.isResizingBinder = true;
+        self.binderResizeStartX = e.clientX;
+        self.binderResizeStartW = self.getBinderWidth();
+        document.body.classList.add("is-resizing-binder");
+        self.bindDragListeners();
+      });
+    }
   };
 
   ScenaGraphEditor.prototype.bindSpawnMenu = function () {
@@ -383,6 +509,17 @@
             '<div class="upload-preview episode-thumb-preview" id="episodeEditorThumbPreview">400×600</div>' +
             '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden id="episodeEditorThumbInput"></label>' +
           '</div></div>' +
+        '<div class="field episode-monetization-field" id="episodeEditorMonetizationField">' +
+          '<label>Chapter access (optional overrides)</label>' +
+          '<div class="form-row">' +
+            '<div class="field"><label>Ducat price</label>' +
+              '<input type="number" id="episodeEditorDucatPrice" min="0" max="999" placeholder="Series default">' +
+              '<p class="field-hint">Leave blank to use series default. 0 = free.</p></div>' +
+            '<div class="field"><label>Free after (days)</label>' +
+              '<input type="number" id="episodeEditorFreeAfterDays" min="0" max="365" placeholder="Series default">' +
+              '<p class="field-hint">Override how many days after release this chapter becomes free.</p></div>' +
+          '</div>' +
+        '</div>' +
         '<div class="field episode-status-field">' +
           '<p class="episode-status-line" id="episodeEditorStatusLine"></p>' +
           '<div class="field episode-publish-field" id="episodeEditorPublishField">' +
@@ -609,6 +746,7 @@
         '<div class="graph-toolbar graph-toolbar--studio">' +
           '<div class="graph-toolbar-desktop">' +
             '<button type="button" class="btn btn-sm graph-play-btn" id="graphPlayBtn" title="Play from selected beat">▶ Play</button>' +
+            '<button type="button" class="btn btn-sm" id="addBoundaryBtn" title="Split the graph into publishable chapters">+ Chapter boundary</button>' +
             '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate</button>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
             '<button type="button" class="btn btn-sm btn-primary" id="graphSaveBtn" disabled>Save</button>' +
@@ -617,14 +755,14 @@
             '<button type="button" class="btn btn-sm" id="mobileBlocksBtn" aria-expanded="false">Blocks</button>' +
             '<button type="button" class="btn btn-sm" id="mobilePlayBtn" aria-expanded="false">Play</button>' +
             '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
+            '<button type="button" class="btn btn-sm" id="mobileBoundaryBtn">Chapter</button>' +
             '<button type="button" class="btn btn-sm" id="mobileAssetsBtn" aria-expanded="false">Assets</button>' +
             '<button type="button" class="btn btn-sm" id="mobileValidateBtn">Validate</button>' +
             '<button type="button" class="btn btn-sm btn-primary" id="mobileSaveBtn">Save</button>' +
           '</div>' +
         '</div>' +
         '<div class="mobile-panel-backdrop" id="mobilePanelBackdrop" hidden></div>' +
-        '<div class="workspace-panels">' +
-          '<aside class="panel-left graph-inspector" id="graphInspector"></aside>' +
+        '<div class="workspace-panels workspace-panels--binder">' +
           '<div class="panel-center" id="panelCenter">' +
             '<div class="center-preview">' +
               '<button type="button" class="mobile-preview-close" id="mobilePreviewClose" aria-label="Hide preview">×</button>' +
@@ -634,11 +772,6 @@
             '</div>' +
             '<div class="center-resizer" id="centerResizer" title="Drag to resize preview / graph"></div>' +
             '<div class="center-graph">' +
-              '<button type="button" class="block-shelf-toggle" id="blockShelfToggle" aria-expanded="false" aria-controls="blockShelf" title="Show block palette">' +
-                '<span class="block-shelf-toggle-icon" aria-hidden="true">▸</span>' +
-                '<span class="block-shelf-toggle-label">Blocks</span>' +
-              '</button>' +
-              '<aside class="block-shelf block-shelf--collapsed" id="blockShelf" aria-label="Block palette"></aside>' +
               '<div class="graph-canvas-wrap" id="graphCanvasWrap" tabindex="0">' +
                 '<div class="graph-canvas" id="graphCanvas">' +
                   '<div class="graph-boundaries" id="graphBoundaries"></div>' +
@@ -648,22 +781,41 @@
               '</div>' +
             '</div>' +
           '</div>' +
-          '<aside class="panel-right workspace-resources" id="workspaceResources">' +
-            '<div class="resources-header">' +
-              '<div class="resources-tabs" id="resourceTabs">' +
-                '<button type="button" class="resources-tab is-active" data-resource-tab="characters">Characters</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="stages">Stages</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="library">My library</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
-              '</div>' +
-              '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
+          '<aside class="workspace-binder" id="workspaceBinder" aria-label="Studio binder">' +
+            '<div class="workspace-binder-resize" id="binderResize" title="Drag to resize"></div>' +
+            '<div class="workspace-binder-rail" role="tablist" aria-label="Binder tabs">' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="blocks" role="tab" aria-selected="false">Blocks</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="details" role="tab" aria-selected="false">Details</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="assets" role="tab" aria-selected="false">Assets</button>' +
+              '<button type="button" class="workspace-binder-close" id="binderClose" title="Close binder" hidden>×</button>' +
             '</div>' +
-            '<div class="resources-split">' +
-              '<div class="resources-list" id="resourcesList"></div>' +
-              '<div class="resources-detail" id="resourcesDetail"></div>' +
+            '<div class="workspace-binder-body">' +
+              '<div class="workspace-binder-pane" data-binder-pane="blocks" id="binderPaneBlocks" hidden>' +
+                '<aside class="block-shelf block-shelf--binder" id="blockShelf" aria-label="Block palette"></aside>' +
+              '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="details" id="binderPaneDetails" hidden>' +
+                '<aside class="graph-inspector" id="graphInspector"></aside>' +
+              '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="assets" id="binderPaneAssets" hidden>' +
+                '<div class="workspace-resources" id="workspaceResources">' +
+                  '<div class="resources-header">' +
+                    '<div class="resources-tabs" id="resourceTabs">' +
+                      '<button type="button" class="resources-tab is-active" data-resource-tab="characters">Characters</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="stages">Stages</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="library">My library</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
+                  '</div>' +
+                  '<div class="resources-split">' +
+                    '<div class="resources-list" id="resourcesList"></div>' +
+                    '<div class="resources-detail" id="resourcesDetail"></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
             '</div>' +
           '</aside>' +
         '</div>' +
@@ -701,7 +853,7 @@
     this.saveStatusEl = this.container.querySelector("#graphSaveStatus");
     this.saveBtn = this.container.querySelector("#graphSaveBtn");
     this.boundariesLayer = this.container.querySelector("#graphBoundaries");
-    this.boundaryBtn = null;
+    this.boundaryBtn = this.container.querySelector("#addBoundaryBtn");
     this.episodeContextBtn = null;
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
@@ -711,6 +863,7 @@
     this.mobilePlayBtn = this.container.querySelector("#mobilePlayBtn");
     this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
     this.mobileInspectorBtn = this.container.querySelector("#mobileInspectorBtn");
+    this.mobileBoundaryBtn = this.container.querySelector("#mobileBoundaryBtn");
     this.mobileAssetsBtn = this.container.querySelector("#mobileAssetsBtn");
     this.mobileValidateBtn = this.container.querySelector("#mobileValidateBtn");
     this.mobileSaveBtn = this.container.querySelector("#mobileSaveBtn");
@@ -757,6 +910,12 @@
 
     if (this.boundaryBtn) {
       this.boundaryBtn.addEventListener("click", function () {
+        self.toggleBoundaryPlacement();
+      });
+    }
+
+    if (this.mobileBoundaryBtn) {
+      this.mobileBoundaryBtn.addEventListener("click", function () {
         self.toggleBoundaryPlacement();
       });
     }
@@ -850,6 +1009,10 @@
         }
         if (self._workspaceModalMode === "marketplace_sell") {
           self.submitMarketplaceSellModal();
+          return;
+        }
+        if (self._workspaceModalMode === "marketplace_edit") {
+          self.submitMarketplaceEditModal();
           return;
         }
         if (self._workspaceModalMode === "library_sell") {
@@ -1011,7 +1174,6 @@
     var self = this;
     var applyTap = function () {
       self.selectNode(pointer.node.id, { skipConfirm: true });
-      self.focusNodeInView(pointer.node);
       if (self.isMobileLayout()) self.setMobileDrawer("inspector");
     };
     var nodeWidth = pointer.isFlowGate ? 240 : ((pointer.isLogic || pointer.isKeyItem) ? 120 : 220);
@@ -1041,6 +1203,9 @@
     if (this.boundaryBtn) {
       this.boundaryBtn.classList.toggle("is-active", this.boundaryPlacementMode);
     }
+    if (this.mobileBoundaryBtn) {
+      this.mobileBoundaryBtn.classList.toggle("is-active", this.boundaryPlacementMode);
+    }
     if (this.wrap) this.wrap.classList.toggle("is-boundary-mode", this.boundaryPlacementMode);
     this.setSaveStatus(this.boundaryPlacementMode
       ? "Click the graph to place an episode boundary line…"
@@ -1048,9 +1213,17 @@
   };
 
   ScenaGraphEditor.prototype.syncInspectorPanel = function () {
-    if (!this.workspaceEditor || this.isMobileLayout()) return;
+    if (!this.workspaceEditor || this.isMobileLayout() || this.learnMode) return;
     var hasSelection = !!(this.selectedId || this.selectedEdgeId || this.selectedBoundaryId);
     this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection);
+    if (hasSelection) {
+      // Open Details when binder is closed; don't yank away from Blocks/Assets mid-edit.
+      if (!this.binderTab || this.binderTab === "details") {
+        this.openBinderTab("details", { persist: false });
+      }
+    } else if (this.binderTab === "details") {
+      this.syncBinderChrome();
+    }
   };
 
   ScenaGraphEditor.prototype.syncMobileChrome = function () {
@@ -1065,6 +1238,15 @@
     root.classList.toggle("is-mobile-block-shelf-open", drawer === "blocks");
     root.classList.toggle("is-mobile-preview-open", drawer === "preview");
     root.classList.toggle("is-mobile-resources-open", drawer === "assets");
+    if (mobile && this.workspaceBinder) {
+      this.workspaceBinder.querySelectorAll("[data-binder-pane]").forEach(function (pane) {
+        var name = pane.getAttribute("data-binder-pane");
+        if (drawer === "blocks") pane.hidden = name !== "blocks";
+        else if (drawer === "inspector") pane.hidden = name !== "details";
+        else if (drawer === "assets") pane.hidden = name !== "assets";
+        else pane.hidden = true;
+      });
+    }
     if (this.mobileBackdrop) {
       this.mobileBackdrop.hidden = !sheetOpen;
     }
@@ -1293,7 +1475,7 @@
       }
       return;
     }
-    if (this.isPanning || this.dragNode || this.dragBoundary || this.connectDragActive) {
+    if (this.isPanning || this.dragNode || this.dragBoundary || this.connectDragActive || this.isResizingBinder) {
       e.preventDefault();
     }
     this.onMouseMove(e);
@@ -1311,6 +1493,11 @@
 
   ScenaGraphEditor.prototype.onMouseMove = function (e) {
     var pt = eventClientXY(e);
+    if (this.isResizingBinder) {
+      var delta = this.binderResizeStartX - pt.x;
+      this.applyBinderWidth(this.binderResizeStartW + delta);
+      return;
+    }
     if (this.pendingNodePointer && !this.dragNode) {
       if (Math.hypot(pt.x - this.pendingNodePointer.startX, pt.y - this.pendingNodePointer.startY) >= 6) {
         this.pendingNodePointer.moved = true;
@@ -1352,6 +1539,12 @@
 
   ScenaGraphEditor.prototype.onMouseUp = function (e) {
     var wasPanning = this.isPanning;
+    if (this.isResizingBinder) {
+      this.isResizingBinder = false;
+      document.body.classList.remove("is-resizing-binder");
+      this.unbindDragListeners();
+      return;
+    }
     if (this.pendingNodePointer && !this.pendingNodePointer.moved && !this.dragNode) {
       this.finishNodeTap(this.pendingNodePointer);
     }
@@ -1751,6 +1944,7 @@
     target.boundaryX = Math.round(x);
     this.boundaryPlacementMode = false;
     if (this.boundaryBtn) this.boundaryBtn.classList.remove("is-active");
+    if (this.mobileBoundaryBtn) this.mobileBoundaryBtn.classList.remove("is-active");
     if (this.wrap) this.wrap.classList.remove("is-boundary-mode");
     this.selectedBoundaryId = target.id;
     this.syncEpisodeGraphState();
@@ -2687,6 +2881,16 @@
         self.armNodePointer(node, el, e.clientX, e.clientY, nodeMeta);
       });
 
+      el.addEventListener("dblclick", function (e) {
+        if (self.shouldIgnoreMouse()) return;
+        if (e.target.closest(".graph-port")) return;
+        e.stopPropagation();
+        e.preventDefault();
+        self.pendingNodePointer = null;
+        self.selectNode(node.id, { skipConfirm: true });
+        self.focusNodeInView(node);
+      });
+
       el.addEventListener("touchstart", function (e) {
         if (e.touches.length !== 1) return;
         if (e.target.closest(".graph-port")) return;
@@ -2863,6 +3067,19 @@
       el.style.removeProperty("--ui-choice-sprite");
       delete el.dataset.customChoice;
     }
+    var layout = ui.layout || {};
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    var name = layout.nameplate || { x: 6, y: 62 };
+    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
+    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
+    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
+    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
+    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
+    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    el.classList.add("preview-frame--laid-out");
   };
 
   ScenaGraphEditor.prototype.renderPreview = function () {
@@ -3280,15 +3497,15 @@
     if (tab === "characters") {
       var profile = ScenaStore.getCharacter(this.series, id);
       if (!profile) { this.resourcesDetail.innerHTML = ""; return; }
-      var sprites = (profile.sprites || []).map(function (s) {
-        return '<div class="sprite-chip" style="background-image:url(' + (s.dataUrl || "") + ')"><span>' + escapeHtml(s.label) + '</span></div>';
+      var sprites = (profile.sprites || []).map(function (s, i) {
+        return '<div class="sprite-chip" data-sprite-idx="' + i + '"><span>' + escapeHtml(s.label) + '</span></div>';
       }).join("");
       html =
         '<h4>Character</h4>' +
         '<div class="field"><label>Name</label><input type="text" id="resCharName" value="' + escapeAttr(profile.name) + '"></div>' +
         '<div class="field"><label>Color</label><input type="color" id="resCharColor" value="' + escapeAttr(profile.color || "#888888") + '"></div>' +
         '<div class="field"><label>Sprites</label><div class="sprite-grid">' + (sprites || '<span class="field-hint">No sprites</span>') + '</div>' +
-        '<label class="btn btn-sm">+ Add sprite<input type="file" accept="image/*" hidden id="resSpriteUpload"></label></div>' +
+        '<label class="btn btn-sm">+ Add sprite<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden id="resSpriteUpload"></label></div>' +
         '<button type="button" class="btn btn-sm btn-danger" id="resDeleteChar">Delete character</button>' +
         '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else if (tab === "stages") {
@@ -3366,6 +3583,7 @@
     this.resourcesDetail.innerHTML = html;
     var metricIdx = tab === "metrics" ? parseInt(String(id).replace("metric_", ""), 10) : NaN;
     this.bindResourceDetail(tab, id, metricIdx);
+    this.applyResourceImagePreviews(tab, id);
   };
 
   ScenaGraphEditor.prototype.renderKeyItemIconPicker = function (selectedUrl, pickerId) {
@@ -3420,23 +3638,70 @@
     });
   };
 
+  var IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp,.png,.jpg,.jpeg,.webp,.gif,.bmp";
+
+  ScenaGraphEditor.prototype.notifyUploadResult = function (okMessage) {
+    var warn = ScenaStore.consumeUploadWarning && ScenaStore.consumeUploadWarning();
+    var meta = ScenaStore.consumeUploadMeta && ScenaStore.consumeUploadMeta();
+    var metaText = ScenaStore.formatUploadMeta ? ScenaStore.formatUploadMeta(meta) : "";
+    if (warn) {
+      this.setSaveStatus(warn);
+    } else if (okMessage) {
+      this.setSaveStatus(metaText ? okMessage + " (" + metaText + ")" : okMessage);
+    }
+  };
+
+  ScenaGraphEditor.prototype.applyResourceImagePreviews = function (tab, id) {
+    if (!this.resourcesDetail) return;
+    if (tab === "characters") {
+      var profile = ScenaStore.getCharacter(this.series, id);
+      if (!profile) return;
+      (profile.sprites || []).forEach(function (sprite, idx) {
+        var chip = this.resourcesDetail.querySelector('[data-sprite-idx="' + idx + '"]');
+        if (chip && sprite.dataUrl) chip.style.backgroundImage = "url(" + sprite.dataUrl + ")";
+      }, this);
+    } else if (tab === "stages") {
+      var bg = ScenaStore.getBackground(this.series, id);
+      if (!bg || !bg.layers) return;
+      ["bg", "mg", "fg"].forEach(function (layerKey) {
+        var el = this.resourcesDetail.querySelector('[data-layer-preview="' + layerKey + '"]');
+        var url = bg.layers[layerKey];
+        if (el && url) {
+          el.style.backgroundImage = "url(" + url + ")";
+          el.textContent = "";
+        }
+      }, this);
+    }
+  };
+
+  ScenaGraphEditor.prototype.spritePoseLabelFromFile = function (file) {
+    var base = (file && file.name ? file.name.replace(/\.[^.]+$/, "") : "") || "pose";
+    var label = window.prompt("Pose name (e.g. happy, angry):", base);
+    if (label === null) return null;
+    return (label.trim() || base).trim();
+  };
+
   ScenaGraphEditor.prototype.layerSlot = function (label, key, dataUrl) {
     return '<div class="layer-slot">' +
       '<span class="layer-slot-label">' + label + '</span>' +
-      '<div class="layer-slot-preview" style="' + (dataUrl ? "background-image:url(" + dataUrl + ")" : "") + '">' + (dataUrl ? "" : "+") + '</div>' +
-      '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden data-layer-key="' + key + '"></label></div>';
+      '<div class="layer-slot-preview" data-layer-preview="' + key + '">' + (dataUrl ? "" : "+") + '</div>' +
+      '<label class="btn btn-sm">Upload<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden data-layer-key="' + key + '"></label></div>';
   };
 
   ScenaGraphEditor.prototype.bindResourceDetail = function (tab, id, metricIdx) {
     var self = this;
 
-    function persist() {
+    function persist(done) {
       self.markDirty();
       self.renderResourcesPanel();
       if (!self.learnMode) {
         self.renderInspector();
         self.renderPreview();
-        self.saveNow();
+        self.saveNow().then(function (ok) {
+          if (typeof done === "function") done(ok);
+        });
+      } else if (typeof done === "function") {
+        done(true);
       }
     }
 
@@ -3457,13 +3722,18 @@
       var upload = this.resourcesDetail.querySelector("#resSpriteUpload");
       if (upload) upload.addEventListener("change", function () {
         var file = upload.files[0];
+        upload.value = "";
         if (!file) return;
-        var label = window.prompt("Pose name (e.g. happy, angry):", file.name.replace(/\.[^.]+$/, ""));
+        var label = self.spritePoseLabelFromFile(file);
         if (!label) return;
+        self.setSaveStatus("Uploading sprite…");
         ScenaStore.fileToDataUrl(file, { purpose: "sprite", seriesId: self.series.id }).then(function (url) {
+          if (!url) throw new Error("Upload returned empty image data.");
           profile.sprites = profile.sprites || [];
-          profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label.trim(), dataUrl: url });
-          persist();
+          profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label, dataUrl: url });
+          persist(function () {
+            self.notifyUploadResult("Sprite added");
+          });
         }).catch(function (err) {
           self.onSaveError((err && err.message) || "Could not upload sprite.");
         });
@@ -3486,12 +3756,17 @@
       this.resourcesDetail.querySelectorAll("[data-layer-key]").forEach(function (input) {
         input.addEventListener("change", function () {
           var file = input.files[0];
+          input.value = "";
           if (!file) return;
           var layerKey = input.getAttribute("data-layer-key");
+          self.setSaveStatus("Uploading layer…");
           ScenaStore.fileToDataUrl(file, { purpose: "stage-" + layerKey, seriesId: self.series.id }).then(function (url) {
+            if (!url) throw new Error("Upload returned empty image data.");
             if (!bg.layers) bg.layers = { bg: null, mg: null, fg: null };
             bg.layers[layerKey] = url;
-            persist();
+            persist(function () {
+              self.notifyUploadResult("Layer uploaded");
+            });
           }).catch(function (err) {
             self.onSaveError((err && err.message) || "Could not upload layer.");
           });
@@ -3913,6 +4188,7 @@
     this.workspaceModal.hidden = true;
     this._createResourceTab = null;
     this._workspaceModalMode = null;
+    this._editListingId = null;
     this.resetWorkspaceModalChrome();
   };
 
@@ -3985,6 +4261,17 @@
         preview.textContent = "400×600";
       }
     }
+    var priceInput = modal.querySelector("#episodeEditorDucatPrice");
+    var freeDaysInput = modal.querySelector("#episodeEditorFreeAfterDays");
+    var monetizationField = modal.querySelector("#episodeEditorMonetizationField");
+    var seriesPaid = this.series.monetization && this.series.monetization.mode === "paid";
+    if (monetizationField) monetizationField.hidden = !seriesPaid;
+    if (priceInput) {
+      priceInput.value = typeof episode.ducatPrice === "number" ? String(episode.ducatPrice) : "";
+    }
+    if (freeDaysInput) {
+      freeDaysInput.value = typeof episode.freeAfterDays === "number" ? String(episode.freeAfterDays) : "";
+    }
     if (titleEl) titleEl.focus();
   };
 
@@ -4000,6 +4287,18 @@
     var blurbEl = modal.querySelector("#episodeEditorBlurb");
     ep.title = titleEl ? titleEl.value.trim() : "";
     ep.shortDescription = blurbEl ? blurbEl.value.trim() : "";
+    var priceInput = modal.querySelector("#episodeEditorDucatPrice");
+    var freeDaysInput = modal.querySelector("#episodeEditorFreeAfterDays");
+    if (priceInput) {
+      var priceRaw = priceInput.value.trim();
+      if (!priceRaw) delete ep.ducatPrice;
+      else ep.ducatPrice = Math.max(0, parseInt(priceRaw, 10) || 0);
+    }
+    if (freeDaysInput) {
+      var daysRaw = freeDaysInput.value.trim();
+      if (!daysRaw) delete ep.freeAfterDays;
+      else ep.freeAfterDays = Math.max(0, parseInt(daysRaw, 10) || 0);
+    }
   };
 
   ScenaGraphEditor.prototype.bindEpisodeEditorModal = function () {
@@ -4120,6 +4419,14 @@
     if (!ep || this.learnMode) return Promise.resolve(false);
     var self = this;
     opts = opts || { when: "now" };
+    var listing = ScenaStore.validateSeriesListing(this.series);
+    if (!listing.ok) {
+      this.onSaveError(
+        "Cannot publish — series listing is incomplete:\n\n" +
+        listing.issues.join("\n")
+      );
+      return Promise.resolve(false);
+    }
     var validation = ScenaStore.validateGraph(this.series);
     if (!validation.ok) {
       var metricErrors = (validation.issues || []).filter(function (item) {
@@ -5462,7 +5769,10 @@
         var detailHtml = "";
         if (self.marketplaceSelectedId) {
           return ScenaMarketplace.getListing(self.marketplaceSelectedId, userId).then(function (listing) {
-            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, {
+              showPackUpsell: true,
+              viewerUserId: userId,
+            });
             return { listings: listings, detailHtml: detailHtml, balance: balance };
           });
         }
@@ -5512,8 +5822,7 @@
       });
     }
 
-    root.querySelectorAll("[data-listing-id]").forEach(function (btn) {
-      if (btn.classList.contains("marketplace-acquire-btn")) return;
+    root.querySelectorAll(".marketplace-card[data-listing-id]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         self.marketplaceSelectedId = btn.getAttribute("data-listing-id");
         self.renderMarketplacePanel();
@@ -5532,6 +5841,9 @@
         btn.disabled = true;
         ScenaMarketplace.purchase(userId, listingId).then(function (result) {
           return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
             if (window.ScenaAssetLibrary && listing) {
               ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
             }
@@ -5561,6 +5873,20 @@
       });
     });
 
+    root.querySelectorAll(".marketplace-edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.openMarketplaceEditModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+
+    root.querySelectorAll(".marketplace-remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
+
     if (window.ScenaWallet && self.feedbackUserId) {
       ScenaWallet.bindPackButtons(root, self.feedbackUserId, function () {
         self.renderMarketplacePanel();
@@ -5568,6 +5894,74 @@
         self.onSaveError((err && err.message) || "Could not buy Ducats.");
       });
     }
+  };
+
+  ScenaGraphEditor.prototype.openMarketplaceEditModal = function (listingId) {
+    var self = this;
+    if (!listingId || !window.ScenaMarketplace || !this.workspaceModal) return;
+    if (!this.feedbackUserId) {
+      this.onSaveError("Sign in to edit listings.");
+      return;
+    }
+    ScenaMarketplace.getListing(listingId, this.feedbackUserId).then(function (listing) {
+      if (!listing) {
+        self.onSaveError("Listing not found.");
+        return;
+      }
+      self._workspaceModalMode = "marketplace_edit";
+      self._editListingId = listingId;
+      self.container.querySelector("#workspaceModalTitle").textContent = "Edit listing";
+      self.container.querySelector("#workspaceModalBody").innerHTML =
+        ScenaMarketplace.renderEditListingBody(listing);
+      self.container.querySelector("#workspaceModalSave").textContent = "Save changes";
+      self.workspaceModal.hidden = false;
+    }).catch(function (err) {
+      self.onSaveError((err && err.message) || "Could not load listing.");
+    });
+  };
+
+  ScenaGraphEditor.prototype.submitMarketplaceEditModal = function () {
+    var self = this;
+    var listingId = this._editListingId;
+    if (!listingId || !this.feedbackUserId) return;
+    var modal = this.container;
+    var title = ((modal.querySelector("#mpEditTitle") || {}).value || "").trim();
+    var desc = ((modal.querySelector("#mpEditDesc") || {}).value || "").trim();
+    var category = (modal.querySelector("#mpEditCategory") || {}).value || "pack";
+    var price = parseInt((modal.querySelector("#mpEditPrice") || {}).value, 10) || 0;
+    var saveBtn = modal.querySelector("#workspaceModalSave");
+    if (title.length < 2) {
+      this.onSaveError("Enter a listing title.");
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaMarketplace.updateListing(this.feedbackUserId, listingId, {
+      title: title,
+      description: desc,
+      category: category,
+      priceDucats: price,
+    }).then(function () {
+      if (saveBtn) saveBtn.disabled = false;
+      self.closeModal();
+      self.setSaveStatus("Listing updated.");
+      self.renderMarketplacePanel();
+    }).catch(function (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      self.onSaveError((err && err.message) || "Could not update listing.");
+    });
+  };
+
+  ScenaGraphEditor.prototype.removeMarketplaceListing = function (listingId) {
+    var self = this;
+    if (!listingId || !this.feedbackUserId || !window.ScenaMarketplace) return;
+    if (!window.confirm("Remove this listing from the asset store? Buyers who already purchased keep their copy.")) return;
+    ScenaMarketplace.removeListing(this.feedbackUserId, listingId).then(function () {
+      if (self.marketplaceSelectedId === listingId) self.marketplaceSelectedId = "";
+      self.setSaveStatus("Listing removed from the store.");
+      self.renderMarketplacePanel();
+    }).catch(function (err) {
+      self.onSaveError((err && err.message) || "Could not remove listing.");
+    });
   };
 
   ScenaGraphEditor.prototype.renderAssetLibraryPanel = function () {
@@ -5658,17 +6052,27 @@
           return;
         }
         btn.disabled = true;
-        ScenaAssetLibrary.importToSeries(self.series, entryId, self.feedbackUserId).then(function (imported) {
-          if (!imported.ok) throw new Error("Could not import asset.");
+        ScenaAssetLibrary.get(self.feedbackUserId, entryId).then(function (entry) {
+          var importTab = "characters";
+          if (entry && entry.category === "stage") importTab = "stages";
+          else if (entry && entry.category === "audio") importTab = "audio";
+          else if (entry && entry.category === "item") importTab = "keyitems";
+          return ScenaAssetLibrary.importToSeries(self.series, entryId, self.feedbackUserId).then(function (imported) {
+            return { imported: imported, importTab: importTab };
+          });
+        }).then(function (payload) {
+          if (!payload.imported.ok) throw new Error("Could not import asset.");
           self.markDirty();
-          return self.saveNow(true);
-        }).then(function (ok) {
+          return self.saveNow(true).then(function (ok) {
+            return { ok: ok, importTab: payload.importTab };
+          });
+        }).then(function (result) {
           btn.disabled = false;
-          if (ok !== false) {
+          if (result.ok !== false) {
             self.setSaveStatus("Imported from your library.");
-            self.resourceTab = "characters";
+            self.resourceTab = result.importTab;
             self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
-              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === "characters");
+              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === result.importTab);
             });
             var split = self.container.querySelector(".resources-split");
             if (split) split.classList.remove("resources-split--store");
@@ -5697,6 +6101,20 @@
         });
       });
     });
+
+    root.querySelectorAll(".library-edit-listing-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.openMarketplaceEditModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+
+    root.querySelectorAll(".library-unlist-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
   };
 
   ScenaGraphEditor.prototype.openMarketplaceSellModal = function () {
@@ -5708,10 +6126,10 @@
     }
 
     this._workspaceModalMode = "marketplace_sell";
-    this.container.querySelector("#workspaceModalTitle").textContent = "Sell asset pack";
+    this.container.querySelector("#workspaceModalTitle").textContent = "Create & sell pack";
     this.container.querySelector("#workspaceModalBody").innerHTML =
       ScenaMarketplace.renderSellModalBody(this.series);
-    this.container.querySelector("#workspaceModalSave").textContent = "Publish listing";
+    this.container.querySelector("#workspaceModalSave").textContent = "Publish pack";
     this.workspaceModal.hidden = false;
   };
 
@@ -5722,30 +6140,38 @@
     var desc = (modal.querySelector("#mpSellDesc") || {}).value || "";
     var category = (modal.querySelector("#mpSellCategory") || {}).value || "pack";
     var price = parseInt((modal.querySelector("#mpSellPrice") || {}).value, 10) || 0;
-    var source = (modal.querySelector("#mpSellSource") || {}).value || "";
     var saveBtn = modal.querySelector("#workspaceModalSave");
+    var selection = ScenaMarketplace.readSellModalSelection
+      ? ScenaMarketplace.readSellModalSelection(modal)
+      : { characterIds: [], stageIds: [], assetIds: [] };
 
     title = title.trim();
     if (title.length < 2) {
       this.onSaveError("Enter a listing title.");
       return;
     }
-    if (!source) {
-      this.onSaveError("Pick a character, stage, or asset to sell.");
+    var picked =
+      (selection.characterIds && selection.characterIds.length) ||
+      (selection.stageIds && selection.stageIds.length) ||
+      (selection.assetIds && selection.assetIds.length);
+    if (!picked) {
+      this.onSaveError("Select at least one character, stage, or audio/item for the pack.");
       return;
     }
 
-    var parts = source.split(":");
-    var spec = { title: title, description: desc, category: category, priceDucats: Math.max(0, price) };
-    if (parts[0] === "char") spec.characterId = parts[1];
-    else if (parts[0] === "stage") spec.stageId = parts[1];
-    else if (parts[0] === "asset") spec.assetId = parts[1];
-
-    var built = ScenaMarketplace.buildBundleFromSeries(this.series, spec);
+    var built = ScenaMarketplace.buildBundleFromSeries(this.series, {
+      characterIds: selection.characterIds,
+      stageIds: selection.stageIds,
+      assetIds: selection.assetIds,
+    });
     if (built.empty) {
       this.onSaveError("Could not build asset pack from selection.");
       return;
     }
+
+    category = ScenaMarketplace.inferListingCategory
+      ? ScenaMarketplace.inferListingCategory(built.bundle, category)
+      : category;
 
     if (saveBtn) saveBtn.disabled = true;
     ScenaMarketplace.publishListing(this.feedbackUserId, {
@@ -5758,7 +6184,9 @@
       sellerName: (this.feedbackProfile && this.feedbackProfile.displayName) || "Creator",
     }).then(function () {
       self.closeModal();
-      self.setSaveStatus("Listing published on the asset store.");
+      self.setSaveStatus(
+        (built.pieceCount > 1 ? "Pack" : "Listing") + " published on the asset store."
+      );
       if (self.resourceTab === "store") self.renderMarketplacePanel();
     }).catch(function (err) {
       if (saveBtn) saveBtn.disabled = false;

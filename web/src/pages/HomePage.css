@@ -434,6 +434,16 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
+.home-continue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-continue-btn {
+  align-self: flex-start;
+}
+
 .home-adult-section {
   border-top: 1px solid var(--border, #eee);
   padding-top: 48px;

@@ -37,6 +37,7 @@
     { id: "stage", label: "Stages" },
     { id: "item", label: "Items" },
     { id: "audio", label: "Audio" },
+    { id: "ui", label: "UI" },
     { id: "pack", label: "Packs" },
   ];
 
@@ -1382,7 +1383,7 @@
           phase: phase,
           prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
           ageRestricted: requiresAgeGate(jam),
-          href: "/studio#/jams/" + jam.id,
+          href: "/jams/" + jam.id,
           totalSubmissions: subs.length,
           submissions: mapSubmissionPreview(jam, subs),
         };
@@ -1401,7 +1402,7 @@
           phase: jamPhase(jam),
           prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
           ageRestricted: requiresAgeGate(jam),
-          href: "/studio#/jams/" + jam.id,
+          href: "/jams/" + jam.id,
           totalSubmissions: (jam.submissions || []).length,
         };
       }
@@ -1416,6 +1417,122 @@
         featured: toFeedGroup(rows[0]),
         others: rows.slice(1).map(toMenuItem),
       });
+      });
+    },
+
+    /** Player-facing jam discover (not creator studio submit). */
+    listPlayerJamDiscover: function (opts) {
+      opts = opts || {};
+      var limit = Math.max(1, Math.min(parseInt(opts.limit, 10) || 40, 80));
+      var query = String(opts.query || "").trim().toLowerCase();
+      return withMergedJams(function (merged) {
+        var rows = merged.slice().map(migrateJam).filter(function (j) {
+          if (j.status !== "published") return false;
+          if ((j.jamType || "game") === "asset") return false;
+          if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(j)) return false;
+          var phase = jamPhase(j);
+          if (phase !== "submissions" && phase !== "judging" && phase !== "closed") return false;
+          if (query) {
+            var hay = [j.title, j.tagline, j.theme, j.description, j.hostName]
+              .map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
+            if (hay.indexOf(query) < 0) return false;
+          }
+          return true;
+        });
+        rows.sort(function (a, b) {
+          var pa = (a.submissions || []).length;
+          var pb = (b.submissions || []).length;
+          if (pb !== pa) return pb - pa;
+          return String(b.submissionEnd || "").localeCompare(String(a.submissionEnd || ""));
+        });
+        return rows.slice(0, limit).map(function (jam) {
+          var active = (jam.submissions || []).filter(function (s) { return !s.disqualified; });
+          var desc = String(jam.tagline || jam.theme || jam.description || "").trim();
+          if (desc.length > 180) desc = desc.slice(0, 177) + "…";
+          return {
+            jamId: jam.id,
+            jamTitle: jam.title,
+            jamType: jam.jamType || "game",
+            description: desc,
+            theme: jam.theme || "",
+            coverStyle: normalizeCoverStyle(jam.coverStyle),
+            phase: jamPhase(jam),
+            prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+            ageRestricted: requiresAgeGate(jam),
+            href: "/jams/" + jam.id,
+            totalSubmissions: active.length,
+            studioHref: "/studio#/jams/" + jam.id,
+          };
+        });
+      });
+    },
+
+    /** Player jam detail with playable/viewable submissions carousel. */
+    getPlayerJamDetail: function (jamId, opts) {
+      opts = opts || {};
+      return withMergedJams(function (merged) {
+        var jam = (merged || []).find(function (j) { return j && j.id === jamId; }) || findJam(jamId);
+        if (!jam) return null;
+        jam = finalizeIfDue(migrateJam(jam));
+        if (jam.status !== "published") return null;
+        if (opts.hideAdult && !opts.viewerIsAdult && requiresAgeGate(jam)) {
+          return { ageGated: true, jamId: jam.id, jamTitle: jam.title };
+        }
+        var phase = jamPhase(jam);
+        var subs = (jam.submissions || []).filter(function (s) { return !s.disqualified; }).slice();
+        subs.sort(function (a, b) {
+          if (phase === "judging") {
+            var la = (a.likes || []).length;
+            var lb = (b.likes || []).length;
+            if (lb !== la) return lb - la;
+          }
+          return String(b.submittedAt || "").localeCompare(String(a.submittedAt || ""));
+        });
+        var desc = String(jam.tagline || jam.theme || jam.description || "").trim();
+        return {
+          jamId: jam.id,
+          jamTitle: jam.title,
+          jamType: jam.jamType || "game",
+          description: desc,
+          theme: jam.theme || "",
+          rules: String(jam.rules || "").trim(),
+          coverStyle: normalizeCoverStyle(jam.coverStyle),
+          phase: phase,
+          prizePool: jam.prizeEnabled ? prizePoolTotal(jam) : 0,
+          ageRestricted: requiresAgeGate(jam),
+          hostName: jam.hostName || "Host",
+          freeDuringJam: phase === "submissions" || phase === "judging",
+          studioHref: "/studio#/jams/" + jam.id,
+          submissions: subs.map(function (s) {
+            if (submissionEntryType(s) === "asset") {
+              return {
+                id: s.id,
+                entryType: "asset",
+                listingTitle: s.listingTitle || "Asset",
+                category: s.category || "",
+                userName: s.userName,
+                submittedAt: s.submittedAt,
+                previewDataUrl: s.preview_data_url || "",
+                viewHref: "/studio#/library/shop",
+                likes: (s.likes || []).length,
+              };
+            }
+            return {
+              id: s.id,
+              entryType: "game",
+              seriesTitle: s.seriesTitle,
+              episodeTitle: s.episodeTitle,
+              userName: s.userName,
+              submittedAt: s.submittedAt,
+              playHref: "/play?series=" + encodeURIComponent(s.seriesId) +
+                "&episode=" + encodeURIComponent(s.episodeId) +
+                ((phase === "submissions" || phase === "judging") ? "&jamFree=1" : ""),
+              likes: (s.likes || []).length,
+              seriesId: s.seriesId,
+              episodeId: s.episodeId,
+            };
+          }),
+        };
       });
     },
 
@@ -2009,7 +2126,7 @@
         return (
           '<article class="asset-jam-shelf">' +
             '<div class="asset-jam-shelf-head">' +
-              renderJamCover(shelf.coverStyle, { compact: true, title: shelf.title }) +
+              renderJamCover(shelf.coverStyle, { compact: true, title: shelf.title, hideGlyph: true }) +
               '<div class="asset-jam-shelf-copy">' +
                 '<a class="asset-jam-shelf-title" href="' + escapeAttr(shelf.href) + '">' +
                   escapeHtml(shelf.title) + "</a>" +
@@ -2152,7 +2269,11 @@
           var genreLine = jamGenreLabels(jam).slice(0, 3).join(" · ");
           return (
             '<a class="jam-card" href="#/jams/' + escapeAttr(jam.id) + '">' +
-              renderJamCover(jam.coverStyle, { compact: true, title: jam.title }) +
+              renderJamCover(jam.coverStyle, {
+                compact: true,
+                title: jam.title,
+                hideGlyph: isAssetJam(jam),
+              }) +
               '<div class="jam-card-body">' +
               '<div class="jam-card-head">' +
                 '<h3>' + escapeHtml(jam.title) + "</h3>" +

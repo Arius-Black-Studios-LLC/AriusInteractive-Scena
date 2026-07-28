@@ -96,6 +96,9 @@
     this.pinchState = null;
     this.ignoreMouseUntil = 0;
     this.mobileDrawer = null;
+    this.binderTab = null;
+    this.binderWidth = 320;
+    this.isResizingBinder = false;
     this.pendingNodePointer = null;
     this.dragNode = null;
     this.dragStart = null;
@@ -230,49 +233,172 @@
     return "scena.blockShelfOpen." + (this.series && this.series.id ? this.series.id : "default");
   };
 
+  ScenaGraphEditor.prototype.binderWidthPrefKey = function () {
+    return "scena.binderWidth." + (this.series && this.series.id ? this.series.id : "default");
+  };
+
+  ScenaGraphEditor.prototype.binderTabPrefKey = function () {
+    return "scena.binderTab." + (this.series && this.series.id ? this.series.id : "default");
+  };
+
   ScenaGraphEditor.prototype.applyBlockShelfState = function (open, opts) {
     opts = opts || {};
-    var centerGraph = this.container.querySelector(".center-graph");
-    if (!this.blockShelf || !this.blockShelfToggle || !centerGraph) return;
     this.blockShelfOpen = !!open;
-    centerGraph.classList.toggle("is-block-shelf-open", this.blockShelfOpen);
-    this.blockShelf.classList.toggle("block-shelf--collapsed", !this.blockShelfOpen);
-    this.blockShelfToggle.setAttribute("aria-expanded", this.blockShelfOpen ? "true" : "false");
-    this.blockShelfToggle.title = this.blockShelfOpen ? "Hide block palette" : "Show block palette";
-    var icon = this.blockShelfToggle.querySelector(".block-shelf-toggle-icon");
-    if (icon) icon.textContent = this.blockShelfOpen ? "◂" : "▸";
-    if (!this.isMobileLayout()) {
+    if (this.isMobileLayout()) {
+      if (!opts.skipChrome) {
+        this.mobileDrawer = this.blockShelfOpen ? "blocks" : (this.mobileDrawer === "blocks" ? null : this.mobileDrawer);
+        this.syncMobileChrome();
+      }
+      return;
+    }
+    if (open) this.openBinderTab("blocks", { persist: !opts.skipPersist });
+    else if (this.binderTab === "blocks") this.closeBinder({ persist: !opts.skipPersist });
+  };
+
+  ScenaGraphEditor.prototype.getBinderWidth = function () {
+    var w = parseInt(this.binderWidth, 10);
+    if (!w || isNaN(w)) w = 320;
+    return Math.max(220, Math.min(560, w));
+  };
+
+  ScenaGraphEditor.prototype.applyBinderWidth = function (width) {
+    this.binderWidth = Math.max(220, Math.min(560, parseInt(width, 10) || 320));
+    if (this.workspaceBinder) {
+      this.workspaceBinder.style.setProperty("--binder-width", this.binderWidth + "px");
+    }
+    try {
+      localStorage.setItem(this.binderWidthPrefKey(), String(this.binderWidth));
+    } catch (e) { /* ignore */ }
+  };
+
+  ScenaGraphEditor.prototype.syncBinderChrome = function () {
+    if (!this.workspaceEditor || this.learnMode) return;
+    var tab = this.binderTab || null;
+    var open = !!tab;
+    this.workspaceEditor.classList.toggle("is-binder-open", open);
+    this.workspaceEditor.classList.toggle("is-binder-blocks", tab === "blocks");
+    this.workspaceEditor.classList.toggle("is-binder-details", tab === "details");
+    this.workspaceEditor.classList.toggle("is-binder-assets", tab === "assets");
+    if (this.workspaceBinder) {
+      this.workspaceBinder.classList.toggle("is-open", open);
+      this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
+        var active = btn.getAttribute("data-binder-tab") === tab;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      this.workspaceBinder.querySelectorAll("[data-binder-pane]").forEach(function (pane) {
+        var show = pane.getAttribute("data-binder-pane") === tab;
+        pane.hidden = !show;
+      });
+    }
+    if (this.binderClose) this.binderClose.hidden = !open;
+    this.blockShelfOpen = tab === "blocks";
+  };
+
+  ScenaGraphEditor.prototype.openBinderTab = function (tab, opts) {
+    opts = opts || {};
+    if (this.learnMode) return;
+    if (this.isMobileLayout()) {
+      var mobileMap = { blocks: "blocks", details: "inspector", assets: "assets" };
+      this.setMobileDrawer(mobileMap[tab] || null);
+      return;
+    }
+    if (tab !== "blocks" && tab !== "details" && tab !== "assets") return;
+    this.binderTab = tab;
+    this.syncBinderChrome();
+    if (opts.persist !== false) {
+      try { localStorage.setItem(this.binderTabPrefKey(), tab); } catch (e) { /* ignore */ }
+      if (tab === "blocks") {
+        try { localStorage.setItem(this.blockShelfPrefKey(), "1"); } catch (e2) { /* ignore */ }
+      }
+    }
+  };
+
+  ScenaGraphEditor.prototype.closeBinder = function (opts) {
+    opts = opts || {};
+    if (this.learnMode) return;
+    if (this.isMobileLayout()) {
+      this.setMobileDrawer(null);
+      return;
+    }
+    this.binderTab = null;
+    this.syncBinderChrome();
+    if (opts.persist !== false) {
       try {
-        localStorage.setItem(this.blockShelfPrefKey(), this.blockShelfOpen ? "1" : "0");
+        localStorage.setItem(this.binderTabPrefKey(), "");
+        localStorage.setItem(this.blockShelfPrefKey(), "0");
       } catch (e) { /* ignore */ }
     }
-    if (!opts.skipChrome && this.isMobileLayout()) {
-      this.mobileDrawer = this.blockShelfOpen ? "blocks" : (this.mobileDrawer === "blocks" ? null : this.mobileDrawer);
-      this.syncMobileChrome();
-    }
+  };
+
+  ScenaGraphEditor.prototype.toggleBinderTab = function (tab) {
+    if (this.binderTab === tab) this.closeBinder();
+    else this.openBinderTab(tab);
   };
 
   ScenaGraphEditor.prototype.bindBlockShelfToggle = function () {
     var self = this;
     if (this.learnMode) return;
-    this.blockShelfToggle = this.container.querySelector("#blockShelfToggle");
-    if (!this.blockShelfToggle || this.blockShelfToggle.dataset.bound === "1") return;
-    this.blockShelfToggle.dataset.bound = "1";
-    var stored = null;
-    try { stored = localStorage.getItem(this.blockShelfPrefKey()); } catch (e) { /* ignore */ }
+    this.bindWorkspaceBinder();
+  };
+
+  ScenaGraphEditor.prototype.bindWorkspaceBinder = function () {
+    var self = this;
+    if (this.learnMode) return;
+    this.workspaceBinder = this.container.querySelector("#workspaceBinder");
+    this.binderClose = this.container.querySelector("#binderClose");
+    this.binderResize = this.container.querySelector("#binderResize");
+    if (!this.workspaceBinder || this.workspaceBinder.dataset.bound === "1") return;
+    this.workspaceBinder.dataset.bound = "1";
+
+    var storedWidth = null;
+    try { storedWidth = localStorage.getItem(this.binderWidthPrefKey()); } catch (e) { /* ignore */ }
+    this.applyBinderWidth(storedWidth || 320);
+
+    var storedTab = null;
+    try { storedTab = localStorage.getItem(this.binderTabPrefKey()); } catch (e2) { /* ignore */ }
     if (this.isMobileLayout()) {
-      this.applyBlockShelfState(false, { skipChrome: true });
+      this.binderTab = null;
+      this.syncBinderChrome();
+    } else if (storedTab === "blocks" || storedTab === "details" || storedTab === "assets") {
+      this.openBinderTab(storedTab, { persist: false });
     } else {
-      this.applyBlockShelfState(stored === "1");
+      var shelfPref = null;
+      try { shelfPref = localStorage.getItem(this.blockShelfPrefKey()); } catch (e3) { /* ignore */ }
+      if (shelfPref === "1") this.openBinderTab("blocks", { persist: false });
+      else this.closeBinder({ persist: false });
     }
-    this.blockShelfToggle.addEventListener("click", function (e) {
-      e.stopPropagation();
-      if (self.isMobileLayout()) {
-        self.setMobileDrawer(self.mobileDrawer === "blocks" ? null : "blocks");
-      } else {
-        self.applyBlockShelfState(!self.blockShelfOpen);
-      }
+
+    this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tab = btn.getAttribute("data-binder-tab");
+        if (self.isMobileLayout()) {
+          var mobileMap = { blocks: "blocks", details: "inspector", assets: "assets" };
+          self.setMobileDrawer(self.mobileDrawer === mobileMap[tab] ? null : mobileMap[tab]);
+          return;
+        }
+        self.toggleBinderTab(tab);
+      });
     });
+
+    if (this.binderClose) {
+      this.binderClose.addEventListener("click", function () {
+        self.closeBinder();
+      });
+    }
+
+    if (this.binderResize) {
+      this.binderResize.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        self.isResizingBinder = true;
+        self.binderResizeStartX = e.clientX;
+        self.binderResizeStartW = self.getBinderWidth();
+        document.body.classList.add("is-resizing-binder");
+        self.bindDragListeners();
+      });
+    }
   };
 
   ScenaGraphEditor.prototype.bindSpawnMenu = function () {
@@ -636,8 +762,7 @@
           '</div>' +
         '</div>' +
         '<div class="mobile-panel-backdrop" id="mobilePanelBackdrop" hidden></div>' +
-        '<div class="workspace-panels">' +
-          '<aside class="panel-left graph-inspector" id="graphInspector"></aside>' +
+        '<div class="workspace-panels workspace-panels--binder">' +
           '<div class="panel-center" id="panelCenter">' +
             '<div class="center-preview">' +
               '<button type="button" class="mobile-preview-close" id="mobilePreviewClose" aria-label="Hide preview">×</button>' +
@@ -647,11 +772,6 @@
             '</div>' +
             '<div class="center-resizer" id="centerResizer" title="Drag to resize preview / graph"></div>' +
             '<div class="center-graph">' +
-              '<button type="button" class="block-shelf-toggle" id="blockShelfToggle" aria-expanded="false" aria-controls="blockShelf" title="Show block palette">' +
-                '<span class="block-shelf-toggle-icon" aria-hidden="true">▸</span>' +
-                '<span class="block-shelf-toggle-label">Blocks</span>' +
-              '</button>' +
-              '<aside class="block-shelf block-shelf--collapsed" id="blockShelf" aria-label="Block palette"></aside>' +
               '<div class="graph-canvas-wrap" id="graphCanvasWrap" tabindex="0">' +
                 '<div class="graph-canvas" id="graphCanvas">' +
                   '<div class="graph-boundaries" id="graphBoundaries"></div>' +
@@ -661,22 +781,41 @@
               '</div>' +
             '</div>' +
           '</div>' +
-          '<aside class="panel-right workspace-resources" id="workspaceResources">' +
-            '<div class="resources-header">' +
-              '<div class="resources-tabs" id="resourceTabs">' +
-                '<button type="button" class="resources-tab is-active" data-resource-tab="characters">Characters</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="stages">Stages</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="library">My library</button>' +
-                '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
-              '</div>' +
-              '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
+          '<aside class="workspace-binder" id="workspaceBinder" aria-label="Studio binder">' +
+            '<div class="workspace-binder-resize" id="binderResize" title="Drag to resize"></div>' +
+            '<div class="workspace-binder-rail" role="tablist" aria-label="Binder tabs">' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="blocks" role="tab" aria-selected="false">Blocks</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="details" role="tab" aria-selected="false">Details</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="assets" role="tab" aria-selected="false">Assets</button>' +
+              '<button type="button" class="workspace-binder-close" id="binderClose" title="Close binder" hidden>×</button>' +
             '</div>' +
-            '<div class="resources-split">' +
-              '<div class="resources-list" id="resourcesList"></div>' +
-              '<div class="resources-detail" id="resourcesDetail"></div>' +
+            '<div class="workspace-binder-body">' +
+              '<div class="workspace-binder-pane" data-binder-pane="blocks" id="binderPaneBlocks" hidden>' +
+                '<aside class="block-shelf block-shelf--binder" id="blockShelf" aria-label="Block palette"></aside>' +
+              '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="details" id="binderPaneDetails" hidden>' +
+                '<aside class="graph-inspector" id="graphInspector"></aside>' +
+              '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="assets" id="binderPaneAssets" hidden>' +
+                '<div class="workspace-resources" id="workspaceResources">' +
+                  '<div class="resources-header">' +
+                    '<div class="resources-tabs" id="resourceTabs">' +
+                      '<button type="button" class="resources-tab is-active" data-resource-tab="characters">Characters</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="stages">Stages</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="metrics">Metrics</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="keyitems">Key items</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="audio">Audio library</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="library">My library</button>' +
+                      '<button type="button" class="resources-tab" data-resource-tab="store">Asset store</button>' +
+                    '</div>' +
+                    '<button type="button" class="btn btn-sm btn-primary" id="resourceCreateBtn">+ Create</button>' +
+                  '</div>' +
+                  '<div class="resources-split">' +
+                    '<div class="resources-list" id="resourcesList"></div>' +
+                    '<div class="resources-detail" id="resourcesDetail"></div>' +
+                  '</div>' +
+                '</div>' +
+              '</div>' +
             '</div>' +
           '</aside>' +
         '</div>' +
@@ -870,6 +1009,10 @@
         }
         if (self._workspaceModalMode === "marketplace_sell") {
           self.submitMarketplaceSellModal();
+          return;
+        }
+        if (self._workspaceModalMode === "marketplace_edit") {
+          self.submitMarketplaceEditModal();
           return;
         }
         if (self._workspaceModalMode === "library_sell") {
@@ -1070,9 +1213,17 @@
   };
 
   ScenaGraphEditor.prototype.syncInspectorPanel = function () {
-    if (!this.workspaceEditor || this.isMobileLayout()) return;
+    if (!this.workspaceEditor || this.isMobileLayout() || this.learnMode) return;
     var hasSelection = !!(this.selectedId || this.selectedEdgeId || this.selectedBoundaryId);
     this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection);
+    if (hasSelection) {
+      // Open Details when binder is closed; don't yank away from Blocks/Assets mid-edit.
+      if (!this.binderTab || this.binderTab === "details") {
+        this.openBinderTab("details", { persist: false });
+      }
+    } else if (this.binderTab === "details") {
+      this.syncBinderChrome();
+    }
   };
 
   ScenaGraphEditor.prototype.syncMobileChrome = function () {
@@ -1087,6 +1238,15 @@
     root.classList.toggle("is-mobile-block-shelf-open", drawer === "blocks");
     root.classList.toggle("is-mobile-preview-open", drawer === "preview");
     root.classList.toggle("is-mobile-resources-open", drawer === "assets");
+    if (mobile && this.workspaceBinder) {
+      this.workspaceBinder.querySelectorAll("[data-binder-pane]").forEach(function (pane) {
+        var name = pane.getAttribute("data-binder-pane");
+        if (drawer === "blocks") pane.hidden = name !== "blocks";
+        else if (drawer === "inspector") pane.hidden = name !== "details";
+        else if (drawer === "assets") pane.hidden = name !== "assets";
+        else pane.hidden = true;
+      });
+    }
     if (this.mobileBackdrop) {
       this.mobileBackdrop.hidden = !sheetOpen;
     }
@@ -1315,7 +1475,7 @@
       }
       return;
     }
-    if (this.isPanning || this.dragNode || this.dragBoundary || this.connectDragActive) {
+    if (this.isPanning || this.dragNode || this.dragBoundary || this.connectDragActive || this.isResizingBinder) {
       e.preventDefault();
     }
     this.onMouseMove(e);
@@ -1333,6 +1493,11 @@
 
   ScenaGraphEditor.prototype.onMouseMove = function (e) {
     var pt = eventClientXY(e);
+    if (this.isResizingBinder) {
+      var delta = this.binderResizeStartX - pt.x;
+      this.applyBinderWidth(this.binderResizeStartW + delta);
+      return;
+    }
     if (this.pendingNodePointer && !this.dragNode) {
       if (Math.hypot(pt.x - this.pendingNodePointer.startX, pt.y - this.pendingNodePointer.startY) >= 6) {
         this.pendingNodePointer.moved = true;
@@ -1374,6 +1539,12 @@
 
   ScenaGraphEditor.prototype.onMouseUp = function (e) {
     var wasPanning = this.isPanning;
+    if (this.isResizingBinder) {
+      this.isResizingBinder = false;
+      document.body.classList.remove("is-resizing-binder");
+      this.unbindDragListeners();
+      return;
+    }
     if (this.pendingNodePointer && !this.pendingNodePointer.moved && !this.dragNode) {
       this.finishNodeTap(this.pendingNodePointer);
     }
@@ -2896,6 +3067,19 @@
       el.style.removeProperty("--ui-choice-sprite");
       delete el.dataset.customChoice;
     }
+    var layout = ui.layout || {};
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    var name = layout.nameplate || { x: 6, y: 62 };
+    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
+    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
+    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
+    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
+    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
+    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    el.classList.add("preview-frame--laid-out");
   };
 
   ScenaGraphEditor.prototype.renderPreview = function () {
@@ -4004,6 +4188,7 @@
     this.workspaceModal.hidden = true;
     this._createResourceTab = null;
     this._workspaceModalMode = null;
+    this._editListingId = null;
     this.resetWorkspaceModalChrome();
   };
 
@@ -5637,8 +5822,7 @@
       });
     }
 
-    root.querySelectorAll("[data-listing-id]").forEach(function (btn) {
-      if (btn.classList.contains("marketplace-acquire-btn")) return;
+    root.querySelectorAll(".marketplace-card[data-listing-id]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         self.marketplaceSelectedId = btn.getAttribute("data-listing-id");
         self.renderMarketplacePanel();
@@ -5689,6 +5873,20 @@
       });
     });
 
+    root.querySelectorAll(".marketplace-edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.openMarketplaceEditModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+
+    root.querySelectorAll(".marketplace-remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
+
     if (window.ScenaWallet && self.feedbackUserId) {
       ScenaWallet.bindPackButtons(root, self.feedbackUserId, function () {
         self.renderMarketplacePanel();
@@ -5696,6 +5894,74 @@
         self.onSaveError((err && err.message) || "Could not buy Ducats.");
       });
     }
+  };
+
+  ScenaGraphEditor.prototype.openMarketplaceEditModal = function (listingId) {
+    var self = this;
+    if (!listingId || !window.ScenaMarketplace || !this.workspaceModal) return;
+    if (!this.feedbackUserId) {
+      this.onSaveError("Sign in to edit listings.");
+      return;
+    }
+    ScenaMarketplace.getListing(listingId, this.feedbackUserId).then(function (listing) {
+      if (!listing) {
+        self.onSaveError("Listing not found.");
+        return;
+      }
+      self._workspaceModalMode = "marketplace_edit";
+      self._editListingId = listingId;
+      self.container.querySelector("#workspaceModalTitle").textContent = "Edit listing";
+      self.container.querySelector("#workspaceModalBody").innerHTML =
+        ScenaMarketplace.renderEditListingBody(listing);
+      self.container.querySelector("#workspaceModalSave").textContent = "Save changes";
+      self.workspaceModal.hidden = false;
+    }).catch(function (err) {
+      self.onSaveError((err && err.message) || "Could not load listing.");
+    });
+  };
+
+  ScenaGraphEditor.prototype.submitMarketplaceEditModal = function () {
+    var self = this;
+    var listingId = this._editListingId;
+    if (!listingId || !this.feedbackUserId) return;
+    var modal = this.container;
+    var title = ((modal.querySelector("#mpEditTitle") || {}).value || "").trim();
+    var desc = ((modal.querySelector("#mpEditDesc") || {}).value || "").trim();
+    var category = (modal.querySelector("#mpEditCategory") || {}).value || "pack";
+    var price = parseInt((modal.querySelector("#mpEditPrice") || {}).value, 10) || 0;
+    var saveBtn = modal.querySelector("#workspaceModalSave");
+    if (title.length < 2) {
+      this.onSaveError("Enter a listing title.");
+      return;
+    }
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaMarketplace.updateListing(this.feedbackUserId, listingId, {
+      title: title,
+      description: desc,
+      category: category,
+      priceDucats: price,
+    }).then(function () {
+      if (saveBtn) saveBtn.disabled = false;
+      self.closeModal();
+      self.setSaveStatus("Listing updated.");
+      self.renderMarketplacePanel();
+    }).catch(function (err) {
+      if (saveBtn) saveBtn.disabled = false;
+      self.onSaveError((err && err.message) || "Could not update listing.");
+    });
+  };
+
+  ScenaGraphEditor.prototype.removeMarketplaceListing = function (listingId) {
+    var self = this;
+    if (!listingId || !this.feedbackUserId || !window.ScenaMarketplace) return;
+    if (!window.confirm("Remove this listing from the asset store? Buyers who already purchased keep their copy.")) return;
+    ScenaMarketplace.removeListing(this.feedbackUserId, listingId).then(function () {
+      if (self.marketplaceSelectedId === listingId) self.marketplaceSelectedId = "";
+      self.setSaveStatus("Listing removed from the store.");
+      self.renderMarketplacePanel();
+    }).catch(function (err) {
+      self.onSaveError((err && err.message) || "Could not remove listing.");
+    });
   };
 
   ScenaGraphEditor.prototype.renderAssetLibraryPanel = function () {
@@ -5833,6 +6099,20 @@
           self.container.querySelector("#workspaceModalSave").textContent = "Publish listing";
           self.workspaceModal.hidden = false;
         });
+      });
+    });
+
+    root.querySelectorAll(".library-edit-listing-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.openMarketplaceEditModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+
+    root.querySelectorAll(".library-unlist-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        self.removeMarketplaceListing(btn.getAttribute("data-listing-id"));
       });
     });
   };

@@ -150,7 +150,8 @@
       });
     },
 
-    hideGameJam: function (jamId, reason) {
+    hideGameJam: function (jamId, reason, opts) {
+      opts = opts || {};
       var sb = getClient();
       if (!sb) return Promise.reject(new Error("Cloud is not configured."));
       return sb.rpc("admin_hide_game_jam", {
@@ -158,6 +159,7 @@
         p_reason: reason || "",
       }).then(function (result) {
         if (result.error) throw result.error;
+        return result.data;
       });
     },
 
@@ -195,13 +197,56 @@
       });
     },
 
-    removeMarketplaceListing: function (listingId, reason) {
+    removeMarketplaceListing: function (listingId, reason, opts) {
+      opts = opts || {};
       var sb = getClient();
       if (!sb) return Promise.reject(new Error("Cloud is not configured."));
       return sb.rpc("admin_remove_marketplace_listing", {
         p_listing_id: listingId,
         p_reason: reason || "",
       }).then(function (result) {
+        if (result.error) throw result.error;
+        return result.data;
+      });
+    },
+
+    countOpenReports: function () {
+      var sb = getClient();
+      if (!sb) return Promise.resolve(0);
+      return sb.rpc("admin_count_open_reports").then(function (result) {
+        if (result.error) {
+          // Fallback: list and count locally if RPC not deployed yet.
+          return ScenaAdmin.listContentReports(80).then(function (rows) {
+            return (rows || []).filter(function (r) { return r.status === "open"; }).length;
+          }).catch(function () { return 0; });
+        }
+        return parseInt(result.data, 10) || 0;
+      }).catch(function () { return 0; });
+    },
+
+    listMyModerationNotices: function (limit) {
+      var sb = getClient();
+      if (!sb) return Promise.resolve([]);
+      return sb.rpc("list_my_moderation_notices", { p_limit: limit || 40 }).then(function (result) {
+        if (result.error) throw result.error;
+        return (result.data || []).map(function (row) {
+          return {
+            noticeId: row.notice_id,
+            targetType: row.target_type,
+            targetId: row.target_id,
+            title: row.title || "",
+            reason: row.reason || "",
+            createdAt: row.created_at,
+            readAt: row.read_at,
+          };
+        });
+      }).catch(function () { return []; });
+    },
+
+    markModerationNoticeRead: function (noticeId) {
+      var sb = getClient();
+      if (!sb) return Promise.reject(new Error("Cloud is not configured."));
+      return sb.rpc("mark_moderation_notice_read", { p_notice_id: noticeId }).then(function (result) {
         if (result.error) throw result.error;
       });
     },

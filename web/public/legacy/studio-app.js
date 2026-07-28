@@ -61,18 +61,36 @@
     var hash = location.hash.replace(/^#/, "") || "/";
     var parts = hash.split("/").filter(Boolean);
     if (parts.length === 0) return { view: "dashboard" };
-    if (parts[0] === "account") return { view: "account" };
-    if (parts[0] === "library") return { view: "library", libraryTab: parts[1] === "shop" ? "shop" : "assets" };
+    if (parts[0] === "account") {
+      window.location.replace("/account");
+      return { view: "dashboard" };
+    }
+    if (parts[0] === "library") {
+      var libTab = "assets";
+      if (parts[1] === "shop") libTab = "shop";
+      else if (parts[1] === "jams") libTab = "jams";
+      return { view: "library", libraryTab: libTab };
+    }
     if (parts[0] === "shop") return { view: "library", libraryTab: "shop" };
     if (parts[0] === "jams") {
-      if (parts[1] === "new") return { view: "jams", jamMode: "new" };
+      if (parts[1] === "new") {
+        return { view: "jams", jamMode: "new", jamType: parts[2] === "asset" ? "asset" : "game" };
+      }
       if (parts[2] === "edit" && parts[1]) return { view: "jams", jamMode: "edit", jamId: parts[1] };
+      if (parts[1] === "asset" && !parts[2]) return { view: "jams", jamMode: "list", jamTypeFilter: "asset" };
+      if (parts[1] === "game" && !parts[2]) return { view: "jams", jamMode: "list", jamTypeFilter: "game" };
       if (parts[1]) return { view: "jams", jamMode: "detail", jamId: parts[1] };
       return { view: "jams", jamMode: "list" };
     }
     if (parts[0] === "series" && parts[1]) {
       var seriesId = parts[1];
-      if (parts[2] === "settings") return { view: "settings", seriesId: seriesId };
+      if (parts[2] === "settings") {
+        var settingsTab = "basics";
+        if (parts[3] === "monetization") settingsTab = "monetization";
+        else if (parts[3] === "promotion") settingsTab = "promotion";
+        else if (parts[3] === "ui" || parts[3] === "game-ui") settingsTab = "ui";
+        return { view: "settings", seriesId: seriesId, settingsTab: settingsTab };
+      }
       if (parts[2] === "graph") return { view: "graph", seriesId: seriesId };
       if (parts[2] === "resources") return { view: "resources", seriesId: seriesId, tab: parts[3] || "characters" };
       if (parts[2] === "episodes") return { view: "episodes", seriesId: seriesId };
@@ -94,6 +112,10 @@
   function navigate(hash) {
     var normalized = hash.charAt(0) === "#" ? hash.slice(1) : hash;
     if (!normalized || normalized.charAt(0) !== "/") normalized = "/" + normalized;
+    if (normalized === "/account" || normalized.indexOf("/account/") === 0) {
+      window.location.assign("/account");
+      return;
+    }
     var parts = normalized.split("/").filter(Boolean);
     if (parts[0] === "series" && parts[1] && parts[2]) {
       rememberStudioView(parts[1], parts[2] === "resources" ? "graph" : parts[2]);
@@ -101,6 +123,19 @@
     var current = location.hash.replace(/^#/, "") || "/";
     location.hash = normalized;
     if (current === normalized) render();
+  }
+
+  function bindStudioHashLinks(root) {
+    if (!root) return;
+    root.querySelectorAll('a[href^="#/"]').forEach(function (a) {
+      if (a.dataset.studioNavBound === "1") return;
+      a.dataset.studioNavBound = "1";
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var href = a.getAttribute("href") || "";
+        navigate(href.replace(/^#/, ""));
+      });
+    });
   }
 
   function formatDate(iso) {
@@ -148,15 +183,17 @@
         sidebarLink("#/series/" + series.id + "/graph", "Story editor", activeView === "graph") +
         sidebarLink("#/series/" + series.id + "/episodes", "Episodes", activeView === "episodes") +
         '<div class="sidebar-section-label">Series</div>' +
-        sidebarLink("#/series/" + series.id + "/settings", "Settings", activeView === "settings");
+        sidebarLink("#/series/" + series.id + "/settings", "Settings", activeView === "settings" && (!window.__scenaSettingsTab || window.__scenaSettingsTab === "basics")) +
+        sidebarLink("#/series/" + series.id + "/settings/monetization", "Monetization", activeView === "settings" && window.__scenaSettingsTab === "monetization") +
+        sidebarLink("#/series/" + series.id + "/settings/promotion", "Promotion", activeView === "settings" && window.__scenaSettingsTab === "promotion") +
+        sidebarLink("#/series/" + series.id + "/settings/ui", "Game UI", activeView === "settings" && window.__scenaSettingsTab === "ui");
     }
 
     sidebar.innerHTML =
-      '<div class="sidebar-section-label">Studio</div>' +
+      '<div class="sidebar-section-label">Creator</div>' +
       sidebarLink("#/", "My series", activeView === "dashboard") +
       sidebarLink("#/library", "My assets", activeView === "library") +
-      sidebarLink("#/jams", "Game jams", activeView === "jams") +
-      sidebarLink("#/account", "Account", activeView === "account") +
+      sidebarLink("#/jams", "Jams", activeView === "jams") +
       nav;
 
     sidebar.querySelectorAll(".sidebar-link").forEach(function (a) {
@@ -250,31 +287,6 @@
       return;
     }
 
-    if (route.view === "account") {
-      ScenaStore.setActiveSeries(null);
-      renderShell("account", null);
-      main.innerHTML = '<div class="page"><p class="field-hint">Loading profile…</p></div>';
-      if (!window.ScenaAccount || !window.ScenaProfile) {
-        main.innerHTML = '<div class="page"><p class="field-hint">Profile module failed to load.</p></div>';
-        return;
-      }
-      ScenaProfile.get(userId, { user: { id: userId, email: userEmail } }).then(function (profile) {
-        userProfile = profile;
-        main.innerHTML = ScenaAccount.renderPage(profile, { userEmail: userEmail });
-        ScenaAccount.bindPage(profile, {
-          userId: userId,
-          userEmail: userEmail,
-          toast: toast,
-          onSaved: function (next) {
-            userProfile = next;
-            paintTopbarProfile(next);
-          },
-        });
-        paintTopbarProfile(profile);
-      });
-      return;
-    }
-
     if (route.view === "library") {
       ScenaStore.setActiveSeries(null);
       renderShell("library", null);
@@ -298,12 +310,17 @@
 
     ScenaStore.setActiveSeries(series.id);
     rememberStudioView(series.id, route.view);
+    if (route.view === "settings") {
+      window.__scenaSettingsTab = route.settingsTab || "basics";
+    } else {
+      window.__scenaSettingsTab = null;
+    }
     renderShell(route.view, series);
 
     if (route.view === "settings") {
-      main.innerHTML = renderSettingsForm(series);
+      main.innerHTML = renderSettingsPage(series, route.settingsTab || "basics");
       try {
-        bindSettingsForm();
+        bindSettingsPage(route.settingsTab || "basics");
       } catch (err) {
         console.error(err);
         toast("Settings form failed to load — try refreshing the page.");
@@ -352,7 +369,7 @@
       userEmail: userEmail,
       title: "Edit account profile",
       onClick: function () {
-        navigate("/account");
+        window.location.assign("/account");
       },
     });
   }
@@ -560,8 +577,8 @@
 
     return (
       '<section class="form-section" id="readerUiSection">' +
-        '<h2>Reader UI</h2>' +
-        '<p class="field-hint">Applies to the whole series — dialogue box, choice buttons, and preview aspect ratio. Preview updates in the Story editor.</p>' +
+        '<h2>Style &amp; chrome</h2>' +
+        '<p class="field-hint">Presets, colors, shapes, and sprites. Drag layout on the mockup to the left.</p>' +
         '<div class="ui-preset-cards" id="uiPresetCards">' + presetCards + '</div>' +
         '<div class="ui-settings-grid">' +
           '<div class="field"><label>Aspect ratio</label>' +
@@ -585,9 +602,12 @@
           '<div class="field"><label>Accent color</label><input type="color" name="uiAccent" value="' + escapeAttr(resolved.colors.accent || "#2a9d8f") + '"></div>' +
           '<div class="field"><label>Speaker color</label><input type="color" name="uiSpeaker" value="' + escapeAttr(resolved.colors.speaker || "#2a9d8f") + '"></div>' +
           '<div class="field"><label>Choice text</label><input type="color" name="uiChoiceText" value="' + escapeAttr(resolved.colors.choiceText || "#ffffff") + '"></div>' +
+          '<div class="field"><label>Dialogue text</label><input type="color" name="uiDialogueText" value="' + escapeAttr(toColorInput(resolved.colors.dialogueText) || "#ffffff") + '"></div>' +
           '<div class="field"><label>Dialogue scale</label><input type="range" name="uiDialogueScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.dialogueScale || 1) + '"><span class="field-hint" id="uiDialogueScaleVal">' + (ui.sizes.dialogueScale || 1) + '×</span></div>' +
           '<div class="field"><label>Choice scale</label><input type="range" name="uiChoiceScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.choiceScale || 1) + '"><span class="field-hint" id="uiChoiceScaleVal">' + (ui.sizes.choiceScale || 1) + '×</span></div>' +
           '<div class="field"><label>Corner radius</label><input type="range" name="uiCornerRadius" min="0" max="24" step="1" value="' + (ui.sizes.cornerRadius || 6) + '"><span class="field-hint" id="uiCornerRadiusVal">' + (ui.sizes.cornerRadius || 6) + 'px</span></div>' +
+          '<div class="field"><label>Dialogue width (%)</label><input type="range" name="uiDialogueWidth" min="40" max="98" step="1" value="' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + '"><span class="field-hint" id="uiDialogueWidthVal">' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + '%</span></div>' +
+          '<div class="field"><label>Choices width (%)</label><input type="range" name="uiChoicesWidth" min="24" max="70" step="1" value="' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + '"><span class="field-hint" id="uiChoicesWidthVal">' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + '%</span></div>' +
         '</div>' +
         '<div class="form-row" style="margin-top:16px">' +
           '<div class="field">' +
@@ -658,17 +678,27 @@
     var uiAccent = form.querySelector('[name="uiAccent"]');
     var uiSpeaker = form.querySelector('[name="uiSpeaker"]');
     var uiChoiceText = form.querySelector('[name="uiChoiceText"]');
+    var uiDialogueText = form.querySelector('[name="uiDialogueText"]');
     var uiDialogueScale = form.querySelector('[name="uiDialogueScale"]');
     var uiChoiceScale = form.querySelector('[name="uiChoiceScale"]');
     var uiCornerRadius = form.querySelector('[name="uiCornerRadius"]');
+    var uiDialogueWidth = form.querySelector('[name="uiDialogueWidth"]');
+    var uiChoicesWidth = form.querySelector('[name="uiChoicesWidth"]');
     if (dialogueShape) ui.shapes.dialogue = dialogueShape.value;
     if (choiceShape) ui.shapes.choice = choiceShape.value;
     if (uiAccent) ui.colors.accent = uiAccent.value;
     if (uiSpeaker) ui.colors.speaker = uiSpeaker.value;
     if (uiChoiceText) ui.colors.choiceText = uiChoiceText.value;
+    if (uiDialogueText) ui.colors.dialogueText = uiDialogueText.value;
     if (uiDialogueScale) ui.sizes.dialogueScale = parseFloat(uiDialogueScale.value) || 1;
     if (uiChoiceScale) ui.sizes.choiceScale = parseFloat(uiChoiceScale.value) || 1;
     if (uiCornerRadius) ui.sizes.cornerRadius = parseInt(uiCornerRadius.value, 10) || 6;
+    if (!ui.layout) ui.layout = defaultUiLayout();
+    if (!ui.layout.dialogue) ui.layout.dialogue = { x: 4, y: 68, w: 92 };
+    if (!ui.layout.choices) ui.layout.choices = { x: 52, y: 28, w: 42 };
+    if (!ui.layout.nameplate) ui.layout.nameplate = { x: 6, y: 62 };
+    if (uiDialogueWidth) ui.layout.dialogue.w = Math.max(40, Math.min(98, parseInt(uiDialogueWidth.value, 10) || 92));
+    if (uiChoicesWidth) ui.layout.choices.w = Math.max(24, Math.min(70, parseInt(uiChoicesWidth.value, 10) || 42));
     if (!ui.sounds) ui.sounds = { clickAssetId: null };
     if (!ui.menu) ui.menu = {
       enabled: true,
@@ -694,62 +724,271 @@
     if (invHud) ui.menu.showInventoryHud = invHud.checked;
   }
 
+  function toColorInput(value) {
+    var v = String(value || "").trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) return v;
+    if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+      return "#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
+    }
+    return "#ffffff";
+  }
+
+  function renderSettingsPage(series, tab) {
+    tab = tab || "basics";
+    if (tab === "monetization") return renderMonetizationPage(series);
+    if (tab === "promotion") return renderPromotionPage(series);
+    if (tab === "ui") return renderGameUiPage(series);
+    return renderSettingsForm(series);
+  }
+
+  function bindSettingsPage(tab) {
+    tab = tab || "basics";
+    if (tab === "monetization") {
+      bindMonetizationPage();
+      return;
+    }
+    if (tab === "promotion") {
+      bindPromotionPage();
+      return;
+    }
+    if (tab === "ui") {
+      bindGameUiPage();
+      return;
+    }
+    bindSettingsForm();
+  }
+
+  function settingsPageChrome(series, tab, title, lede, bodyHtml) {
+    var tabs = [
+      { id: "basics", href: "#/series/" + series.id + "/settings", label: "Settings" },
+      { id: "monetization", href: "#/series/" + series.id + "/settings/monetization", label: "Monetization" },
+      { id: "promotion", href: "#/series/" + series.id + "/settings/promotion", label: "Promotion" },
+      { id: "ui", href: "#/series/" + series.id + "/settings/ui", label: "Game UI" },
+    ].map(function (t) {
+      return '<a class="settings-subnav-link' + (t.id === tab ? " is-active" : "") + '" href="' + t.href + '">' +
+        escapeHtml(t.label) + "</a>";
+    }).join("");
+    return (
+      '<div class="page page-settings page-settings--' + escapeAttr(tab) + '">' +
+        '<div class="page-head">' +
+          '<div><h1>' + escapeHtml(title) + "</h1><p>" + lede + "</p></div>" +
+          '<div style="display:flex;gap:8px">' +
+            (tab === "basics" && series.id
+              ? '<button type="button" class="btn btn-danger btn-sm" id="deleteSeriesBtn">Delete</button>'
+              : "") +
+            '<button type="button" class="btn btn-primary" id="saveSettingsBtn">Save</button>' +
+          "</div>" +
+        "</div>" +
+        '<nav class="settings-subnav" aria-label="Series settings">' + tabs + "</nav>" +
+        bodyHtml +
+      "</div>"
+    );
+  }
+
+  function renderMonetizationPage(series) {
+    return settingsPageChrome(
+      series,
+      "monetization",
+      "Monetization",
+      "Control how readers unlock chapters with Ducats.",
+      '<form id="settingsForm">' + renderMonetizationSection(series) + "</form>"
+    );
+  }
+
+  function renderPromotionPage(series) {
+    return settingsPageChrome(
+      series,
+      "promotion",
+      "Promotion",
+      "Tools to feature and grow your series — coming soon.",
+      '<section class="form-section">' +
+        "<h2>Coming soon</h2>" +
+        '<p class="field-hint">Trailers, launch windows, cross-promo, and featured placement tools will live here. For now, use Staff picks (admin) and your series listing images under Settings.</p>' +
+        '<ul class="field-hint">' +
+          "<li>Series trailer / teaser clip</li>" +
+          "<li>Launch schedule &amp; countdown</li>" +
+          "<li>Creator cross-promotion</li>" +
+        "</ul>" +
+      "</section>"
+    );
+  }
+
+  function renderGameUiPage(series) {
+    ScenaStore.ensureReaderUi(series);
+    var ui = ScenaStore.resolveReaderUi(series);
+    var mock = renderUiMockupMarkup(ui);
+    return settingsPageChrome(
+      series,
+      "ui",
+      "Game UI",
+      "Customize the in-game look — drag elements on the mockup, tweak colors, then save as an asset or sell in the UI marketplace.",
+      '<form id="settingsForm" class="game-ui-form">' +
+        '<div class="game-ui-layout">' +
+          '<div class="game-ui-mock-col">' +
+            '<div class="game-ui-mock-toolbar">' +
+              '<span class="field-hint">Drag dialogue, nameplate, and choices. Double-click an element to focus its settings.</span>' +
+              '<button type="button" class="btn btn-sm btn-ghost" id="uiResetLayoutBtn">Reset layout</button>' +
+            "</div>" +
+            mock +
+          "</div>" +
+          '<div class="game-ui-controls-col">' +
+            renderReaderUiSection(series) +
+            '<section class="form-section" id="uiAssetActions">' +
+              "<h2>Save &amp; sell</h2>" +
+              '<p class="field-hint">Save this UI setup to My assets for other projects, or publish it under the new <strong>UI</strong> shop category.</p>' +
+              '<div class="field"><label>Asset title</label>' +
+                '<input type="text" id="uiAssetTitle" maxlength="80" placeholder="e.g. Soft romance dialogue kit" value="' +
+                  escapeAttr((series.title || "Series") + " UI") + '"></div>' +
+              '<div class="field"><label>Shop description</label>' +
+                '<textarea id="uiAssetDesc" rows="2" maxlength="400" placeholder="What buyers get…"></textarea></div>' +
+              '<div class="field"><label>Price (Ducats, 0 = free)</label>' +
+                '<input type="number" id="uiAssetPrice" min="0" max="9999" value="0"></div>' +
+              '<div class="modal-actions" style="justify-content:flex-start;margin-top:8px">' +
+                '<button type="button" class="btn btn-secondary" id="uiSaveAssetBtn">Save to My assets</button>' +
+                '<button type="button" class="btn btn-primary" id="uiPublishAssetBtn">Publish to shop</button>' +
+              "</div>" +
+            "</section>" +
+          "</div>" +
+        "</div>" +
+      "</form>"
+    );
+  }
+
+  function renderUiMockupMarkup(ui) {
+    var layout = ui.layout || defaultUiLayout();
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
+    var name = layout.nameplate || { x: 6, y: 62 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    return (
+      '<div class="ui-mock-stage" id="uiMockStage" data-aspect="' + escapeAttr(ui.aspectRatio || "16:9") + '">' +
+        '<div class="ui-mock-frame preview-frame player-frame preview-ui--' + escapeAttr(ui.preset || "scena-classic") +
+          " preview-shape-dialogue--" + escapeAttr(ui.shapes.dialogue || "bar") +
+          " preview-shape-choice--" + escapeAttr(ui.shapes.choice || "rounded") +
+          '" id="uiMockFrame">' +
+          '<div class="ui-mock-bg" aria-hidden="true"></div>' +
+          '<div class="ui-mock-layer ui-mock-nameplate" data-ui-drag="nameplate" style="left:' + name.x + "%;top:" + name.y + '%">' +
+            '<span class="ui-mock-speaker">Character</span>' +
+          "</div>" +
+          '<div class="ui-mock-layer ui-mock-dialogue" data-ui-drag="dialogue" style="left:' + dlg.x + "%;top:" + dlg.y + "%;width:" + dlg.w + '%">' +
+            '<p class="ui-mock-dialogue-text">Dialogue text appears here — drag to reposition.</p>' +
+          "</div>" +
+          '<div class="ui-mock-layer ui-mock-choices" data-ui-drag="choices" style="left:' + ch.x + "%;top:" + ch.y + "%;width:" + ch.w + '%">' +
+            '<button type="button" class="ui-mock-choice" tabindex="-1">Choice A</button>' +
+            '<button type="button" class="ui-mock-choice" tabindex="-1">Choice B</button>' +
+          "</div>" +
+        "</div>" +
+      "</div>"
+    );
+  }
+
+  function defaultUiLayout() {
+    return {
+      dialogue: { x: 4, y: 68, w: 92 },
+      nameplate: { x: 6, y: 62 },
+      choices: { x: 52, y: 28, w: 42 },
+    };
+  }
+
   function renderSettingsForm(series) {
-    var flags = ScenaStore.CONTENT_FLAGS.map(function (f) {
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genreChips = ScenaStore.GENRE_TAGS.map(function (f) {
+      var on = (series.genres || []).indexOf(f.key) >= 0;
+      return '<button type="button" class="flag-chip' + (on ? " is-on" : "") + '" data-genre="' + f.key + '">' + f.label + "</button>";
+    }).join("");
+    var matureChips = ScenaStore.MATURE_CONTENT_FLAGS.map(function (f) {
       var on = (series.contentFlags || []).indexOf(f.key) >= 0;
-      return '<button type="button" class="flag-chip' + (on ? " is-on" : "") + '" data-flag="' + f.key + '">' + f.label + '</button>';
+      return '<button type="button" class="flag-chip flag-chip--mature' + (on ? " is-on" : "") + '" data-mature-flag="' + f.key + '">' + f.label + "</button>";
     }).join("");
 
+    var body =
+      '<form id="settingsForm">' +
+        '<section class="form-section">' +
+          "<h2>Basics</h2>" +
+          field("Title", "title", series.title, "Required for listing") +
+          field("URL slug", "slug", series.slug || ScenaStore.slugify(series.title), "arleco.app/s/your-slug") +
+          field("Short description", "shortDescription", series.shortDescription, "Max 160 chars — grid card blurb", true) +
+          field("Long description", "longDescription", series.longDescription, "Series detail page body", true, 5) +
+        "</section>" +
+        '<section class="form-section">' +
+          '<h2>Listing images <span class="field-required">Required</span></h2>' +
+          '<p class="field-hint">Thumbnail and banner are required before you can publish chapters. They appear on Discover and your series page.</p>' +
+          '<div class="form-row">' +
+            '<div class="field">' +
+              '<label>Thumbnail <span class="field-required">Required</span></label>' +
+              '<div class="upload-preview' + (series.thumbnailDataUrl ? " upload-preview--filled" : "") + '" id="thumbPreview" style="' + (series.thumbnailDataUrl ? "background-image:url(" + series.thumbnailDataUrl + ")" : "") + '">' + (series.thumbnailDataUrl ? "" : "400×600") + "</div>" +
+              '<input type="file" accept="image/*" id="thumbInput">' +
+            "</div>" +
+            '<div class="field">' +
+              '<label>Banner <span class="field-required">Required</span></label>' +
+              '<div class="upload-preview is-banner' + (series.bannerDataUrl ? " upload-preview--filled" : "") + '" id="bannerPreview" style="' + (series.bannerDataUrl ? "background-image:url(" + series.bannerDataUrl + ")" : "") + '">' + (series.bannerDataUrl ? "" : "800×400") + "</div>" +
+              '<input type="file" accept="image/*" id="bannerInput">' +
+            "</div>" +
+          "</div>" +
+        "</section>" +
+        '<section class="form-section">' +
+          "<h2>Genres</h2>" +
+          '<p class="field-hint">Pick what kind of story this is — used for discover and search.</p>' +
+          '<div class="flag-chips" id="genreChips">' + genreChips + "</div>" +
+        "</section>" +
+        '<section class="form-section">' +
+          "<h2>Mature content (18+)</h2>" +
+          '<p class="field-hint">Any selection here marks the series as 18+ and hides it from readers who have not confirmed their age.</p>' +
+          '<div class="flag-chips" id="matureFlagChips">' + matureChips + "</div>" +
+        "</section>" +
+        '<section class="form-section form-section--danger">' +
+          "<h2>Reset for playtesting</h2>" +
+          '<p class="field-hint">' +
+            (series.templateSource
+              ? "Restore the graph from the original template, "
+              : "Keep your current graph, ") +
+            "set every chapter except chapter 1 to <strong>draft</strong>, publish chapter 1, and clear your personal reading progress for this story." +
+          "</p>" +
+          '<button type="button" class="btn btn-danger btn-sm" id="resetSeriesBtn">Reset to chapter 1 only</button>' +
+        "</section>" +
+        '<p class="field-hint" style="margin-top:16px">Monetization, promotion, and game UI each have their own menu. Story metrics live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
+      "</form>";
+
+    return settingsPageChrome(
+      series,
+      "basics",
+      "Series settings",
+      "Listing info and content flags. Build your story in the Graph editor.",
+      body
+    );
+  }
+
+  function renderMonetizationSection(series) {
+    ScenaStore.normalizeSeries(series);
+    var m = series.monetization || {};
+    var isPaid = m.mode === "paid";
     return (
-      '<div class="page">' +
-        '<div class="page-head">' +
-          '<div><h1>Series settings</h1><p>Listing info and content flags. Build your story in the Graph editor.</p></div>' +
-          '<div style="display:flex;gap:8px">' +
-            (series.id ? '<button type="button" class="btn btn-danger btn-sm" id="deleteSeriesBtn">Delete</button>' : '') +
-            '<button type="button" class="btn btn-primary" id="saveSettingsBtn">Save</button>' +
+      '<section class="form-section" id="monetizationSection">' +
+        '<h2>Reader access (Ducats)</h2>' +
+        '<p class="field-hint">Choose whether chapters are free or cost Ducats. Readers still must finish the previous chapter before the next one unlocks.</p>' +
+        '<div class="field">' +
+          '<label>Series access</label>' +
+          '<select name="monetizationMode" id="monetizationMode">' +
+            '<option value="free"' + (!isPaid ? " selected" : "") + '>Entire series free</option>' +
+            '<option value="paid"' + (isPaid ? " selected" : "") + '>Paid chapters (Ducats)</option>' +
+          '</select>' +
+        '</div>' +
+        '<div id="monetizationPaidFields"' + (isPaid ? "" : ' hidden') + '>' +
+          '<div class="field">' +
+            '<label>Free chapters at start</label>' +
+            '<input type="number" name="freeEpisodeCount" min="0" max="99" value="' + (m.freeEpisodeCount != null ? m.freeEpisodeCount : 1) + '">' +
+            '<p class="field-hint">How many early chapters readers can play without spending Ducats (usually 1).</p>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>Default price per chapter (Ducats)</label>' +
+            '<input type="number" name="defaultEpisodePriceDucats" min="0" max="999" value="' + (m.defaultEpisodePriceDucats != null ? m.defaultEpisodePriceDucats : 5) + '">' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>Become free after (days)</label>' +
+            '<input type="number" name="freeAfterDays" min="0" max="365" value="' + (m.freeAfterDays != null ? m.freeAfterDays : 0) + '">' +
+            '<p class="field-hint">0 = stay paid forever. Example: 7 means a chapter costs Ducats for one week after release, then becomes free for everyone.</p>' +
           '</div>' +
         '</div>' +
-        '<form id="settingsForm">' +
-          '<section class="form-section">' +
-            '<h2>Basics</h2>' +
-            field("Title", "title", series.title, "Required for listing") +
-            field("URL slug", "slug", series.slug || ScenaStore.slugify(series.title), "arleco.app/s/your-slug") +
-            field("Short description", "shortDescription", series.shortDescription, "Max 160 chars — grid card blurb", true) +
-            field("Long description", "longDescription", series.longDescription, "Series detail page body", true, 5) +
-          '</section>' +
-          '<section class="form-section">' +
-            '<h2>Listing images</h2>' +
-            '<div class="form-row">' +
-              '<div class="field">' +
-                '<label>Thumbnail</label>' +
-                '<div class="upload-preview' + (series.thumbnailDataUrl ? "" : "") + '" id="thumbPreview" style="' + (series.thumbnailDataUrl ? "background-image:url(" + series.thumbnailDataUrl + ")" : "") + '">' + (series.thumbnailDataUrl ? "" : "400×600") + '</div>' +
-                '<input type="file" accept="image/*" id="thumbInput">' +
-              '</div>' +
-              '<div class="field">' +
-                '<label>Banner</label>' +
-                '<div class="upload-preview is-banner" id="bannerPreview" style="' + (series.bannerDataUrl ? "background-image:url(" + series.bannerDataUrl + ")" : "") + '">' + (series.bannerDataUrl ? "" : "800×400") + '</div>' +
-                '<input type="file" accept="image/*" id="bannerInput">' +
-              '</div>' +
-            '</div>' +
-          '</section>' +
-          '<section class="form-section">' +
-            '<h2>Content flags</h2>' +
-            '<div class="flag-chips" id="flagChips">' + flags + '</div>' +
-          '</section>' +
-          renderReaderUiSection(series) +
-          '<section class="form-section form-section--danger">' +
-            '<h2>Reset for playtesting</h2>' +
-            '<p class="field-hint">' +
-              (series.templateSource
-                ? "Restore the graph from the original template, "
-                : "Keep your current graph, ") +
-              "set every chapter except chapter 1 to <strong>draft</strong>, publish chapter 1, and clear your personal reading progress for this story." +
-            '</p>' +
-            '<button type="button" class="btn btn-danger btn-sm" id="resetSeriesBtn">Reset to chapter 1 only</button>' +
-          '</section>' +
-          '<p class="field-hint" style="margin-top:16px">Story metrics and branching logic live in the <a href="#/series/' + series.id + '/graph">Graph editor</a>.</p>' +
-        '</form>' +
-      '</div>'
+      '</section>'
     );
   }
 
@@ -778,13 +1017,25 @@
       saveTimer = setTimeout(function () {
         try {
           collectSettingsForm(form, series);
+          var listing = validateSettingsListing(series);
+          if (!listing.ok && form.querySelector('[name="title"]')) return;
           persistSeries(series);
           updateSidebarSeriesTitle(series);
+          if ($("#uiMockFrame")) refreshUiMockup(series);
         } catch (err) {
           console.error(err);
           toast("Could not save settings — try again.");
         }
       }, 600);
+    }
+
+    var monetizationMode = form.querySelector("#monetizationMode");
+    var monetizationPaidFields = form.querySelector("#monetizationPaidFields");
+    if (monetizationMode && monetizationPaidFields) {
+      monetizationMode.addEventListener("change", function () {
+        monetizationPaidFields.hidden = monetizationMode.value !== "paid";
+        scheduleAutoSave();
+      });
     }
 
     bindImageUpload("#thumbInput", "#thumbPreview", function (url) { series.thumbnailDataUrl = url; scheduleAutoSave(); }, "thumb", series.id);
@@ -804,15 +1055,15 @@
     form.querySelectorAll("input, textarea").forEach(function (el) {
       el.addEventListener("input", scheduleAutoSave);
     });
-    var flagChips = $("#flagChips");
-    if (flagChips) {
-      flagChips.querySelectorAll(".flag-chip").forEach(function (chip) {
+    [$("#genreChips"), $("#matureFlagChips")].forEach(function (chipRoot) {
+      if (!chipRoot) return;
+      chipRoot.querySelectorAll(".flag-chip").forEach(function (chip) {
         chip.addEventListener("click", function () {
           chip.classList.toggle("is-on");
           scheduleAutoSave();
         });
       });
-    }
+    });
 
     var presetCards = document.querySelectorAll("#uiPresetCards .ui-preset-card");
     if (presetCards.length) {
@@ -851,6 +1102,10 @@
           $("#uiChoiceScaleVal").textContent = el.value + "×";
         } else if (el.name === "uiCornerRadius") {
           $("#uiCornerRadiusVal").textContent = el.value + "px";
+        } else if (el.name === "uiDialogueWidth") {
+          $("#uiDialogueWidthVal").textContent = el.value + "%";
+        } else if (el.name === "uiChoicesWidth") {
+          $("#uiChoicesWidthVal").textContent = el.value + "%";
         }
         scheduleAutoSave();
       });
@@ -903,7 +1158,15 @@
     if (saveSettingsBtn) {
       saveSettingsBtn.addEventListener("click", function () {
         collectSettingsForm(form, series);
+        if (form.querySelector('[name="title"]')) {
+          var listing = validateSettingsListing(series);
+          if (!listing.ok) {
+            toast(listing.issues[0] || "Thumbnail and banner are required.");
+            return;
+          }
+        }
         persistSeries(series, "Series saved");
+        if ($("#uiMockFrame")) refreshUiMockup(series);
       });
     }
 
@@ -948,6 +1211,271 @@
         });
       });
     }
+
+    document.querySelectorAll(".settings-subnav-link").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        navigate(a.getAttribute("href").replace(/^#/, ""));
+      });
+    });
+  }
+
+  function bindMonetizationPage() {
+    var route = parseRoute();
+    var series = ScenaStore.getSeries(userId, route.seriesId);
+    if (!series) return;
+    var form = $("#settingsForm");
+    if (!form) return;
+    var saveTimer;
+    function scheduleAutoSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () {
+        try {
+          collectSettingsForm(form, series);
+          persistSeries(series);
+        } catch (err) {
+          console.error(err);
+          toast("Could not save monetization.");
+        }
+      }, 500);
+    }
+    var monetizationMode = form.querySelector("#monetizationMode");
+    var monetizationPaidFields = form.querySelector("#monetizationPaidFields");
+    if (monetizationMode && monetizationPaidFields) {
+      monetizationMode.addEventListener("change", function () {
+        monetizationPaidFields.hidden = monetizationMode.value !== "paid";
+        scheduleAutoSave();
+      });
+    }
+    form.querySelectorAll("input, select").forEach(function (el) {
+      el.addEventListener("input", scheduleAutoSave);
+      el.addEventListener("change", scheduleAutoSave);
+    });
+    var saveBtn = $("#saveSettingsBtn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        collectSettingsForm(form, series);
+        persistSeries(series);
+        toast("Monetization saved.");
+      });
+    }
+    document.querySelectorAll(".settings-subnav-link").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        navigate(a.getAttribute("href").replace(/^#/, ""));
+      });
+    });
+  }
+
+  function bindPromotionPage() {
+    document.querySelectorAll(".settings-subnav-link").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        navigate(a.getAttribute("href").replace(/^#/, ""));
+      });
+    });
+    var saveBtn = $("#saveSettingsBtn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        toast("Promotion tools coming soon.");
+      });
+    }
+  }
+
+  function bindGameUiPage() {
+    var route = parseRoute();
+    var series = ScenaStore.getSeries(userId, route.seriesId);
+    if (!series) return;
+    ScenaStore.ensureReaderUi(series);
+    bindSettingsForm();
+    refreshUiMockup(series);
+    bindUiMockupDrag(series);
+    var resetLayout = $("#uiResetLayoutBtn");
+    if (resetLayout) {
+      resetLayout.addEventListener("click", function () {
+        series.readerUi.layout = defaultUiLayout();
+        var form = $("#settingsForm");
+        if (form) {
+          var dw = form.querySelector('[name="uiDialogueWidth"]');
+          var cw = form.querySelector('[name="uiChoicesWidth"]');
+          if (dw) dw.value = "92";
+          if (cw) cw.value = "42";
+          var dwv = $("#uiDialogueWidthVal");
+          var cwv = $("#uiChoicesWidthVal");
+          if (dwv) dwv.textContent = "92%";
+          if (cwv) cwv.textContent = "42%";
+        }
+        persistSeries(series);
+        refreshUiMockup(series);
+        toast("Layout reset.");
+      });
+    }
+    var saveAssetBtn = $("#uiSaveAssetBtn");
+    if (saveAssetBtn) {
+      saveAssetBtn.addEventListener("click", function () {
+        saveUiAsAsset(series, false);
+      });
+    }
+    var publishBtn = $("#uiPublishAssetBtn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", function () {
+        saveUiAsAsset(series, true);
+      });
+    }
+  }
+
+  function applyUiMockFrameStyles(frame, series) {
+    if (!frame) return;
+    var ui = ScenaStore.resolveReaderUi(series);
+    var parts = String(ui.aspectRatio || "16:9").split(":");
+    frame.style.setProperty("--preview-aspect-w", String(parseInt(parts[0], 10) || 16));
+    frame.style.setProperty("--preview-aspect-h", String(parseInt(parts[1], 10) || 9));
+    frame.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
+    frame.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
+    frame.style.setProperty("--ui-accent", ui.colors.accent);
+    frame.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
+    frame.style.setProperty("--ui-choice-text", ui.colors.choiceText);
+    frame.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
+    frame.style.setProperty("--ui-speaker", ui.colors.speaker);
+    frame.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
+    frame.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
+    frame.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
+    frame.className = "ui-mock-frame preview-frame player-frame preview-ui--" + ui.preset +
+      " preview-shape-dialogue--" + ui.shapes.dialogue +
+      " preview-shape-choice--" + ui.shapes.choice;
+    if (ui.customSprites.dialogueBox) {
+      frame.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
+      frame.dataset.customDialogue = "1";
+    } else {
+      frame.style.removeProperty("--ui-dialogue-sprite");
+      delete frame.dataset.customDialogue;
+    }
+    if (ui.customSprites.choiceButton) {
+      frame.style.setProperty("--ui-choice-sprite", "url(" + ui.customSprites.choiceButton + ")");
+      frame.dataset.customChoice = "1";
+    } else {
+      frame.style.removeProperty("--ui-choice-sprite");
+      delete frame.dataset.customChoice;
+    }
+    var layout = ui.layout || defaultUiLayout();
+    var dlg = frame.querySelector('[data-ui-drag="dialogue"]');
+    var name = frame.querySelector('[data-ui-drag="nameplate"]');
+    var ch = frame.querySelector('[data-ui-drag="choices"]');
+    if (dlg) {
+      dlg.style.left = layout.dialogue.x + "%";
+      dlg.style.top = layout.dialogue.y + "%";
+      dlg.style.width = layout.dialogue.w + "%";
+    }
+    if (name) {
+      name.style.left = layout.nameplate.x + "%";
+      name.style.top = layout.nameplate.y + "%";
+    }
+    if (ch) {
+      ch.style.left = layout.choices.x + "%";
+      ch.style.top = layout.choices.y + "%";
+      ch.style.width = layout.choices.w + "%";
+    }
+    var stage = $("#uiMockStage");
+    if (stage) stage.setAttribute("data-aspect", ui.aspectRatio || "16:9");
+  }
+
+  function refreshUiMockup(series) {
+    applyUiMockFrameStyles($("#uiMockFrame"), series);
+  }
+
+  function bindUiMockupDrag(series) {
+    var frame = $("#uiMockFrame");
+    if (!frame || frame.dataset.dragBound === "1") return;
+    frame.dataset.dragBound = "1";
+    var drag = null;
+
+    function onMove(e) {
+      if (!drag) return;
+      var rect = frame.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      var x = ((e.clientX - rect.left) / rect.width) * 100 - drag.ox;
+      var y = ((e.clientY - rect.top) / rect.height) * 100 - drag.oy;
+      x = Math.max(0, Math.min(90, x));
+      y = Math.max(0, Math.min(90, y));
+      ScenaStore.ensureReaderUi(series);
+      if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
+      var key = drag.key;
+      if (key === "dialogue") {
+        series.readerUi.layout.dialogue.x = Math.round(x * 10) / 10;
+        series.readerUi.layout.dialogue.y = Math.round(y * 10) / 10;
+      } else if (key === "nameplate") {
+        series.readerUi.layout.nameplate.x = Math.round(x * 10) / 10;
+        series.readerUi.layout.nameplate.y = Math.round(y * 10) / 10;
+      } else if (key === "choices") {
+        series.readerUi.layout.choices.x = Math.round(x * 10) / 10;
+        series.readerUi.layout.choices.y = Math.round(y * 10) / 10;
+      }
+      applyUiMockFrameStyles(frame, series);
+    }
+
+    function onUp() {
+      if (!drag) return;
+      drag = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      persistSeries(series);
+    }
+
+    frame.querySelectorAll("[data-ui-drag]").forEach(function (el) {
+      el.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var rect = frame.getBoundingClientRect();
+        var key = el.getAttribute("data-ui-drag");
+        var layout = (series.readerUi && series.readerUi.layout) || defaultUiLayout();
+        var node = layout[key] || { x: 0, y: 0 };
+        var curX = ((e.clientX - rect.left) / rect.width) * 100;
+        var curY = ((e.clientY - rect.top) / rect.height) * 100;
+        drag = { key: key, ox: curX - (node.x || 0), oy: curY - (node.y || 0) };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
+  }
+
+  function saveUiAsAsset(series, publish) {
+    if (!window.ScenaAssetLibrary || !window.ScenaMarketplace) {
+      toast("Asset library unavailable.");
+      return;
+    }
+    ScenaStore.ensureReaderUi(series);
+    var form = $("#settingsForm");
+    if (form) collectReaderUi(form, series);
+    var title = (($("#uiAssetTitle") && $("#uiAssetTitle").value) || (series.title + " UI") || "Game UI").trim();
+    var desc = (($("#uiAssetDesc") && $("#uiAssetDesc").value) || "").trim();
+    var price = Math.max(0, parseInt(($("#uiAssetPrice") && $("#uiAssetPrice").value) || "0", 10) || 0);
+    var preview = series.readerUi.customSprites && series.readerUi.customSprites.dialogueBox
+      ? series.readerUi.customSprites.dialogueBox
+      : "";
+    ScenaAssetLibrary.saveFromSeries(userId, series, { readerUi: true }, {
+      title: title,
+      sourceSeriesId: series.id,
+      sourceSeriesTitle: series.title || "",
+    }).then(function (entry) {
+      if (!publish) {
+        toast("UI saved to My assets.");
+        return entry;
+      }
+      return ScenaMarketplace.publishListing(userId, {
+        title: title,
+        description: desc || "Game UI kit for Arleco stories.",
+        category: "ui",
+        priceDucats: price,
+        bundle: (entry && entry.bundle) || { readerUi: series.readerUi },
+        previewDataUrl: preview || (entry && entry.preview_data_url) || "",
+        sellerName: (userProfile && userProfile.displayName) || "Creator",
+      }).then(function () {
+        toast("UI published to the shop.");
+      });
+    }).catch(function (err) {
+      toast((err && err.message) || "Could not save UI asset.");
+    });
   }
 
   function collectSettingsForm(form, series) {
@@ -959,14 +1487,36 @@
     if (slugEl) series.slug = ScenaStore.slugify(slugEl.value.trim() || series.title);
     if (shortEl) series.shortDescription = shortEl.value.trim();
     if (longEl) series.longDescription = longEl.value.trim();
+    series.genres = [];
     series.contentFlags = [];
-    var flagChips = $("#flagChips");
-    if (flagChips) {
-      flagChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
-        series.contentFlags.push(c.getAttribute("data-flag"));
+    var genreChips = $("#genreChips");
+    if (genreChips) {
+      genreChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
+        series.genres.push(c.getAttribute("data-genre"));
+      });
+    }
+    var matureChips = $("#matureFlagChips");
+    if (matureChips) {
+      matureChips.querySelectorAll(".flag-chip.is-on").forEach(function (c) {
+        series.contentFlags.push(c.getAttribute("data-mature-flag"));
       });
     }
     if (form.querySelector("#readerUiSection")) collectReaderUi(form, series);
+    if (!series.monetization) series.monetization = { mode: "free", freeEpisodeCount: 1, defaultEpisodePriceDucats: 5, freeAfterDays: 0 };
+    var modeEl = form.querySelector('[name="monetizationMode"]');
+    var freeCountEl = form.querySelector('[name="freeEpisodeCount"]');
+    var priceEl = form.querySelector('[name="defaultEpisodePriceDucats"]');
+    var freeDaysEl = form.querySelector('[name="freeAfterDays"]');
+    if (modeEl) series.monetization.mode = modeEl.value === "paid" ? "paid" : "free";
+    if (freeCountEl) series.monetization.freeEpisodeCount = Math.max(0, parseInt(freeCountEl.value, 10) || 0);
+    if (priceEl) series.monetization.defaultEpisodePriceDucats = Math.max(0, parseInt(priceEl.value, 10) || 0);
+    if (freeDaysEl) series.monetization.freeAfterDays = Math.max(0, parseInt(freeDaysEl.value, 10) || 0);
+    ScenaStore.normalizeSeries(series);
+  }
+
+  function validateSettingsListing(series) {
+    if (!window.ScenaStore || !ScenaStore.validateSeriesListing) return { ok: true, issues: [] };
+    return ScenaStore.validateSeriesListing(series);
   }
 
   function bindSoundPreview(btnSel, selectSel, series, isBgm) {
@@ -1411,7 +1961,18 @@
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  var libraryUiState = { tab: "assets", category: "", query: "", selectedId: "", shopCategory: "", shopQuery: "", shopSelectedId: "" };
+  var libraryUiState = {
+    tab: "assets",
+    category: "",
+    query: "",
+    selectedId: "",
+    shopCategory: "",
+    shopQuery: "",
+    shopSelectedId: "",
+    jamShopQuery: "",
+    jamShopSelectedId: "",
+  };
+  var jamBrowseState = { genre: "all", keyword: "", sort: "date", phase: "all", jamType: "all" };
 
   function listUserSeries() {
     return ScenaStore.listSeries(userId).filter(function (s) { return !s.templateSource; });
@@ -1427,7 +1988,7 @@
       '<div class="page page-library">' +
         '<div class="page-head">' +
           '<div><h1>Asset library</h1>' +
-          '<p>Reuse characters, stages, and audio across projects. Purchased assets stay yours — import anytime without paying again.</p></div>' +
+          '<p>Reuse characters, stages, and audio across projects. Build packs from several assets and sell them in the shop.</p></div>' +
         '</div>' +
         '<div id="libraryRoot" class="library-root"><p class="field-hint">Loading…</p></div>' +
         '<div class="workspace-modal-backdrop" id="librarySellModal" hidden>' +
@@ -1437,6 +1998,27 @@
             '<div class="modal-actions">' +
               '<button type="button" class="btn" id="librarySellCancel">Cancel</button>' +
               '<button type="button" class="btn btn-primary" id="librarySellSave">Publish listing</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="workspace-modal-backdrop" id="libraryPackModal" hidden>' +
+          '<div class="modal" role="dialog">' +
+            '<h2>Create pack</h2>' +
+            '<div id="libraryPackBody"></div>' +
+            '<div class="modal-actions">' +
+              '<button type="button" class="btn" id="libraryPackCancel">Cancel</button>' +
+              '<button type="button" class="btn btn-secondary" id="libraryPackSaveOnly">Save to My assets</button>' +
+              '<button type="button" class="btn btn-primary" id="libraryPackPublish">Publish to shop</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="workspace-modal-backdrop" id="libraryEditListingModal" hidden>' +
+          '<div class="modal" role="dialog">' +
+            '<h2>Edit listing</h2>' +
+            '<div id="libraryEditListingBody"></div>' +
+            '<div class="modal-actions">' +
+              '<button type="button" class="btn" id="libraryEditListingCancel">Cancel</button>' +
+              '<button type="button" class="btn btn-primary" id="libraryEditListingSave">Save changes</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -1450,6 +2032,10 @@
 
     if (libraryUiState.tab === "shop") {
       paintLibraryShop(root);
+      return;
+    }
+    if (libraryUiState.tab === "jams") {
+      paintLibraryAssetJams(root);
       return;
     }
 
@@ -1482,6 +2068,13 @@
       });
       bindLibraryAssetsPanel(root);
       bindLibrarySellModal();
+      bindLibraryPackModal();
+      bindLibraryEditListingModal();
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load assets' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        "</p>";
     });
   }
 
@@ -1494,25 +2087,45 @@
       ? ScenaWallet.load(userId).then(function (w) {
           if (w && w.purchased) toast("Payment received — Ducats added to your wallet.");
           return ScenaWallet.getBalance(userId);
+        }).catch(function (err) {
+          console.warn("Shop wallet load:", err && err.message ? err.message : err);
+          return ScenaWallet.getBalance(userId);
         })
       : Promise.resolve(null);
 
-    balancePromise.then(function (balance) {
+    var assetJamsPromise = window.ScenaJams && ScenaJams.listMarketplaceAssetJams
+      ? ScenaJams.listMarketplaceAssetJams({
+          limit: 6,
+          hideAdult: true,
+          viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+        }).catch(function () { return []; })
+      : Promise.resolve([]);
+
+    Promise.all([balancePromise, assetJamsPromise]).then(function (pair) {
+      var balance = pair[0];
+      var assetJams = pair[1] || [];
       return ScenaMarketplace.loadListings({
         category: libraryUiState.shopCategory,
         query: libraryUiState.shopQuery,
+        viewerUserId: userId,
       }).then(function (listings) {
         var detailHtml = "";
         if (libraryUiState.shopSelectedId) {
           return ScenaMarketplace.getListing(libraryUiState.shopSelectedId, userId).then(function (listing) {
-            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
-            return { listings: listings, detailHtml: detailHtml, balance: balance };
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, {
+              showPackUpsell: true,
+              viewerUserId: userId,
+            });
+            return { listings: listings, detailHtml: detailHtml, balance: balance, assetJams: assetJams };
           });
         }
-        return { listings: listings, detailHtml: detailHtml, balance: balance };
+        return { listings: listings, detailHtml: detailHtml, balance: balance, assetJams: assetJams };
       });
     }).then(function (payload) {
-      var shopHtml = ScenaMarketplace.renderStorePanel(payload.listings, {
+      var jamStrip = window.ScenaJams && ScenaJams.renderMarketplaceAssetJamSection
+        ? ScenaJams.renderMarketplaceAssetJamSection(payload.assetJams)
+        : "";
+      var shopHtml = jamStrip + ScenaMarketplace.renderStorePanel(payload.listings, {
         category: libraryUiState.shopCategory,
         query: libraryUiState.shopQuery,
         selectedId: libraryUiState.shopSelectedId,
@@ -1524,16 +2137,98 @@
         shopHtml: shopHtml,
       });
       bindLibraryShopPanel(root);
+      bindStudioHashLinks(root);
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load shop' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        " Try refreshing the page.</p>";
     });
+  }
+
+  function paintLibraryAssetJams(root) {
+    if (!window.ScenaJams) {
+      root.innerHTML = '<p class="field-hint">Jams module failed to load. Refresh the page.</p>';
+      return;
+    }
+    if (typeof ScenaJams.listAssetJamShopShelves !== "function") {
+      // Older cached scena-jams.js — fall back to marketplace strip + jam browse.
+      root.innerHTML = ScenaAssetLibrary.renderPanel([], {
+        pageTab: "jams",
+        jamsHtml:
+          '<div class="asset-jam-shop">' +
+            '<div class="asset-jam-shop-intro">' +
+              "<h3>Shop asset jams</h3>" +
+              '<p class="field-hint">Reload Studio to update the asset jam shop (cached scripts are out of date).</p>' +
+            "</div>" +
+            '<p class="field-hint"><a href="#/jams/asset">Browse asset jams</a> · ' +
+              '<a href="#/library/shop">Open shop</a></p>' +
+          "</div>",
+      });
+      bindLibraryAssetJamsPanel(root);
+      bindStudioHashLinks(root);
+      return;
+    }
+    var selectedId = libraryUiState.jamShopSelectedId;
+    ScenaJams.listAssetJamShopShelves({
+      query: libraryUiState.jamShopQuery,
+      limit: 10,
+      hideAdult: true,
+      viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+      viewerUserId: userId,
+    }).then(function (shelves) {
+      var detailPromise = Promise.resolve("");
+      if (selectedId && window.ScenaMarketplace) {
+        detailPromise = ScenaMarketplace.getListing(selectedId, userId).then(function (listing) {
+          return ScenaMarketplace.renderListingDetail(listing, {
+            showPackUpsell: true,
+            viewerUserId: userId,
+          });
+        }).catch(function () { return ""; });
+      }
+      return detailPromise.then(function (detailHtml) {
+        var jamsHtml =
+          ScenaJams.renderAssetJamShopShelves(shelves, {
+            query: libraryUiState.jamShopQuery,
+            viewerUserId: userId,
+          }) +
+          (detailHtml
+            ? '<div class="marketplace-layout asset-jam-shop-detail-layout">' +
+                '<div class="marketplace-detail asset-jam-shop-detail">' + detailHtml + "</div>" +
+              "</div>"
+            : "");
+        root.innerHTML = ScenaAssetLibrary.renderPanel([], {
+          pageTab: "jams",
+          jamsHtml: jamsHtml,
+        });
+        bindLibraryAssetJamsPanel(root);
+        bindStudioHashLinks(root);
+      });
+    }).catch(function (err) {
+      root.innerHTML =
+        '<p class="field-hint">Could not load asset jams' +
+        (err && err.message ? ": " + escapeHtml(err.message) : ".") +
+        "</p>";
+    });
+  }
+
+  function libraryTabNavigate(page) {
+    if (page === "shop") {
+      libraryUiState.tab = "shop";
+      navigate("/library/shop");
+    } else if (page === "jams") {
+      libraryUiState.tab = "jams";
+      navigate("/library/jams");
+    } else {
+      libraryUiState.tab = "assets";
+      navigate("/library");
+    }
   }
 
   function bindLibraryAssetsPanel(root) {
     root.querySelectorAll("[data-library-page]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var page = btn.getAttribute("data-library-page");
-        libraryUiState.tab = page === "shop" ? "shop" : "assets";
-        if (page === "shop") navigate("/library/shop");
-        else navigate("/library");
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
       });
     });
     root.querySelectorAll("[data-library-category]").forEach(function (btn) {
@@ -1601,9 +2296,60 @@
         openLibrarySellModal(btn.getAttribute("data-library-id"));
       });
     });
+    root.querySelectorAll(".library-edit-listing-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openLibraryEditListingModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+    root.querySelectorAll(".library-unlist-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
+    var createPackBtns = root.querySelectorAll("#libraryCreatePackBtn");
+    createPackBtns.forEach(function (btn) {
+      btn.addEventListener("click", openLibraryPackModal);
+    });
   }
 
   var librarySellEntryId = null;
+  var libraryEditListingId = null;
+
+  function openLibraryEditListingModal(listingId) {
+    libraryEditListingId = listingId;
+    var modal = $("#libraryEditListingModal");
+    if (!modal || !window.ScenaMarketplace || !listingId) return;
+    ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+      if (!listing) {
+        toast("Listing not found.");
+        return;
+      }
+      $("#libraryEditListingBody").innerHTML = ScenaMarketplace.renderEditListingBody(listing);
+      modal.hidden = false;
+    }).catch(function (err) {
+      toast((err && err.message) || "Could not load listing.");
+    });
+  }
+
+  function closeLibraryEditListingModal() {
+    libraryEditListingId = null;
+    var modal = $("#libraryEditListingModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function removeMarketplaceListing(listingId) {
+    if (!listingId || !window.ScenaMarketplace) return;
+    if (!window.confirm("Remove this listing from the asset store? Buyers who already purchased keep their copy in My assets.")) return;
+    ScenaMarketplace.removeListing(userId, listingId).then(function () {
+      if (libraryUiState.shopSelectedId === listingId) libraryUiState.shopSelectedId = "";
+      toast("Listing removed from the store.");
+      paintLibraryRoot();
+    }).catch(function (err) {
+      toast((err && err.message) || "Could not remove listing.");
+    });
+  }
 
   function openLibrarySellModal(entryId) {
     librarySellEntryId = entryId;
@@ -1620,6 +2366,70 @@
     librarySellEntryId = null;
     var modal = $("#librarySellModal");
     if (modal) modal.hidden = true;
+  }
+
+  function openLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (!modal || !window.ScenaAssetLibrary) return;
+    ScenaAssetLibrary.list(userId, { source: "made" }).then(function (entries) {
+      $("#libraryPackBody").innerHTML = ScenaAssetLibrary.renderPackBuilderBody(entries);
+      modal.hidden = false;
+    });
+  }
+
+  function closeLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function submitLibraryPack(publish) {
+    var ids = [];
+    document.querySelectorAll("#libraryPackBody [data-lib-pack-id]:checked").forEach(function (el) {
+      ids.push(el.getAttribute("data-lib-pack-id"));
+    });
+    if (ids.length < 1) {
+      toast("Select at least one asset for the pack.");
+      return;
+    }
+    var title = (($("#libPackTitle") || {}).value || "").trim();
+    var desc = (($("#libPackDesc") || {}).value || "").trim();
+    var price = parseInt(($("#libPackPrice") || {}).value, 10) || 0;
+    if (title.length < 2) {
+      toast("Enter a pack title.");
+      return;
+    }
+    var pubBtn = $("#libraryPackPublish");
+    var saveBtn = $("#libraryPackSaveOnly");
+    if (pubBtn) pubBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaAssetLibrary.createPackFromLibrary(userId, ids, {
+      title: title,
+      description: desc,
+      priceDucats: price,
+      publish: !!publish,
+      sellerName: (userProfile && userProfile.displayName) || "Creator",
+    }).then(function (result) {
+      closeLibraryPackModal();
+      libraryUiState.selectedId = result.entry && result.entry.id ? result.entry.id : "";
+      libraryUiState.category = "pack";
+      toast(publish ? "Pack published to the shop." : "Pack saved to My assets.");
+      paintLibraryRoot();
+    }).catch(function (err) {
+      toast((err && err.message) || "Could not create pack.");
+    }).then(function () {
+      if (pubBtn) pubBtn.disabled = false;
+      if (saveBtn) saveBtn.disabled = false;
+    });
+  }
+
+  function bindLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (!modal || modal.dataset.bound === "1") return;
+    modal.dataset.bound = "1";
+    $("#libraryPackCancel").addEventListener("click", closeLibraryPackModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeLibraryPackModal(); });
+    $("#libraryPackSaveOnly").addEventListener("click", function () { submitLibraryPack(false); });
+    $("#libraryPackPublish").addEventListener("click", function () { submitLibraryPack(true); });
   }
 
   function bindLibrarySellModal() {
@@ -1654,13 +2464,45 @@
     });
   }
 
+  function bindLibraryEditListingModal() {
+    var modal = $("#libraryEditListingModal");
+    if (!modal || modal.dataset.bound === "1") return;
+    modal.dataset.bound = "1";
+    $("#libraryEditListingCancel").addEventListener("click", closeLibraryEditListingModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeLibraryEditListingModal(); });
+    $("#libraryEditListingSave").addEventListener("click", function () {
+      if (!libraryEditListingId || !window.ScenaMarketplace) return;
+      var title = ($("#mpEditTitle") || {}).value || "";
+      var desc = ($("#mpEditDesc") || {}).value || "";
+      var category = ($("#mpEditCategory") || {}).value || "pack";
+      var price = parseInt(($("#mpEditPrice") || {}).value, 10) || 0;
+      if (title.trim().length < 2) {
+        toast("Enter a listing title.");
+        return;
+      }
+      var saveBtn = $("#libraryEditListingSave");
+      if (saveBtn) saveBtn.disabled = true;
+      ScenaMarketplace.updateListing(userId, libraryEditListingId, {
+        title: title.trim(),
+        description: desc.trim(),
+        category: category,
+        priceDucats: price,
+      }).then(function () {
+        if (saveBtn) saveBtn.disabled = false;
+        closeLibraryEditListingModal();
+        toast("Listing updated.");
+        paintLibraryRoot();
+      }).catch(function (err) {
+        if (saveBtn) saveBtn.disabled = false;
+        toast((err && err.message) || "Could not update listing.");
+      });
+    });
+  }
+
   function bindLibraryShopPanel(root) {
     root.querySelectorAll("[data-library-page]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var page = btn.getAttribute("data-library-page");
-        libraryUiState.tab = page === "shop" ? "shop" : "assets";
-        if (page === "shop") navigate("/library/shop");
-        else navigate("/library");
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
       });
     });
     root.querySelectorAll("[data-marketplace-category]").forEach(function (btn) {
@@ -1678,8 +2520,7 @@
         paintLibraryRoot();
       });
     }
-    root.querySelectorAll("[data-listing-id]").forEach(function (btn) {
-      if (btn.classList.contains("marketplace-acquire-btn")) return;
+    root.querySelectorAll(".marketplace-card[data-listing-id]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         libraryUiState.shopSelectedId = btn.getAttribute("data-listing-id");
         paintLibraryRoot();
@@ -1692,6 +2533,9 @@
         btn.disabled = true;
         ScenaMarketplace.purchase(userId, listingId).then(function (result) {
           return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
             if (window.ScenaAssetLibrary && listing) {
               ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
             }
@@ -1709,6 +2553,31 @@
         });
       });
     });
+    root.querySelectorAll(".marketplace-edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openLibraryEditListingModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+    root.querySelectorAll(".marketplace-remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
+    root.querySelectorAll("[data-mp-rate-listing]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-mp-rate-listing");
+        var stars = btn.getAttribute("data-mp-stars");
+        if (!listingId || btn.disabled) return;
+        ScenaMarketplace.rateListing(userId, listingId, stars).then(function () {
+          toast("Thanks for rating!");
+          paintLibraryRoot();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not save rating.");
+        });
+      });
+    });
     if (window.ScenaWallet) {
       ScenaWallet.bindPackButtons(root, userId, function (result) {
         if (result && result.redirecting) return;
@@ -1717,12 +2586,91 @@
       }, function (err) {
         toast((err && err.message) || "Could not buy Ducats.");
       });
-      root.querySelectorAll(".ducat-pack-btn").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          toast("Opening Stripe checkout…");
-        }, { once: false });
+    }
+    bindLibraryEditListingModal();
+  }
+
+  function bindLibraryAssetJamsPanel(root) {
+    root.querySelectorAll("[data-library-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryTabNavigate(btn.getAttribute("data-library-page"));
+      });
+    });
+    var search = root.querySelector(".asset-jam-shop-search");
+    if (search) {
+      search.addEventListener("change", function () {
+        libraryUiState.jamShopQuery = search.value.trim();
+        libraryUiState.jamShopSelectedId = "";
+        paintLibraryRoot();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          libraryUiState.jamShopQuery = search.value.trim();
+          libraryUiState.jamShopSelectedId = "";
+          paintLibraryRoot();
+        }
       });
     }
+    root.querySelectorAll(".asset-jam-shelf-card[data-listing-id]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        libraryUiState.jamShopSelectedId = btn.getAttribute("data-listing-id");
+        paintLibraryRoot();
+      });
+    });
+    root.querySelectorAll(".marketplace-acquire-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-listing-id");
+        if (!listingId) return;
+        btn.disabled = true;
+        ScenaMarketplace.purchase(userId, listingId).then(function (result) {
+          return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
+            if (window.ScenaAssetLibrary && listing) {
+              ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
+            }
+            return result;
+          });
+        }).then(function () {
+          btn.disabled = false;
+          toast("Added to your library — import into any project from My assets.");
+          libraryUiState.tab = "assets";
+          libraryUiState.selectedId = "";
+          navigate("/library");
+        }).catch(function (err) {
+          btn.disabled = false;
+          toast((err && err.message) || "Purchase failed.");
+        });
+      });
+    });
+    root.querySelectorAll(".marketplace-edit-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openLibraryEditListingModal(btn.getAttribute("data-listing-id"));
+      });
+    });
+    root.querySelectorAll(".marketplace-remove-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        removeMarketplaceListing(btn.getAttribute("data-listing-id"));
+      });
+    });
+    root.querySelectorAll("[data-mp-rate-listing]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-mp-rate-listing");
+        var stars = btn.getAttribute("data-mp-stars");
+        if (!listingId || btn.disabled) return;
+        ScenaMarketplace.rateListing(userId, listingId, stars).then(function () {
+          toast("Thanks for rating!");
+          paintLibraryRoot();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not save rating.");
+        });
+      });
+    });
+    bindLibraryEditListingModal();
   }
 
   function handleJamNeedDucats(root, err, onRetry) {
@@ -1765,22 +2713,32 @@
     }
 
     if (route.jamMode === "new") {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam form…</p></div>';
       loadJamFormBalance().then(function (balance) {
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
-              '<div><h1>Host a game jam</h1>' +
+              '<div><h1>' + (route.jamType === "asset" ? "Host an asset jam" : "Host a game jam") + "</h1>" +
               '<p>Set theme, rules, schedule, entry requirements, and optional Ducat prizes.</p></div>' +
               '<button type="button" class="btn btn-primary" id="jamSaveDraftBtn">Save &amp; continue</button>' +
             "</div>" +
-            ScenaJams.renderForm({}, { balance: balance }) +
+            ScenaJams.renderForm({}, { balance: balance, jamType: route.jamType || "game" }) +
           "</div>";
         bindJamForm(main);
+        if (window.ScenaJams && ScenaJams.bindCoverStyleEditor) ScenaJams.bindCoverStyleEditor(main);
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not open jam form.") +
+          "</p></div>";
       });
       return;
     }
 
     if (route.jamMode === "edit" && route.jamId) {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam editor…</p></div>';
       ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
@@ -1803,12 +2761,22 @@
               ScenaJams.renderForm(jam, { balance: balance, published: published }) +
             "</div>";
           bindJamForm(main, jam);
+          if (window.ScenaJams && ScenaJams.bindCoverStyleEditor) {
+            ScenaJams.bindCoverStyleEditor(main, { coverStyle: jam.coverStyle });
+          }
         });
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not open jam editor.") +
+          "</p></div>";
       });
       return;
     }
 
     if (route.jamMode === "detail" && route.jamId) {
+      main.innerHTML =
+        '<div class="page page-jams"><p class="field-hint">Loading jam…</p></div>';
       ScenaJams.get(route.jamId, { userId: userId }).then(function (jam) {
         if (!jam) {
           main.innerHTML = '<div class="page"><p class="field-hint">Jam not found.</p></div>';
@@ -1820,41 +2788,152 @@
           return;
         }
         var seriesList = listUserSeries();
-        main.innerHTML = ScenaJams.renderDetail(jam, {
+        var detailCtx = {
           userId: userId,
           adultVerified: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
           seriesList: seriesList,
+          libraryEntries: [],
+          sellerListings: [],
+        };
+        var assetLoads = [];
+        if (window.ScenaJams && ScenaJams.isAssetJam(jam)) {
+          if (window.ScenaAssetLibrary) {
+            assetLoads.push(
+              ScenaAssetLibrary.list(userId, { source: "made" }).then(function (rows) {
+                rows = rows || [];
+                var cats = jam.allowedCategories || [];
+                if (cats.length) {
+                  rows = rows.filter(function (e) { return cats.indexOf(e.category) >= 0; });
+                }
+                // Default asset jams only accept packs created during the submission window.
+                if ((jam.assetSubmissionMode || "new_listing") !== "existing_listing") {
+                  var subStart = jam.submissionStart ? new Date(jam.submissionStart).getTime() : 0;
+                  rows = rows.filter(function (e) {
+                    var created = new Date(e.createdAt || e.updatedAt || 0).getTime();
+                    return !subStart || created >= subStart;
+                  });
+                }
+                detailCtx.libraryEntries = rows;
+              })
+            );
+          }
+          if (window.ScenaMarketplace && ScenaMarketplace.listSellerListings) {
+            assetLoads.push(
+              ScenaMarketplace.listSellerListings(userId).then(function (rows) {
+                detailCtx.sellerListings = rows || [];
+              })
+            );
+          }
+        }
+        Promise.all(assetLoads).then(function () {
+          main.innerHTML = ScenaJams.renderDetail(jam, detailCtx);
+          bindJamDetail(main, jam, seriesList, detailCtx);
         });
-        bindJamDetail(main, jam, seriesList);
+      }).catch(function (err) {
+        main.innerHTML =
+          '<div class="page"><p class="field-hint">' +
+          escapeHtml((err && err.message) || "Could not load jam.") +
+          "</p></div>";
       });
       return;
     }
 
-    ScenaJams.list({ publishedOnly: true }).then(function (published) {
+    if (route.jamTypeFilter === "asset" || route.jamTypeFilter === "game") {
+      jamBrowseState.jamType = route.jamTypeFilter;
+    }
+
+    ScenaJams.list({
+      publishedOnly: true,
+      genre: jamBrowseState.genre,
+      keyword: jamBrowseState.keyword,
+      sort: jamBrowseState.sort,
+      phase: jamBrowseState.phase,
+      jamType: jamBrowseState.jamType,
+      hideAdult: true,
+      viewerIsAdult: window.ScenaProfile && ScenaProfile.isAdultVerified(userProfile),
+    }).then(function (published) {
       ScenaJams.list({ hostUserId: userId }).then(function (mine) {
+        var browseOpts = {
+          genre: jamBrowseState.genre,
+          keyword: jamBrowseState.keyword,
+          sort: jamBrowseState.sort,
+          phase: jamBrowseState.phase,
+          jamType: jamBrowseState.jamType,
+          canHost: true,
+        };
         main.innerHTML =
           '<div class="page page-jams">' +
             '<div class="page-head">' +
-              '<div><h1>Game jams</h1><p>Community events — create under your rules, optional Ducat rewards.</p></div>' +
-              '<a class="btn btn-primary" href="#/jams/new">Host a jam</a>' +
+              '<div><h1>Jams</h1><p>Browse game jams and asset jams — filter by type, genre, prize pool, or keywords.</p></div>' +
+              '<div class="page-head-actions">' +
+                '<a class="btn btn-secondary" href="#/jams/new/asset">Host asset jam</a>' +
+                '<a class="btn btn-primary" href="#/jams/new">Host game jam</a>' +
+              "</div>" +
             "</div>" +
-            (mine.length
-              ? '<section class="form-section"><h2>Your jams</h2>' +
+            (mine.filter(function (j) { return j.status === "draft"; }).length
+              ? '<section class="form-section"><h2>Your drafts</h2>' +
                   ScenaJams.renderList(mine.filter(function (j) { return j.status === "draft"; }), { canHost: true }) +
                 "</section>"
               : "") +
-            '<section class="form-section"><h2>Active &amp; upcoming</h2>' +
-              ScenaJams.renderList(published, { canHost: true }) +
+            '<section class="form-section"><h2>Browse jams</h2>' +
+              ScenaJams.renderBrowse(published, browseOpts) +
             "</section>" +
           "</div>";
-        main.querySelectorAll(".jam-card").forEach(function (card) {
-          card.addEventListener("click", function (e) {
-            e.preventDefault();
-            navigate(card.getAttribute("href").replace(/^#/, ""));
-          });
-        });
+        bindJamBrowse(main);
       });
     });
+  }
+
+  function bindJamBrowse(root) {
+    function repaint() {
+      render();
+    }
+    root.querySelectorAll("[data-jam-type]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        jamBrowseState.jamType = btn.getAttribute("data-jam-type") || "all";
+        repaint();
+      });
+    });
+    root.querySelectorAll("[data-jam-genre]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        jamBrowseState.genre = btn.getAttribute("data-jam-genre") || "all";
+        repaint();
+      });
+    });
+    var search = $("#jamBrowseSearch", root);
+    if (search) {
+      search.addEventListener("change", function () {
+        jamBrowseState.keyword = search.value.trim();
+        repaint();
+      });
+      search.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          jamBrowseState.keyword = search.value.trim();
+          repaint();
+        }
+      });
+    }
+    var sortSel = $("#jamBrowseSort", root);
+    if (sortSel) {
+      sortSel.addEventListener("change", function () {
+        jamBrowseState.sort = sortSel.value || "date";
+        repaint();
+      });
+    }
+    var phaseSel = $("#jamBrowsePhase", root);
+    if (phaseSel) {
+      phaseSel.addEventListener("change", function () {
+        jamBrowseState.phase = phaseSel.value || "all";
+        repaint();
+      });
+    }
+    root.querySelectorAll(".jam-card").forEach(function (card) {
+      card.addEventListener("click", function (e) {
+        e.preventDefault();
+        navigate(card.getAttribute("href").replace(/^#/, ""));
+      });
+    });
+    bindStudioHashLinks(root);
   }
 
   function bindJamForm(root, existingJam) {
@@ -1865,14 +2944,60 @@
     if (prizeToggle && prizeFields) {
       prizeToggle.addEventListener("change", function () {
         prizeFields.hidden = !prizeToggle.checked;
+        if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root);
       });
     }
-    form.querySelectorAll("[data-jam-flag]").forEach(function (el) {
+    function syncJamTypeSections() {
+      var typeEl = $("#jamTypeSelect", root) || form.elements.jamType;
+      var type = (typeEl && typeEl.value) === "asset" ? "asset" : "game";
+      var gameSec = $("#jamGameEntryReqs", root);
+      var assetSec = $("#jamAssetEntryReqs", root);
+      function setSection(sec, active) {
+        if (!sec) return;
+        sec.hidden = !active;
+        sec.querySelectorAll("input, select, textarea").forEach(function (el) {
+          el.disabled = !active;
+        });
+      }
+      setSection(gameSec, type === "game");
+      setSection(assetSec, type === "asset");
+      if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root);
+    }
+    var typeSelect = $("#jamTypeSelect", root);
+    if (typeSelect) {
+      typeSelect.addEventListener("change", syncJamTypeSections);
+      syncJamTypeSections();
+    } else if (window.ScenaJams && ScenaJams.syncWinnerFormUi) {
+      ScenaJams.syncWinnerFormUi(root);
+    }
+
+    function onWinnerUiChange(opts) {
+      if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root, opts);
+    }
+    ["jamWinnerMode", "jamWinnerCount"].forEach(function (id) {
+      var el = $("#" + id, root);
+      if (el) el.addEventListener("change", function () { onWinnerUiChange(); });
+    });
+    var hostContrib = form.elements.hostContribution;
+    if (hostContrib) {
+      hostContrib.addEventListener("input", function () { onWinnerUiChange({ rebuildModes: false }); });
+      hostContrib.addEventListener("change", function () { onWinnerUiChange({ rebuildModes: false }); });
+    }
+    root.addEventListener("input", function (ev) {
+      if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-prize-split") != null) {
+        onWinnerUiChange({ rebuildModes: false });
+      }
+    });
+
+    form.querySelectorAll("[data-jam-mature]").forEach(function (el) {
       el.addEventListener("change", function () {
-        if (el.getAttribute("data-jam-flag") === "sexual_content" && el.checked) {
-          var age = $("#jamAgeRestricted", root);
-          if (age) age.checked = true;
-        }
+        var note = $("#jamAutoAgeNote", root);
+        if (!note) return;
+        var any = false;
+        form.querySelectorAll("[data-jam-mature]").forEach(function (box) {
+          if (box.checked) any = true;
+        });
+        note.hidden = !any;
       });
     });
     var saveBtn = $("#jamSaveDraftBtn", root);
@@ -1899,9 +3024,12 @@
         });
       });
     }
+    bindStudioHashLinks(root);
   }
 
-  function bindJamDetail(root, jam, seriesList) {
+  function bindJamDetail(root, jam, seriesList, detailCtx) {
+    detailCtx = detailCtx || {};
+    var isAssetJam = window.ScenaJams && ScenaJams.isAssetJam(jam);
     var publishBtn = $("#jamPublishBtn", root);
     if (publishBtn) {
       publishBtn.addEventListener("click", function () {
@@ -1911,7 +3039,9 @@
           render();
         }).catch(function (err) {
           publishBtn.disabled = false;
-          if (!handleJamNeedDucats(root, err)) {
+          if (!handleJamNeedDucats(root, err, function () {
+            publishBtn.click();
+          })) {
             toast((err && err.message) || "Could not publish jam.");
           }
         });
@@ -1965,13 +3095,13 @@
           escapeHtml(ep.title || ("Episode " + (ep.number || ""))) + "</option>";
       }).join("");
     }
-    if (seriesSel) {
+    if (!isAssetJam && seriesSel) {
       paintEpisodes();
       seriesSel.addEventListener("change", paintEpisodes);
     }
 
     var submitBtn = $("#jamSubmitBtn", root);
-    if (submitBtn) {
+    if (!isAssetJam && submitBtn) {
       submitBtn.addEventListener("click", function () {
         var sid = seriesSel && seriesSel.value;
         var eid = epSel && epSel.value;
@@ -1998,6 +3128,111 @@
       });
     }
 
+    var libSel = $("#jamSubmitLibrary", root);
+    var libPublishSel = $("#jamSubmitLibraryPublish", root);
+    var libTitle = $("#jamSubmitAssetTitle", root);
+    var directAssetBtn = $("#jamSubmitAssetDirectBtn", root);
+    if (directAssetBtn) {
+      directAssetBtn.addEventListener("click", function () {
+        var entryId = libSel && libSel.value;
+        if (!entryId) {
+          toast("Pick a library asset first.");
+          return;
+        }
+        var contribEl = $("#jamSubmitContrib", root);
+        directAssetBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          libraryEntryId: entryId,
+          directLibrary: true,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Asset submitted!");
+          render();
+        }).catch(function (err) {
+          directAssetBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            directAssetBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit asset.");
+          }
+        });
+      });
+    }
+
+    var publishAssetBtn = $("#jamSubmitAssetPublishBtn", root);
+    if (publishAssetBtn) {
+      publishAssetBtn.addEventListener("click", function () {
+        var entryId = libPublishSel && libPublishSel.value;
+        if (!entryId && libSel) entryId = libSel.value;
+        if (!entryId) {
+          toast("Pick a library asset first.");
+          return;
+        }
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === entryId; });
+        var contribEl = $("#jamSubmitContrib", root);
+        publishAssetBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          libraryEntryId: entryId,
+          title: (libTitle && libTitle.value.trim()) || (entry && entry.title) || "Jam entry",
+          description: ($("#jamSubmitAssetDesc", root) || {}).value || "",
+          category: entry && entry.category,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Asset published and submitted!");
+          render();
+        }).catch(function (err) {
+          publishAssetBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            publishAssetBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit asset.");
+          }
+        });
+      });
+    }
+
+    var listingBtn = $("#jamSubmitAssetListingBtn", root);
+    var listingSel = $("#jamSubmitListing", root);
+    if (listingBtn) {
+      listingBtn.addEventListener("click", function () {
+        var listingId = listingSel && listingSel.value;
+        var listing = (detailCtx.sellerListings || []).find(function (l) { return l.id === listingId; });
+        if (!listing) {
+          toast("Pick one of your live listings.");
+          return;
+        }
+        var contribEl = $("#jamSubmitContrib", root);
+        listingBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          listing: listing,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Listing submitted!");
+          render();
+        }).catch(function (err) {
+          listingBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            listingBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit listing.");
+          }
+        });
+      });
+    }
+
+    if (libSel && libTitle) {
+      libSel.addEventListener("change", function () {
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === libSel.value; });
+        if (entry && !libTitle.value.trim()) libTitle.value = entry.title || "";
+      });
+    }
+    if (libPublishSel && libTitle) {
+      libPublishSel.addEventListener("change", function () {
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === libPublishSel.value; });
+        if (entry && !libTitle.value.trim()) libTitle.value = entry.title || "";
+      });
+    }
+
     root.querySelectorAll(".jam-like-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var subId = btn.getAttribute("data-like-sub");
@@ -2012,14 +3247,56 @@
     root.querySelectorAll(".jam-pick-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var subId = btn.getAttribute("data-pick-sub");
-        ScenaJams.pickWinner(userId, jam.id, subId).then(function () {
-          toast("Winner chosen — prize sent if funded.");
+        var place = btn.getAttribute("data-pick-place");
+        ScenaJams.pickWinner(userId, jam.id, subId, place).then(function () {
+          toast(place ? ("Set as " + place + " — prize pays when all places are filled.") : "Winner updated.");
           render();
         }).catch(function (err) {
           toast((err && err.message) || "Could not pick winner.");
         });
       });
     });
+
+    root.querySelectorAll(".jam-rate-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-rate-sub");
+        var stars = btn.getAttribute("data-stars");
+        ScenaJams.rateJamEntry(userId, jam.id, subId, stars).then(function () {
+          toast("Rating saved.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not rate entry.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-dq-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-dq-sub");
+        if (!window.confirm("Disqualify this entry as off topic? It will drop out of judging while voting is live.")) {
+          return;
+        }
+        ScenaJams.disqualifyEntry(userId, jam.id, subId, "Off topic").then(function () {
+          toast("Entry disqualified.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not disqualify entry.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-reinstate-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-reinstate-sub");
+        ScenaJams.reinstateEntry(userId, jam.id, subId).then(function () {
+          toast("Entry reinstated.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not reinstate entry.");
+        });
+      });
+    });
+    bindStudioHashLinks(root);
   }
 
   function escapeAttr(s) {

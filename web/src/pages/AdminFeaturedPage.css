@@ -3,9 +3,57 @@
   max-width: 960px;
 }
 
+.admin-featured-section {
+  margin-top: 4px;
+}
+
+.admin-featured-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.admin-featured-section-title {
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+
+.admin-featured-lookup {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.admin-featured-lookup > span:first-child {
+  grid-column: 1 / -1;
+}
+
+.admin-featured-lookup input[type="search"] {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--scena-surface);
+  color: inherit;
+}
+
+.admin-featured-lookup-meta {
+  font-size: 0.75rem;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
 .admin-featured-loading,
 .admin-featured-error {
-  padding: 80px 24px;
+  padding: 40px 0;
   text-align: center;
   color: var(--faint);
 }

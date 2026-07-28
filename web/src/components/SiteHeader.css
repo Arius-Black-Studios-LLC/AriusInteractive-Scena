@@ -54,10 +54,37 @@
 .site-header-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.site-mod-link {
+  position: relative;
+}
+
+.site-mod-alert {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 3px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: #b42318;
 }
 
 @media (max-width: 760px) {
   .site-nav {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .site-studio-link {
     display: none;
   }
 }

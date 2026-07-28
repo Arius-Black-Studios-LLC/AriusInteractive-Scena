@@ -102,9 +102,30 @@ declare global {
           totalSubmissions: number;
         }>;
       }>;
+      listPlayerJamDiscover?: (opts: Record<string, unknown>) => Promise<Array<Record<string, unknown>>>;
+      getPlayerJamDetail?: (jamId: string, opts?: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
     };
     ScenaStore?: Record<string, unknown>;
-    ScenaProgress?: Record<string, unknown>;
+    ScenaProgress?: Record<string, unknown> & {
+      scopeFromUser?: (userId: string | null) => string;
+      listContinueReading?: (
+        scopeId: string,
+        catalogEntries: unknown[],
+      ) => Promise<Array<Record<string, unknown>>>;
+    };
+    ScenaHearts?: {
+      load: (seriesId: string, episodeId: string) => Promise<unknown[]>;
+      count: (seriesId: string, episodeId: string) => number;
+      isHearted: (seriesId: string, episodeId: string, profile: unknown) => boolean;
+      toggle: (
+        seriesId: string,
+        episodeId: string,
+        profile: unknown,
+      ) => Promise<{ hearted: boolean; count: number } | null>;
+      listMyHeartedSeries?: (
+        userId: string,
+      ) => Promise<Array<{ seriesId: string; lastHeartedAt?: string }>>;
+    };
     ScenaPlayer?: new (
       container: HTMLElement,
       series: unknown,
@@ -141,12 +162,19 @@ declare global {
       unhideComment: (commentId: string) => Promise<void>;
       setSeriesModeration: (opts: Record<string, unknown>) => Promise<unknown>;
       listGameJams: (limit?: number) => Promise<Array<Record<string, unknown>>>;
-      hideGameJam: (jamId: string, reason?: string) => Promise<void>;
+      hideGameJam: (jamId: string, reason?: string, opts?: Record<string, unknown>) => Promise<void>;
       unhideGameJam: (jamId: string) => Promise<void>;
       listMarketplaceListings: (limit?: number) => Promise<Array<Record<string, unknown>>>;
-      removeMarketplaceListing: (listingId: string, reason?: string) => Promise<void>;
+      removeMarketplaceListing: (
+        listingId: string,
+        reason?: string,
+        opts?: Record<string, unknown>,
+      ) => Promise<void>;
       listContentReports: (limit?: number) => Promise<Array<Record<string, unknown>>>;
       resolveContentReport: (reportId: string, status?: string) => Promise<void>;
+      countOpenReports?: () => Promise<number>;
+      listMyModerationNotices?: (limit?: number) => Promise<Array<Record<string, unknown>>>;
+      markModerationNoticeRead?: (noticeId: string) => Promise<void>;
     };
     ScenaAccount?: {
       renderPage: (profile: Record<string, unknown>, ctx: Record<string, unknown>) => string;

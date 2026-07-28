@@ -810,6 +810,11 @@
       shapes: { dialogue: "bar", choice: "rounded" },
       customSprites: { dialogueBox: null, choiceButton: null },
       sounds: { clickAssetId: null },
+      layout: {
+        dialogue: { x: 4, y: 68, w: 92 },
+        nameplate: { x: 6, y: 62 },
+        choices: { x: 52, y: 28, w: 42 },
+      },
       menu: {
         enabled: true,
         showTranscript: true,
@@ -2270,6 +2275,12 @@
         sizes: Object.assign({}, base.sizes, saved.sizes || {}),
         shapes: Object.assign({}, preset.shapes, saved.shapes || {}),
         customSprites: Object.assign({}, base.customSprites, saved.customSprites || {}),
+        sounds: Object.assign({}, base.sounds, saved.sounds || {}),
+        layout: {
+          dialogue: Object.assign({}, base.layout.dialogue, (saved.layout && saved.layout.dialogue) || {}),
+          nameplate: Object.assign({}, base.layout.nameplate, (saved.layout && saved.layout.nameplate) || {}),
+          choices: Object.assign({}, base.layout.choices, (saved.layout && saved.layout.choices) || {}),
+        },
         menu: Object.assign({}, base.menu, saved.menu || {}),
       };
     },
@@ -2290,6 +2301,11 @@
         series.readerUi.customSprites = Object.assign(defaultReaderUi().customSprites, series.readerUi.customSprites || {});
         series.readerUi.sounds = Object.assign(defaultReaderUi().sounds, series.readerUi.sounds || {});
         series.readerUi.menu = Object.assign(defaultReaderUi().menu, series.readerUi.menu || {});
+        series.readerUi.layout = {
+          dialogue: Object.assign({}, defaultReaderUi().layout.dialogue, (series.readerUi.layout && series.readerUi.layout.dialogue) || {}),
+          nameplate: Object.assign({}, defaultReaderUi().layout.nameplate, (series.readerUi.layout && series.readerUi.layout.nameplate) || {}),
+          choices: Object.assign({}, defaultReaderUi().layout.choices, (series.readerUi.layout && series.readerUi.layout.choices) || {}),
+        };
       }
       return series.readerUi;
     },

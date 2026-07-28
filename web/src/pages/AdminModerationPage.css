@@ -38,6 +38,32 @@
   line-height: 1.5;
 }
 
+.admin-mod-reason-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 20px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.admin-mod-reason-bar select {
+  max-width: 420px;
+  padding: 8px 10px;
+  font-size: 0.875rem;
+}
+
+.admin-mod-hint {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.admin-mod-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
 .admin-mod-head-actions {
   display: flex;
   gap: 8px;
@@ -59,6 +85,11 @@
   padding: 8px 14px;
   font: inherit;
   cursor: pointer;
+  text-decoration: none;
+}
+
+.admin-mod-tab:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
 }
 
 .admin-mod-tab.is-active {

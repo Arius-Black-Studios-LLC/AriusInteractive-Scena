@@ -169,7 +169,7 @@ declare
 begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   if p_title is null or length(trim(p_title)) < 2 then raise exception 'Title too short'; end if;
-  if p_category not in ('character', 'stage', 'item', 'audio', 'pack') then
+  if p_category not in ('character', 'stage', 'item', 'audio', 'ui', 'pack') then
     raise exception 'Invalid category';
   end if;
   if p_price_ducats is null or p_price_ducats < 0 then raise exception 'Invalid price'; end if;

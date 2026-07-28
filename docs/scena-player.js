@@ -554,6 +554,19 @@
       el.style.removeProperty("--ui-choice-sprite");
       delete el.dataset.customChoice;
     }
+    var layout = ui.layout || {};
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    var name = layout.nameplate || { x: 6, y: 62 };
+    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
+    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
+    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
+    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
+    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
+    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    el.classList.add("preview-frame--laid-out");
     this.initReaderMenu();
     if (this.readerMenu) {
       this.readerMenu.mount();

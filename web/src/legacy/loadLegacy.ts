@@ -89,9 +89,11 @@ export const LEGACY_BUNDLES = {
     "scena-demo-series.js",
     "scena-catalog.js",
     "scena-progress.js",
+    "scena-hearts.js",
     "scena-feedback.js",
     "scena-profile.js",
     "scena-jams.js",
+    "scena-admin.js",
   ],
   player: [
     "scena-cloud.js",
@@ -111,7 +113,13 @@ export const LEGACY_BUNDLES = {
     "scena-reader-menu.js",
     "scena-player.js",
   ],
-  account: ["scena-content-policy.js", "scena-profile.js", "scena-wallet.js", "scena-account.js"],
+  account: [
+    "scena-content-policy.js",
+    "scena-profile.js",
+    "scena-wallet.js",
+    "scena-account.js",
+    "scena-admin.js",
+  ],
   admin: ["scena-cloud.js", "scena-profile.js", "scena-admin.js", "scena-jams.js"],
   studio: [
     "scena-cloud.js",

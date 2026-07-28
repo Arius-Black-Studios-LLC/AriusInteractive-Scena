@@ -11,6 +11,7 @@
     { id: "stage", label: "Stages" },
     { id: "item", label: "Items" },
     { id: "audio", label: "Audio" },
+    { id: "ui", label: "UI" },
     { id: "pack", label: "Packs" },
   ];
 
@@ -47,11 +48,18 @@
 
   function inferCategory(bundle) {
     if (!bundle) return "pack";
+    if (bundle.readerUi &&
+      !(bundle.characterProfiles || []).length &&
+      !(bundle.backgroundScenes || []).length &&
+      !(bundle.assets || []).length) {
+      return "ui";
+    }
     if ((bundle.characterProfiles || []).length) return "character";
     if ((bundle.backgroundScenes || []).length) return "stage";
     var assets = bundle.assets || [];
     if (assets.some(function (a) { return a.kind === "keyItem"; })) return "item";
     if (assets.length) return "audio";
+    if (bundle.readerUi) return "ui";
     return "pack";
   }
 
@@ -240,8 +248,8 @@
       }
       var built = ScenaMarketplace.buildBundleFromSeries(series, spec);
       if (built.empty) return Promise.reject(new Error("Nothing to save from this resource."));
-      var resourceId = spec.characterId || spec.stageId || spec.assetId || "asset";
-      var category = spec.characterId ? "character" : spec.stageId ? "stage" :
+      var resourceId = spec.readerUi ? "reader_ui" : (spec.characterId || spec.stageId || spec.assetId || "asset");
+      var category = spec.readerUi ? "ui" : spec.characterId ? "character" : spec.stageId ? "stage" :
         (spec.assetId && series.assets && series.assets.find(function (a) { return a.id === spec.assetId && a.kind === "keyItem"; }))
           ? "item" : "audio";
       var title = meta.title || "Untitled asset";
@@ -269,6 +277,21 @@
       var list = readLibrary(userId).filter(function (e) { return e.id !== entryId; });
       writeLibrary(userId, list);
       return Promise.resolve(true);
+    },
+
+    clearListingSale: function (userId, listingId) {
+      if (!userId || !listingId) return;
+      var list = readLibrary(userId);
+      var changed = false;
+      list.forEach(function (e) {
+        if (e.listingId === listingId || (e.forSale && e.id === "made_" + listingId)) {
+          e.forSale = false;
+          e.listingId = null;
+          e.saleTitle = null;
+          changed = true;
+        }
+      });
+      if (changed) writeLibrary(userId, list);
     },
 
     publishFromLibrary: function (userId, entryId, spec) {
@@ -494,10 +517,15 @@
           (opts.showSell && entry.source === "made" && !entry.forSale
             ? '<button type="button" class="btn btn-sm btn-secondary library-sell-btn" data-library-id="' + escapeAttr(entry.id) + '">Sell on marketplace</button>'
             : "") +
-          (entry.forSale
-            ? '<span class="field-hint">Listed on the asset store' +
-              (entry.listingId ? " · listing active" : "") + ".</span>"
-            : "") +
+          (entry.forSale && entry.listingId
+            ? '<button type="button" class="btn btn-sm btn-secondary library-edit-listing-btn" data-listing-id="' +
+                escapeAttr(entry.listingId) + '">Edit listing</button>' +
+              '<button type="button" class="btn btn-sm btn-danger library-unlist-btn" data-listing-id="' +
+                escapeAttr(entry.listingId) + '">Remove from store</button>' +
+              '<span class="field-hint">Listed on the asset store.</span>'
+            : entry.forSale
+              ? '<span class="field-hint">Listed on the asset store.</span>'
+              : "") +
           (opts.showRemove
             ? '<button type="button" class="btn btn-sm btn-ghost library-remove-btn" data-library-id="' + escapeAttr(entry.id) + '">Remove from library</button>'
             : "") +

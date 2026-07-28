@@ -12,6 +12,7 @@
     { id: "stage", label: "Stages" },
     { id: "item", label: "Items" },
     { id: "audio", label: "Audio" },
+    { id: "ui", label: "UI" },
     { id: "pack", label: "Packs" },
   ];
 
@@ -303,6 +304,11 @@
       series.metrics.push(m);
       count++;
     });
+    if (bundle.readerUi && window.ScenaStore) {
+      series.readerUi = JSON.parse(JSON.stringify(bundle.readerUi));
+      ScenaStore.ensureReaderUi(series);
+      count++;
+    }
 
     return { ok: count > 0, count: count };
   }
@@ -343,29 +349,48 @@
       if (!preview) preview = asset.dataUrl || "";
     });
 
-    var empty = !bundle.characterProfiles.length && !bundle.backgroundScenes.length && !bundle.assets.length;
+    if (spec.readerUi && window.ScenaStore) {
+      ScenaStore.ensureReaderUi(series);
+      bundle.readerUi = JSON.parse(JSON.stringify(series.readerUi));
+      if (!preview && series.readerUi.customSprites) {
+        preview = series.readerUi.customSprites.dialogueBox || series.readerUi.customSprites.choiceButton || "";
+      }
+    }
+
+    var empty = !bundle.characterProfiles.length && !bundle.backgroundScenes.length &&
+      !bundle.assets.length && !bundle.readerUi;
     var pieceCount =
-      bundle.characterProfiles.length + bundle.backgroundScenes.length + bundle.assets.length;
+      bundle.characterProfiles.length + bundle.backgroundScenes.length + bundle.assets.length +
+      (bundle.readerUi ? 1 : 0);
     return { bundle: bundle, preview: preview, empty: empty, pieceCount: pieceCount };
   }
 
   function inferListingCategory(bundle, preferred) {
     if (preferred && preferred !== "pack") return preferred;
     if (!bundle) return preferred || "pack";
+    if (bundle.readerUi &&
+      !(bundle.characterProfiles || []).length &&
+      !(bundle.backgroundScenes || []).length &&
+      !(bundle.assets || []).length) {
+      return "ui";
+    }
     var types = 0;
     if ((bundle.characterProfiles || []).length) types++;
     if ((bundle.backgroundScenes || []).length) types++;
     if ((bundle.assets || []).length) types++;
+    if (bundle.readerUi) types++;
     var pieces =
       (bundle.characterProfiles || []).length +
       (bundle.backgroundScenes || []).length +
-      (bundle.assets || []).length;
+      (bundle.assets || []).length +
+      (bundle.readerUi ? 1 : 0);
     if (types > 1 || pieces > 1) return "pack";
     if ((bundle.characterProfiles || []).length) return "character";
     if ((bundle.backgroundScenes || []).length) return "stage";
     var assets = bundle.assets || [];
     if (assets.some(function (a) { return a.kind === "keyItem"; })) return "item";
     if (assets.length) return "audio";
+    if (bundle.readerUi) return "ui";
     return preferred || "pack";
   }
 
@@ -709,6 +734,165 @@
       });
     },
 
+    updateListing: function (userId, listingId, spec) {
+      spec = spec || {};
+      if (!userId) return Promise.reject(new Error("Sign in to edit listings."));
+      if (!listingId) return Promise.reject(new Error("Missing listing."));
+      var title = String(spec.title || "").trim();
+      if (title.length < 2) return Promise.reject(new Error("Title is too short."));
+      var category = spec.category || "pack";
+      var allowed = CATEGORIES.some(function (c) { return c.id && c.id === category; });
+      if (!allowed) return Promise.reject(new Error("Invalid category."));
+      var price = Math.max(0, parseInt(spec.priceDucats, 10) || 0);
+      var description = String(spec.description || "").trim();
+
+      if (window.ScenaContentPolicy) {
+        var titleCheck = ScenaContentPolicy.check(title);
+        if (!titleCheck.ok) return Promise.reject(new Error(titleCheck.message));
+        var descCheck = ScenaContentPolicy.check(description);
+        if (!descCheck.ok) return Promise.reject(new Error(descCheck.message));
+      }
+
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      var sb = getClient();
+
+      function mirrorLocal(extra) {
+        var list = readLocalListings();
+        var idx = list.findIndex(function (l) { return l.id === listingId; });
+        if (idx < 0) {
+          if (!isLocalId) {
+            list.unshift(Object.assign({
+              id: listingId,
+              seller_id: userId,
+              status: "live",
+              purchase_count: 0,
+              seller_name: "You",
+              is_seller: true,
+              preview_data_url: "",
+              bundle: {},
+            }, {
+              title: title,
+              description: description,
+              category: category,
+              price_ducats: price,
+            }, extra || {}));
+            writeLocalListings(list);
+          }
+          return;
+        }
+        if (list[idx].seller_id && list[idx].seller_id !== userId) {
+          throw new Error("Only the seller can edit this listing.");
+        }
+        list[idx] = Object.assign({}, list[idx], {
+          title: title,
+          description: description,
+          category: category,
+          price_ducats: price,
+          status: list[idx].status === "removed" ? "live" : (list[idx].status || "live"),
+          seller_id: userId,
+          is_seller: true,
+          updated_at: new Date().toISOString(),
+        }, extra || {});
+        writeLocalListings(list);
+      }
+
+      if (isLocalId || !useCloud() || !sb) {
+        try {
+          mirrorLocal();
+        } catch (err) {
+          return Promise.reject(err);
+        }
+        var local = findLocalListing(listingId, userId);
+        if (!local) return Promise.reject(new Error("Listing not found."));
+        return Promise.resolve(local);
+      }
+
+      return sb.rpc("update_marketplace_listing", {
+        p_listing_id: listingId,
+        p_title: title,
+        p_description: description,
+        p_category: category,
+        p_price_ducats: price,
+      }).then(function (res) {
+        if (res.error) throw new Error(res.error.message || "Could not update listing.");
+        try { mirrorLocal(); } catch (e) { /* ignore mirror errors */ }
+        return Object.assign({ id: listingId }, res.data || {}, {
+          title: title,
+          description: description,
+          category: category,
+          price_ducats: price,
+          is_seller: true,
+          seller_id: userId,
+        });
+      });
+    },
+
+    removeListing: function (userId, listingId) {
+      if (!userId) return Promise.reject(new Error("Sign in to remove listings."));
+      if (!listingId) return Promise.reject(new Error("Missing listing."));
+
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      var sb = getClient();
+
+      function markLocalRemoved() {
+        var list = readLocalListings();
+        var idx = list.findIndex(function (l) { return l.id === listingId; });
+        if (idx >= 0) {
+          if (list[idx].seller_id && list[idx].seller_id !== userId) {
+            throw new Error("Only the seller can remove this listing.");
+          }
+          list[idx] = Object.assign({}, list[idx], {
+            status: "removed",
+            updated_at: new Date().toISOString(),
+          });
+          writeLocalListings(list);
+        } else if (isLocalId) {
+          throw new Error("Listing not found.");
+        }
+      }
+
+      var chain;
+      if (isLocalId || !useCloud() || !sb) {
+        try {
+          markLocalRemoved();
+          chain = Promise.resolve({ id: listingId, status: "removed" });
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      } else {
+        chain = sb.rpc("remove_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not remove listing.");
+          try { markLocalRemoved(); } catch (e) { /* ignore */ }
+          return { id: listingId, status: "removed" };
+        });
+      }
+
+      return chain.then(function (result) {
+        if (window.ScenaAssetLibrary && ScenaAssetLibrary.clearListingSale) {
+          ScenaAssetLibrary.clearListingSale(userId, listingId);
+        }
+        return result;
+      });
+    },
+
+    renderEditListingBody: function (listing) {
+      if (!listing) return "<p>Listing not found.</p>";
+      var catOpts = CATEGORIES.filter(function (c) { return c.id; }).map(function (c) {
+        return '<option value="' + escapeAttr(c.id) + '"' +
+          (listing.category === c.id ? " selected" : "") + ">" + escapeHtml(c.label) + "</option>";
+      }).join("");
+      return (
+        '<div class="field"><label>Listing title</label><input type="text" id="mpEditTitle" maxlength="80" value="' +
+          escapeAttr(listing.title || "") + '"></div>' +
+        '<div class="field"><label>Description</label><textarea id="mpEditDesc" rows="3" maxlength="400">' +
+          escapeHtml(listing.description || "") + "</textarea></div>" +
+        '<div class="field"><label>Category</label><select id="mpEditCategory">' + catOpts + "</select></div>" +
+        '<div class="field"><label>Price (Ducats, 0 = free)</label><input type="number" id="mpEditPrice" min="0" max="9999" value="' +
+          escapeAttr(String(listing.price_ducats != null ? listing.price_ducats : 0)) + '"></div>' +
+        '<p class="field-hint">Changes apply to the shop listing. The asset pack contents stay the same.</p>'
+      );
+    },
+
     importBundleToSeries: importBundleToSeries,
 
     buildBundleFromSeries: buildBundleFromSeries,
@@ -829,8 +1013,13 @@
       var actionHtml;
       if (isSeller) {
         actionHtml =
-          '<button type="button" class="btn btn-sm btn-ghost" disabled>Your listing</button>' +
-          '<span class="field-hint">You already own this — use My assets to import it into a project.</span>';
+          '<div class="marketplace-seller-actions">' +
+            '<button type="button" class="btn btn-sm btn-secondary marketplace-edit-btn" data-listing-id="' +
+              escapeAttr(listing.id) + '">Edit listing</button>' +
+            '<button type="button" class="btn btn-sm btn-danger marketplace-remove-btn" data-listing-id="' +
+              escapeAttr(listing.id) + '">Remove from store</button>' +
+          "</div>" +
+          '<span class="field-hint">This is your listing. Edit title, price, or category — or remove it from the shop. Buyers who already purchased keep their copy.</span>';
       } else {
         var actionLabel = owned
           ? "Add to project"

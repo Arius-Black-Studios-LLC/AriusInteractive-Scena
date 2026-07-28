@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
+import { AdminDelistControl } from "../components/AdminDelistControl";
 import "./SeriesPage.css";
 
 type Episode = {
@@ -22,7 +23,7 @@ type SaveRow = {
 
 export function SeriesPage() {
   const [params] = useSearchParams();
-  const { userId } = useAuth();
+  const { userId, isAdmin } = useAuth();
   const seriesId = params.get("series");
   const lockedEp = params.get("locked");
   const { ready, error: loadError } = useLegacyBundle("reader", [
@@ -38,6 +39,7 @@ export function SeriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [scopeId, setScopeId] = useState("anon");
   const [seriesData, setSeriesData] = useState<unknown>(null);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
 
   function refreshSaves(series: unknown, scope: string) {
     const progress = window.ScenaProgress as Record<string, (...args: unknown[]) => unknown>;
@@ -78,10 +80,13 @@ export function SeriesPage() {
         shortDescription?: string;
         longDescription?: string;
         bannerDataUrl?: string;
+        ownerId?: string;
+        userId?: string;
       };
       setTitle(s.title || "Untitled");
       setLongDescription((s.longDescription || "").trim());
       setBannerUrl((s.bannerDataUrl || "").trim());
+      setOwnerId(s.ownerId || s.userId || null);
 
       const eps = (
         store.orderedEpisodes as (ser: unknown) => Episode[]
@@ -193,6 +198,14 @@ export function SeriesPage() {
         ) : null}
         <div className="series-hero-heading">
           <h1>{title}</h1>
+          {isAdmin && seriesId ? (
+            <AdminDelistControl
+              targetType="series"
+              targetId={seriesId}
+              targetTitle={title}
+              ownerId={ownerId}
+            />
+          ) : null}
         </div>
       </header>
 

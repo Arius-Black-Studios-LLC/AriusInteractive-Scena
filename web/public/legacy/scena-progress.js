@@ -937,7 +937,7 @@
 
 
 
-    isEpisodeUnlocked: function (scopeId, series, episode) {
+    isEpisodeProgressUnlocked: function (scopeId, series, episode) {
 
       if (!episode || !series) return false;
 
@@ -960,6 +960,24 @@
       var rec = this.get(scopeId, series.id).episodes[prev.id];
 
       return !!(rec && rec.completed);
+
+    },
+
+
+
+    isEpisodeUnlocked: function (scopeId, series, episode) {
+
+      if (!this.isEpisodeProgressUnlocked(scopeId, series, episode)) return false;
+
+      if (!window.ScenaStore || !ScenaStore.episodeReaderPrice) return true;
+
+      var price = ScenaStore.episodeReaderPrice(series, episode);
+
+      if (!price) return true;
+
+      if (window.ScenaWallet && ScenaWallet.hasUnlock(scopeId, series.id, episode.id)) return true;
+
+      return false;
 
     },
 
@@ -1075,6 +1093,21 @@
       }
 
       if (this.isEpisodeUnlocked(scopeId, series, episode)) return "";
+
+      if (window.ScenaStore && ScenaStore.episodeReaderPrice) {
+        var price = ScenaStore.episodeReaderPrice(series, episode);
+        if (price > 0) {
+          if (this.isEpisodeProgressUnlocked(scopeId, series, episode)) {
+            if (window.ScenaWallet && !window.ScenaAuth) {
+              return "Sign in to unlock this chapter for " + price + " Ducats.";
+            }
+            if (window.ScenaAuth && ScenaAuth.isConfigured && ScenaAuth.isConfigured() && !ScenaAuth.getSessionUserId()) {
+              return "Sign in to unlock this chapter for " + price + " Ducats.";
+            }
+            return "Unlock this chapter for " + price + " Ducats.";
+          }
+        }
+      }
 
       if (!window.ScenaStore || !ScenaStore.previousEpisode) return "Complete the previous chapter first.";
 
@@ -1315,6 +1348,162 @@
       if (restart) url += "&restart=1";
 
       return url;
+
+    },
+
+    /** Home “Continue reading” — series with active progress that still have a resume chapter. */
+
+    listContinueReading: function (scopeId, catalogEntries) {
+
+      var self = this;
+
+      var entries = catalogEntries || [];
+
+      var byId = {};
+
+      entries.forEach(function (e) {
+
+        if (e && e.id) byId[e.id] = e;
+
+      });
+
+
+
+      function fromLocalIds() {
+
+        var prefix = "scena.progress." + (scopeId || "anon") + ".";
+
+        var ids = [];
+
+        try {
+
+          for (var i = 0; i < localStorage.length; i++) {
+
+            var k = localStorage.key(i);
+
+            if (k && k.indexOf(prefix) === 0) ids.push(k.slice(prefix.length));
+
+          }
+
+        } catch (e) { /* ignore */ }
+
+        return ids;
+
+      }
+
+
+
+      var cloudChain;
+
+      if (useCloud(scopeId)) {
+
+        cloudChain = getClient().from("reader_progress")
+
+          .select("series_id, updated_at")
+
+          .eq("user_id", scopeId)
+
+          .order("updated_at", { ascending: false })
+
+          .limit(40)
+
+          .then(function (res) {
+
+            if (res.error) return fromLocalIds().map(function (id) {
+
+              return { seriesId: id, updatedAt: "" };
+
+            });
+
+            return (res.data || []).map(function (row) {
+
+              return { seriesId: row.series_id, updatedAt: row.updated_at || "" };
+
+            });
+
+          })
+
+          .catch(function () {
+
+            return fromLocalIds().map(function (id) { return { seriesId: id, updatedAt: "" }; });
+
+          });
+
+      } else {
+
+        cloudChain = Promise.resolve(fromLocalIds().map(function (id) {
+
+          return { seriesId: id, updatedAt: "" };
+
+        }));
+
+      }
+
+
+
+      return cloudChain.then(function (rows) {
+
+        var out = [];
+
+        var seen = {};
+
+        rows.forEach(function (row) {
+
+          var sid = row.seriesId;
+
+          if (!sid || seen[sid] || !byId[sid]) return;
+
+          seen[sid] = true;
+
+          var entry = byId[sid];
+
+          var resume = null;
+
+          try {
+
+            // Catalog entry isn't a full series — still try progress heuristics via save summary.
+
+            var bundle = self.getBundle(scopeId, sid);
+
+            var slot = bundle && bundle.saves && bundle.saves[bundle.activeSaveId];
+
+            var progress = slot && slot.data;
+
+            if (progress && progress.finishedAt) return;
+
+            if (progress && progress.resumeEpisodeId) {
+
+              resume = { id: progress.resumeEpisodeId, title: progress.resumeEpisodeTitle || "Continue" };
+
+            } else if (progress && progress.lastEpisodeId) {
+
+              resume = { id: progress.lastEpisodeId, title: "Continue" };
+
+            }
+
+          } catch (e) { /* ignore */ }
+
+          if (!resume) return;
+
+          out.push({
+
+            entry: entry,
+
+            resumeEpisodeId: resume.id,
+
+            resumeLabel: resume.title || "Continue",
+
+            updatedAt: row.updatedAt || "",
+
+            href: self.playUrl(sid, resume.id, false),
+
+          });
+
+        });
+
+        return out.slice(0, 8);
+
+      });
 
     },
 
