@@ -609,6 +609,7 @@
         '<div class="graph-toolbar graph-toolbar--studio">' +
           '<div class="graph-toolbar-desktop">' +
             '<button type="button" class="btn btn-sm graph-play-btn" id="graphPlayBtn" title="Play from selected beat">▶ Play</button>' +
+            '<button type="button" class="btn btn-sm" id="addBoundaryBtn" title="Split the graph into publishable chapters">+ Chapter boundary</button>' +
             '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate</button>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
             '<button type="button" class="btn btn-sm btn-primary" id="graphSaveBtn" disabled>Save</button>' +
@@ -617,6 +618,7 @@
             '<button type="button" class="btn btn-sm" id="mobileBlocksBtn" aria-expanded="false">Blocks</button>' +
             '<button type="button" class="btn btn-sm" id="mobilePlayBtn" aria-expanded="false">Play</button>' +
             '<button type="button" class="btn btn-sm" id="mobileInspectorBtn" aria-expanded="false">Inspector</button>' +
+            '<button type="button" class="btn btn-sm" id="mobileBoundaryBtn">Chapter</button>' +
             '<button type="button" class="btn btn-sm" id="mobileAssetsBtn" aria-expanded="false">Assets</button>' +
             '<button type="button" class="btn btn-sm" id="mobileValidateBtn">Validate</button>' +
             '<button type="button" class="btn btn-sm btn-primary" id="mobileSaveBtn">Save</button>' +
@@ -701,7 +703,7 @@
     this.saveStatusEl = this.container.querySelector("#graphSaveStatus");
     this.saveBtn = this.container.querySelector("#graphSaveBtn");
     this.boundariesLayer = this.container.querySelector("#graphBoundaries");
-    this.boundaryBtn = null;
+    this.boundaryBtn = this.container.querySelector("#addBoundaryBtn");
     this.episodeContextBtn = null;
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
@@ -711,6 +713,7 @@
     this.mobilePlayBtn = this.container.querySelector("#mobilePlayBtn");
     this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
     this.mobileInspectorBtn = this.container.querySelector("#mobileInspectorBtn");
+    this.mobileBoundaryBtn = this.container.querySelector("#mobileBoundaryBtn");
     this.mobileAssetsBtn = this.container.querySelector("#mobileAssetsBtn");
     this.mobileValidateBtn = this.container.querySelector("#mobileValidateBtn");
     this.mobileSaveBtn = this.container.querySelector("#mobileSaveBtn");
@@ -757,6 +760,12 @@
 
     if (this.boundaryBtn) {
       this.boundaryBtn.addEventListener("click", function () {
+        self.toggleBoundaryPlacement();
+      });
+    }
+
+    if (this.mobileBoundaryBtn) {
+      this.mobileBoundaryBtn.addEventListener("click", function () {
         self.toggleBoundaryPlacement();
       });
     }
@@ -1011,7 +1020,6 @@
     var self = this;
     var applyTap = function () {
       self.selectNode(pointer.node.id, { skipConfirm: true });
-      self.focusNodeInView(pointer.node);
       if (self.isMobileLayout()) self.setMobileDrawer("inspector");
     };
     var nodeWidth = pointer.isFlowGate ? 240 : ((pointer.isLogic || pointer.isKeyItem) ? 120 : 220);
@@ -1040,6 +1048,9 @@
     this.boundaryPlacementMode = !this.boundaryPlacementMode;
     if (this.boundaryBtn) {
       this.boundaryBtn.classList.toggle("is-active", this.boundaryPlacementMode);
+    }
+    if (this.mobileBoundaryBtn) {
+      this.mobileBoundaryBtn.classList.toggle("is-active", this.boundaryPlacementMode);
     }
     if (this.wrap) this.wrap.classList.toggle("is-boundary-mode", this.boundaryPlacementMode);
     this.setSaveStatus(this.boundaryPlacementMode
@@ -1751,6 +1762,7 @@
     target.boundaryX = Math.round(x);
     this.boundaryPlacementMode = false;
     if (this.boundaryBtn) this.boundaryBtn.classList.remove("is-active");
+    if (this.mobileBoundaryBtn) this.mobileBoundaryBtn.classList.remove("is-active");
     if (this.wrap) this.wrap.classList.remove("is-boundary-mode");
     this.selectedBoundaryId = target.id;
     this.syncEpisodeGraphState();
@@ -2685,6 +2697,16 @@
         e.stopPropagation();
         e.preventDefault();
         self.armNodePointer(node, el, e.clientX, e.clientY, nodeMeta);
+      });
+
+      el.addEventListener("dblclick", function (e) {
+        if (self.shouldIgnoreMouse()) return;
+        if (e.target.closest(".graph-port")) return;
+        e.stopPropagation();
+        e.preventDefault();
+        self.pendingNodePointer = null;
+        self.selectNode(node.id, { skipConfirm: true });
+        self.focusNodeInView(node);
       });
 
       el.addEventListener("touchstart", function (e) {
