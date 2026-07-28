@@ -1052,8 +1052,8 @@ body.is-resizing-binder {
   overflow: hidden;
   background: #1a1a1a;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
-  /* Font size uses the frame's own width via children — see .preview-content / fitted JS. */
-  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
+  /* Design root scales with playfield width (18px at 1920). JS fit overrides when fitted. */
+  font-size: calc(18px * 100cqw / 1920 * var(--ui-dialogue-scale, 1));
   --preview-aspect-w: 16;
   --preview-aspect-h: 9;
   --ui-dialogue-bg: rgba(0, 0, 0, 0.75);
@@ -1071,12 +1071,14 @@ body.is-resizing-binder {
   aspect-ratio: unset;
   max-width: none;
   max-height: none;
+  font-size: var(--playfield-font, 18px);
 }
 
-/* Size type against the playfield itself, not the outer viewport. */
-.preview-frame > .preview-content,
-.preview-frame .player-story-inner {
-  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
+/* Fitted playfield: children inherit the JS root font (scales with width). */
+.preview-frame--fitted > .preview-content,
+.preview-frame--fitted .player-story-inner,
+.player-story-inner.preview-frame--fitted {
+  font-size: inherit;
 }
 
 .preview-content {
@@ -1727,8 +1729,8 @@ body.is-resizing-center {
   overflow: hidden;
   background: #1a1a1a;
   box-shadow: none;
-  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
   container-type: inline-size;
+  font-size: calc(18px * 100cqw / 1920 * var(--ui-dialogue-scale, 1));
   --preview-aspect-w: 16;
   --preview-aspect-h: 9;
   --ui-dialogue-bg: rgba(0, 0, 0, 0.75);
@@ -1995,7 +1997,9 @@ body.is-resizing-center {
   z-index: 1;
   font-size: var(--ui-dialogue-font-size, 100%);
 }
-.ui-mock-frame[data-bestfit-dialogue="1"] .ui-mock-dialogue-text { font-size: clamp(0.8rem, 1.1vw, 1.1rem); }
+.ui-mock-frame[data-bestfit-dialogue="1"] .ui-mock-dialogue-text {
+  font-size: var(--ui-dialogue-font-size, 100%);
+}
 .ui-mock-nameplate {
   position: relative;
   isolation: isolate;

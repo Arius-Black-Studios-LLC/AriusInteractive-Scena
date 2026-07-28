@@ -2504,7 +2504,7 @@
     /**
      * Letterbox el into viewport at a fixed aspect (default 16:9 / 1920×1080).
      * Sets exact pixel size so UI % and stage art never warp when the pane resizes.
-     * Font size is derived from the fitted width (not the outer viewport).
+     * Root font tracks playfield width so dialogue/nameplate scale with the stage.
      */
     fitPlayfield: function (el, viewportEl, opts) {
       opts = opts || {};
@@ -2518,18 +2518,24 @@
       var scale = Math.min(pw / aw, ph / ah);
       var w = Math.max(1, Math.floor(aw * scale));
       var h = Math.max(1, Math.floor(ah * scale));
-      var dialogueScale = parseFloat(el.style.getPropertyValue("--ui-dialogue-scale")) || 1;
+      var dialogueScale = parseFloat(getComputedStyle(el).getPropertyValue("--ui-dialogue-scale")) || 1;
+      if (!isFinite(dialogueScale) || dialogueScale <= 0) dialogueScale = 1;
+      /* Design root: 18px at 1920-wide playfield — scales linearly with width. */
+      var designW = 1920;
+      var rootPx = 18 * (w / designW) * dialogueScale;
       el.style.width = w + "px";
       el.style.height = h + "px";
       el.style.maxWidth = "none";
       el.style.maxHeight = "none";
       el.style.aspectRatio = "unset";
       el.style.flex = "0 0 auto";
-      el.style.fontSize = ((7 + 0.52 * (w / 100)) * dialogueScale).toFixed(3) + "px";
+      el.style.setProperty("--playfield-font", rootPx.toFixed(3) + "px");
+      el.style.setProperty("--playfield-scale", (w / designW).toFixed(5));
+      el.style.fontSize = rootPx.toFixed(3) + "px";
       el.classList.add("preview-frame--fitted");
       el.dataset.playfieldW = String(w);
       el.dataset.playfieldH = String(h);
-      return { width: w, height: h, scale: scale };
+      return { width: w, height: h, scale: scale, fontSize: rootPx };
     },
 
     bindPlayfieldFit: function (el, viewportEl, opts) {

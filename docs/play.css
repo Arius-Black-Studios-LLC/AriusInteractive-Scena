@@ -106,13 +106,14 @@
   height: auto;
   max-height: none;
   aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
-  font-size: calc((7px + 0.52cqw) * var(--ui-dialogue-scale, 1));
+  font-size: calc(18px * min(100cqw, 100%) / 1920 * var(--ui-dialogue-scale, 1));
 }
 
 #playerRoot .player-story--reading .player-story-inner.preview-frame--fitted {
   aspect-ratio: unset;
   max-width: none;
   max-height: none;
+  font-size: var(--playfield-font, 18px);
 }
 
 .player-story--discuss-hint::after {

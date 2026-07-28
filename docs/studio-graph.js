@@ -1067,6 +1067,12 @@
       return;
     }
     this.panelCenter.style.setProperty("--preview-ratio", String(this.previewRatio));
+    var self = this;
+    requestAnimationFrame(function () {
+      if (self.previewEl && self.previewViewport && window.ScenaStore && ScenaStore.fitPlayfield) {
+        ScenaStore.fitPlayfield(self.previewEl, self.previewViewport, { pad: 0 });
+      }
+    });
   };
 
   ScenaGraphEditor.prototype.markTouchPointer = function () {
