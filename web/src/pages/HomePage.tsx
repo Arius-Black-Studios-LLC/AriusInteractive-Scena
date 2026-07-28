@@ -4,11 +4,11 @@ import { SeriesCard } from "../components/SeriesCard";
 import { useAuth } from "../context/AuthContext";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import { mountHomepageReviews } from "../legacy/adapters";
+import { FeaturedPicks, type FeaturedEntry } from "../components/FeaturedPicks";
 import { JamHomeFeed } from "../components/JamHomeFeed";
 import {
   ADULT_GENRE_FILTERS,
   CATEGORY_SECTIONS,
-  DEMO_SERIES,
   GENRE_FILTERS,
   entriesForCategory,
   type CatalogEntryExt,
@@ -44,7 +44,8 @@ export function HomePage() {
   const [filter, setFilter] = useState("all");
   const [adultFilter, setAdultFilter] = useState("all_adult");
   const [search, setSearch] = useState("");
-  const [entries, setEntries] = useState<CatalogEntryExt[]>(DEMO_SERIES);
+  const [entries, setEntries] = useState<CatalogEntryExt[]>([]);
+  const [featuredPicks, setFeaturedPicks] = useState<FeaturedEntry[]>([]);
   const [viewerIsAdult, setViewerIsAdult] = useState(false);
   const [jamSpotlight, setJamSpotlight] = useState<JamHomeSpotlight>({
     featured: null,
@@ -53,8 +54,8 @@ export function HomePage() {
   const [heroWordIdx, setHeroWordIdx] = useState(0);
   const [heroWordChanging, setHeroWordChanging] = useState(false);
   const [stats, setStats] = useState<HeroStats>({
-    liveSeries: DEMO_SERIES.length,
-    episodes: 4,
+    liveSeries: 0,
+    episodes: 0,
     chaptersRead: 0,
   });
 
@@ -88,9 +89,10 @@ export function HomePage() {
 
     Promise.all([
       window.ScenaCatalog.listDiscover(userId),
+      window.ScenaCatalog.listFeatured?.(userId) ?? Promise.resolve([]),
       window.ScenaCatalog.fetchReaderStats(),
     ])
-      .then(([list, cloudStats]) => {
+      .then(([list, featured, cloudStats]) => {
         const readerBundle = window.ScenaCatalog!.enrichReaderStats(list, cloudStats) as {
           entries?: CatalogEntryExt[];
           chaptersReadThisWeek?: number;
@@ -100,20 +102,25 @@ export function HomePage() {
           mapEntry(entry as CatalogEntryExt & { readersThisWeekLabel?: string; liveCount?: number }),
         );
 
-        if (rows.length) setEntries(rows);
+        setEntries(rows);
+        setFeaturedPicks(
+          (featured || []).map((entry) => mapEntry(entry as CatalogEntryExt)) as FeaturedEntry[],
+        );
 
         const episodeTotal = (list || []).reduce(
           (sum, entry) => sum + ((entry as { liveCount?: number }).liveCount || 0),
           0,
         );
         setStats({
-          liveSeries: list.length || DEMO_SERIES.length,
-          episodes: episodeTotal || 4,
+          liveSeries: list.length,
+          episodes: episodeTotal,
           chaptersRead: readerBundle.chaptersReadThisWeek || 0,
         });
       })
       .catch(() => {
-        /* keep demo fallback */
+        setEntries([]);
+        setFeaturedPicks([]);
+        setStats({ liveSeries: 0, episodes: 0, chaptersRead: 0 });
       });
   }, [ready, userId]);
 
@@ -136,6 +143,11 @@ export function HomePage() {
     if (!ready) return;
     mountHomepageReviews("creatorReviewsMount");
   }, [ready]);
+
+  const safeFeatured = useMemo(
+    () => featuredPicks.filter((e) => viewerIsAdult || !e.isAgeRestricted),
+    [featuredPicks, viewerIsAdult],
+  );
 
   const safeEntries = useMemo(
     () => entries.filter((e) => viewerIsAdult || !e.isAgeRestricted),
@@ -221,39 +233,7 @@ export function HomePage() {
         </section>
       </div>
 
-      <section className="section container" id="featured">
-        <div className="section-head section-head--center">
-          <h2>Featured</h2>
-          <span className="section-meta">Staff picks</span>
-        </div>
-        <div className="featured-grid">
-          <Link className="featured-card featured-card--hero" to="/series?series=signal-lost">
-            <div className="featured-visual featured-visual--c">
-              <span className="badge">Read free</span>
-            </div>
-            <div className="featured-body">
-              <div className="featured-eyebrow">Editor&apos;s pick</div>
-              <h3 className="featured-title">Signal Lost</h3>
-              <p className="featured-desc">
-                A sci-fi mystery aboard Kerberos-9 — comms dead, crew uneasy, and something
-                knocking inside the hull.
-              </p>
-              <p className="featured-meta">by Lotus Wave · 2 chapters · ~10 min each</p>
-            </div>
-          </Link>
-          <div className="featured-side">
-            <Link className="featured-card featured-card--side" to="/series?series=cafe-at-sunset">
-              <div className="featured-visual featured-visual--b" />
-              <div className="featured-body">
-                <h3 className="featured-title">Café at Sunset</h3>
-                <p className="featured-desc">
-                  Two playable chapters of cozy romance and too much matcha.
-                </p>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <FeaturedPicks picks={safeFeatured} />
 
       <JamHomeFeed spotlight={jamSpotlight} />
 
@@ -319,7 +299,11 @@ export function HomePage() {
           {filtered.length ? (
             filtered.map((entry) => <SeriesCard key={entry.id} entry={entry} />)
           ) : (
-            <p className="empty-state">No series match that filter.</p>
+            <p className="empty-state">
+              {safeEntries.length
+                ? "No series match that filter."
+                : "No published series yet. Publish yours in Studio."}
+            </p>
           )}
         </div>
       </section>

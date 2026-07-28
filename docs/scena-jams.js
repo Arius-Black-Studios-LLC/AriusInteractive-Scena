@@ -366,7 +366,15 @@
       return matureKeys.indexOf(key) >= 0;
     });
     jam.ageRestricted = !!(jam.ageRestricted || (jam.contentFlags || []).length > 0);
-    if (!jam.jamType) jam.jamType = "game";
+    if (!jam.jamType) {
+      if (jam.requireFreeListing === true ||
+          (Array.isArray(jam.allowedCategories) && jam.allowedCategories.length > 0) ||
+          (jam.submissions || []).some(function (s) { return s.entryType === "asset" || s.listingId; })) {
+        jam.jamType = "asset";
+      } else {
+        jam.jamType = "game";
+      }
+    }
     if (!jam.assetSubmissionMode) jam.assetSubmissionMode = "either";
     if (!Array.isArray(jam.allowedCategories)) jam.allowedCategories = [];
     if (jam.requireFreeListing == null) jam.requireFreeListing = jam.jamType === "asset";
@@ -674,6 +682,45 @@
     })) {
       throw new Error("You already submitted this episode.");
     }
+  }
+
+  function validateAssetLibraryEntry(jam, userId, entry) {
+    if (!jam || jam.status !== "published") throw new Error("This jam is not accepting entries.");
+    if (!isAssetJam(jam)) throw new Error("This is a game jam — submit a published episode instead.");
+    if (jamPhase(jam) !== "submissions") throw new Error("Submissions are closed for this jam.");
+    if (!entry || !entry.id) throw new Error("Pick an asset from your library.");
+    if (entry.source !== "made") {
+      throw new Error("Only assets you created can be submitted — purchased assets cannot be entered.");
+    }
+    if (!entry.bundle) throw new Error("This library entry has no asset data.");
+    var cats = jam.allowedCategories || [];
+    if (cats.length && cats.indexOf(entry.category) < 0) {
+      throw new Error("This jam only accepts: " + cats.join(", ") + ".");
+    }
+    var mode = jam.assetSubmissionMode || "either";
+    if (mode === "existing_listing") {
+      throw new Error("This jam only accepts existing marketplace listings — publish your asset to the shop first.");
+    }
+    if ((jam.submissions || []).some(function (s) {
+      return s.userId === userId && s.libraryEntryId === entry.id;
+    })) {
+      throw new Error("You already submitted this library asset.");
+    }
+  }
+
+  function libraryEntryToAssetEntry(userId, profile, entry) {
+    return {
+      id: "sub_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+      entryType: "asset",
+      userId: userId,
+      userName: (profile && profile.displayName) || "Creator",
+      libraryEntryId: entry.id,
+      listingId: entry.listingId || null,
+      listingTitle: entry.title || "Untitled asset",
+      category: entry.category || "pack",
+      preview_data_url: entry.preview_data_url || "",
+      submittedAt: new Date().toISOString(),
+    };
   }
 
   function validateAssetListing(jam, userId, listing, opts) {
@@ -1085,6 +1132,33 @@
 
       var chain = Promise.resolve(null);
 
+      if (pick.directLibrary && pick.libraryEntryId) {
+        if (!window.ScenaAssetLibrary) {
+          return Promise.reject(new Error("Asset library unavailable."));
+        }
+        chain = ScenaAssetLibrary.get(userId, pick.libraryEntryId).then(function (entry) {
+          validateAssetLibraryEntry(jam, userId, entry);
+          return entry;
+        });
+        return chain.then(function (entry) {
+          var assetEntry = libraryEntryToAssetEntry(userId, profile, entry);
+          var payChain = contribute > 0
+            ? checkWalletBalance(userId, contribute).then(function () {
+                return walletSpend(userId, contribute, jam.id);
+              })
+            : Promise.resolve();
+          return payChain.then(function () {
+            if (contribute > 0) {
+              jam.prize = jam.prize || { contributions: {} };
+              jam.prize.contributions[userId] = (parseInt(jam.prize.contributions[userId], 10) || 0) + contribute;
+            }
+            jam.submissions = jam.submissions || [];
+            jam.submissions.push(assetEntry);
+            return saveJam(jam);
+          });
+        });
+      }
+
       if (pick.listing) {
         validateAssetListing(jam, userId, pick.listing, { viaExisting: true });
         chain = Promise.resolve(pick.listing);
@@ -1459,6 +1533,7 @@
     renderDetail: function (jam, ctx) {
       ctx = ctx || {};
       if (!jam) return "<p>Jam not found.</p>";
+      migrateJam(jam);
       var phase = jamPhase(jam);
       var pool = jam.prizeEnabled ? prizePoolTotal(jam) : 0;
       var isHost = ctx.userId && jam.hostUserId === ctx.userId;
@@ -1561,8 +1636,10 @@
           : "";
 
         if (isAssetJam(jam)) {
-          var libOpts = (ctx.libraryEntries || []).map(function (e) {
-            return '<option value="' + escapeAttr(e.id) + '">' + escapeHtml(e.title || "Untitled") + "</option>";
+          var libEntries = ctx.libraryEntries || [];
+          var libOpts = libEntries.map(function (e) {
+            return '<option value="' + escapeAttr(e.id) + '">' +
+              escapeHtml((e.title || "Untitled") + " · " + (e.category || "asset")) + "</option>";
           }).join("");
           var listOpts = (ctx.sellerListings || []).map(function (l) {
             return '<option value="' + escapeAttr(l.id) + '">' + escapeHtml(l.title || "Listing") + "</option>";
@@ -1570,15 +1647,27 @@
           var mode = jam.assetSubmissionMode || "either";
           var showPublish = mode !== "existing_listing";
           var showExisting = mode !== "new_listing";
+          var showDirect = mode !== "existing_listing";
           submitPanel =
             '<section class="form-section jam-submit-panel jam-submit-panel--asset">' +
               "<h2>Submit your asset</h2>" +
               ageWarn +
-              '<p class="field-hint">Publish an asset from your library or link an existing marketplace listing.</p>' +
+              '<p class="field-hint">Choose an asset you <strong>made</strong> in your library (Studio → Assets → My library). Purchased assets cannot be submitted.</p>' +
+              (showDirect
+                ? '<div class="jam-asset-submit-block" id="jamAssetLibraryBlock">' +
+                    '<h3 class="jam-asset-submit-subhead">From my library</h3>' +
+                    '<div class="field"><label>Library asset</label><select id="jamSubmitLibrary">' +
+                      (libOpts || '<option value="">No made assets yet — save one from the graph editor</option>') +
+                    "</select></div>" +
+                    '<p class="field-hint">Save characters, stages, or packs to <strong>My library</strong> from the story editor, then pick them here.</p>' +
+                    '<button type="button" class="btn btn-primary" id="jamSubmitAssetDirectBtn"' +
+                      (libOpts ? "" : " disabled") + ">Submit asset</button>" +
+                  "</div>"
+                : "") +
               (showPublish
                 ? '<div class="jam-asset-submit-block" id="jamAssetPublishBlock">' +
-                    '<h3 class="jam-asset-submit-subhead">Publish from library</h3>' +
-                    '<div class="field"><label>Library asset</label><select id="jamSubmitLibrary">' +
+                    '<h3 class="jam-asset-submit-subhead">Publish to shop &amp; submit</h3>' +
+                    '<div class="field"><label>Library asset</label><select id="jamSubmitLibraryPublish">' +
                       (libOpts || '<option value="">No made assets in library</option>') +
                     "</select></div>" +
                     '<div class="field"><label>Listing title</label><input type="text" id="jamSubmitAssetTitle" maxlength="80" placeholder="Title for the shop listing"></div>' +
@@ -1586,12 +1675,13 @@
                     (jam.requireFreeListing
                       ? '<p class="field-hint">This jam requires free listings (0 Ducats).</p>'
                       : "") +
-                    '<button type="button" class="btn btn-primary" id="jamSubmitAssetPublishBtn">Publish &amp; submit</button>' +
+                    '<button type="button" class="btn btn-secondary" id="jamSubmitAssetPublishBtn"' +
+                      (libOpts ? "" : " disabled") + ">Publish &amp; submit</button>" +
                   "</div>"
                 : "") +
               (showExisting
                 ? '<div class="jam-asset-submit-block" id="jamAssetExistingBlock">' +
-                    '<h3 class="jam-asset-submit-subhead">Existing listing</h3>' +
+                    '<h3 class="jam-asset-submit-subhead">Existing shop listing</h3>' +
                     '<div class="field"><label>Your live listing</label><select id="jamSubmitListing">' +
                       (listOpts || '<option value="">No listings yet</option>') +
                     "</select></div>" +

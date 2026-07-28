@@ -1943,7 +1943,12 @@
           if (window.ScenaAssetLibrary) {
             assetLoads.push(
               ScenaAssetLibrary.list(userId, { source: "made" }).then(function (rows) {
-                detailCtx.libraryEntries = rows || [];
+                rows = rows || [];
+                var cats = jam.allowedCategories || [];
+                if (cats.length) {
+                  rows = rows.filter(function (e) { return cats.indexOf(e.category) >= 0; });
+                }
+                detailCtx.libraryEntries = rows;
               })
             );
           }
@@ -2112,6 +2117,7 @@
 
   function bindJamDetail(root, jam, seriesList, detailCtx) {
     detailCtx = detailCtx || {};
+    var isAssetJam = window.ScenaJams && ScenaJams.isAssetJam(jam);
     var publishBtn = $("#jamPublishBtn", root);
     if (publishBtn) {
       publishBtn.addEventListener("click", function () {
@@ -2177,13 +2183,13 @@
           escapeHtml(ep.title || ("Episode " + (ep.number || ""))) + "</option>";
       }).join("");
     }
-    if (seriesSel) {
+    if (!isAssetJam && seriesSel) {
       paintEpisodes();
       seriesSel.addEventListener("change", paintEpisodes);
     }
 
     var submitBtn = $("#jamSubmitBtn", root);
-    if (submitBtn) {
+    if (!isAssetJam && submitBtn) {
       submitBtn.addEventListener("click", function () {
         var sid = seriesSel && seriesSel.value;
         var eid = epSel && epSel.value;
@@ -2211,11 +2217,41 @@
     }
 
     var libSel = $("#jamSubmitLibrary", root);
+    var libPublishSel = $("#jamSubmitLibraryPublish", root);
     var libTitle = $("#jamSubmitAssetTitle", root);
+    var directAssetBtn = $("#jamSubmitAssetDirectBtn", root);
+    if (directAssetBtn) {
+      directAssetBtn.addEventListener("click", function () {
+        var entryId = libSel && libSel.value;
+        if (!entryId) {
+          toast("Pick a library asset first.");
+          return;
+        }
+        var contribEl = $("#jamSubmitContrib", root);
+        directAssetBtn.disabled = true;
+        ScenaJams.submitAssetEntry(userId, userProfile, jam.id, {
+          libraryEntryId: entryId,
+          directLibrary: true,
+          contribution: contribEl ? contribEl.value : 0,
+        }).then(function () {
+          toast("Asset submitted!");
+          render();
+        }).catch(function (err) {
+          directAssetBtn.disabled = false;
+          if (!handleJamNeedDucats(root, err, function () {
+            directAssetBtn.click();
+          })) {
+            toast((err && err.message) || "Could not submit asset.");
+          }
+        });
+      });
+    }
+
     var publishAssetBtn = $("#jamSubmitAssetPublishBtn", root);
     if (publishAssetBtn) {
       publishAssetBtn.addEventListener("click", function () {
-        var entryId = libSel && libSel.value;
+        var entryId = libPublishSel && libPublishSel.value;
+        if (!entryId && libSel) entryId = libSel.value;
         if (!entryId) {
           toast("Pick a library asset first.");
           return;
@@ -2275,6 +2311,12 @@
     if (libSel && libTitle) {
       libSel.addEventListener("change", function () {
         var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === libSel.value; });
+        if (entry && !libTitle.value.trim()) libTitle.value = entry.title || "";
+      });
+    }
+    if (libPublishSel && libTitle) {
+      libPublishSel.addEventListener("change", function () {
+        var entry = (detailCtx.libraryEntries || []).find(function (e) { return e.id === libPublishSel.value; });
         if (entry && !libTitle.value.trim()) libTitle.value = entry.title || "";
       });
     }

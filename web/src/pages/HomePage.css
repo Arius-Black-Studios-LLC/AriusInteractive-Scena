@@ -222,6 +222,12 @@
   align-items: start;
 }
 
+.featured-grid--solo {
+  grid-template-columns: 1fr;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
 .featured-card {
   display: flex;
   flex-direction: column;

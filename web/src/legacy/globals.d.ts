@@ -18,9 +18,17 @@ export type CatalogEntry = {
   chaptersReadThisWeekLabel?: string;
   thumbStyle?: string;
   thumbnailDataUrl?: string;
+  bannerDataUrl?: string;
   isDemo?: boolean;
   genreKeys?: string[];
   isAgeRestricted?: boolean;
+  featured?: boolean;
+  featuredOrder?: number | null;
+  featuredEyebrow?: string;
+  creatorName?: string;
+  liveCount?: number;
+  ownerId?: string | null;
+  updatedAt?: string;
 };
 
 declare global {
@@ -48,10 +56,15 @@ declare global {
     };
     ScenaCatalog?: {
       listDiscover: (userId: string | null) => Promise<CatalogEntry[]>;
+      listFeatured?: (
+        userId: string | null,
+        opts?: { limit?: number },
+      ) => Promise<CatalogEntry[]>;
       resolveSeries: (seriesId: string, userId: string | null) => Promise<unknown>;
       fetchReaderStats: () => Promise<unknown>;
       enrichReaderStats: (entries: CatalogEntry[], stats: unknown) => unknown;
       renderDiscoverGrid?: (el: HTMLElement, entries: CatalogEntry[], bundle: unknown) => void;
+      renderFeaturedGrid?: (el: HTMLElement, entries: CatalogEntry[]) => void;
     };
     ScenaJams?: {
       listHomeSubmissionFeed: (opts: Record<string, unknown>) => Promise<{
