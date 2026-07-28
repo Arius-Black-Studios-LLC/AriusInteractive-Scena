@@ -566,6 +566,21 @@
     el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
     el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
     el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    var menuPos = layout.menu || { x: 92, y: 4 };
+    el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
+    el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
+    el.style.setProperty("--ui-layout-menu-right", "auto");
+    var menuCfg = ui.menu || {};
+    var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
+    el.style.setProperty("--ui-menu-panel-w", panelW + "%");
+    if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
+    if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
+    var accent = String(ui.colors.accent || "#2a9d8f");
+    var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (rgb) {
+      el.style.setProperty("--ui-accent-rgb",
+        parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
+    }
     el.classList.add("preview-frame--laid-out");
     this.initReaderMenu();
     if (this.readerMenu) {

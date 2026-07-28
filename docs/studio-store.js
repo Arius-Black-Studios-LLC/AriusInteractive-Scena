@@ -823,6 +823,10 @@
         showAudioSettings: true,
         inventoryDisplay: "grid",
         showInventoryHud: false,
+        panelSide: "right",
+        panelWidth: 42,
+        panelBg: "#12100e",
+        panelText: "#f5f0e6",
       },
     };
   }

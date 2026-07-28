@@ -1501,6 +1501,7 @@ body.is-resizing-center {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 
 .game-ui-mock-toolbar {
@@ -1510,6 +1511,14 @@ body.is-resizing-center {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.game-ui-mock-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .game-ui-inspector { overflow: auto; }
@@ -1522,9 +1531,12 @@ body.is-resizing-center {
   border-top: 1px solid var(--scena-border);
 }
 
+/* Stage is a size container so the mock frame can fit the series aspect ratio
+   the same way the in-game player does (never stretch free-form). */
 .ui-mock-stage {
   width: 100%;
   flex: 1;
+  min-height: 360px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1534,12 +1546,17 @@ body.is-resizing-center {
     repeating-conic-gradient(#1a1d22 0% 25%, #15181c 0% 50%) 0 0 / 20px 20px,
     #12151a;
   border: 1px solid var(--scena-border);
-  min-height: 420px;
+  container-type: size;
+  container-name: ui-mock-stage;
 }
 
-.ui-mock-frame {
+.ui-mock-frame.preview-frame {
   position: relative;
-  width: min(100%, 640px);
+  /* Match .preview-frame fit-inside-box; override any fixed max-width mock sizing */
+  width: min(100cqw, calc(100cqh * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)));
+  height: min(100cqh, calc(100cqw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16)));
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
   overflow: hidden;
   background: #1a1a1a;
@@ -1554,6 +1571,9 @@ body.is-resizing-center {
   --ui-choice-border: rgba(255, 255, 255, 0.15);
   --ui-speaker: #2a9d8f;
   --ui-corner-radius: 6px;
+  --ui-menu-panel-bg: rgba(18, 16, 14, 0.96);
+  --ui-menu-panel-text: #f5f0e6;
+  --ui-menu-panel-w: 42%;
 }
 
 .ui-mock-bg {
@@ -1582,6 +1602,7 @@ body.is-resizing-center {
 .ui-mock-menu {
   left: 92%;
   top: 4%;
+  z-index: 5;
   width: 2rem;
   height: 2rem;
   display: inline-flex;
@@ -1597,6 +1618,59 @@ body.is-resizing-center {
 .ui-mock-menu.is-hidden-ui {
   opacity: 0.35;
   border-style: dashed;
+}
+
+.ui-mock-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: none;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+.ui-mock-frame.is-menu-open .ui-mock-menu-backdrop {
+  display: flex;
+}
+.ui-mock-menu-backdrop[data-side="left"] {
+  justify-content: flex-start;
+}
+.ui-mock-menu-panel {
+  width: var(--ui-menu-panel-w, 42%);
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-menu-panel-bg, rgba(18, 16, 14, 0.96));
+  color: var(--ui-menu-panel-text, #f5f0e6);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+  cursor: default;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.ui-mock-menu-backdrop[data-side="left"] .ui-mock-menu-panel {
+  border-left: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+}
+.ui-mock-menu-panel.is-selected {
+  outline-color: var(--scena-accent, #2a9d8f);
+}
+.ui-mock-menu-panel .player-menu-header,
+.ui-mock-menu-panel .player-menu-tabs,
+.ui-mock-menu-panel .player-menu-body {
+  pointer-events: none;
+}
+.ui-mock-menu-close {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.ui-mock-menu-panel .player-menu-tab.is-active {
+  background: color-mix(in srgb, var(--ui-accent, #2a9d8f) 28%, transparent);
+  color: #fff8e8;
 }
 
 .ui-mock-nameplate {

@@ -32,6 +32,18 @@ const POSTS = {
   ],
   publishing: [
     {
+      href: "/blog/promote-visual-novel-with-game-jams.html",
+      tag: "Growth",
+      title: "Promote your visual novel for free with game jams",
+      desc: "Discover promotion, free-to-read hooks during jams, and a playbook for turning jam readers into series fans.",
+    },
+    {
+      href: "/blog/how-indie-visual-novel-creators-make-money.html",
+      tag: "Monetization",
+      title: "How indie visual novel creators make money",
+      desc: "Arleco marketplace & chapters vs itch, Steam, and Patreon — pros, cons, and why early creators shape the ecosystem.",
+    },
+    {
       href: "/blog/publish-interactive-fiction-online.html",
       tag: "Publishing",
       title: "How to publish interactive fiction online (without building an app)",

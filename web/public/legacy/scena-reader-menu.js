@@ -131,6 +131,9 @@
       return;
     }
     this.menuBtn.hidden = false;
+    if (this.menuBackdrop) {
+      this.menuBackdrop.setAttribute("data-side", menu.panelSide === "left" ? "left" : "right");
+    }
     this.renderTabs();
     if (this.menuOpen) this.renderBody();
     this.renderKeyItemsHud();
