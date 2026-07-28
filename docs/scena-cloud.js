@@ -498,7 +498,7 @@
 
       return uploadDataUrl(userId, seriesId, category, assetId, dataUrl).catch(function (err) {
 
-        if ((isBucketMissingError(err) || isStoragePolicyError(err)) && isInlineImage(dataUrl)) {
+        if (isInlineImage(dataUrl)) {
 
           return dataUrl;
 

@@ -14,6 +14,14 @@
   var useIdb = typeof indexedDB !== "undefined";
   var cloudUserId = null;
   var activeSeriesId = null;
+  var lastUploadWarning = null;
+  var lastUploadMeta = null;
+
+  function noteLocalUploadFallback() {
+    lastUploadWarning =
+      "Image saved in this browser only — cloud storage upload failed. " +
+      "Your art is still in the project. If this keeps happening, run docs/supabase-cloud-setup.sql in Supabase.";
+  }
 
   function uid() {
     return "s_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
@@ -150,50 +158,130 @@
     });
   }
 
+  function dataUrlByteLength(dataUrl) {
+    if (!dataUrl || dataUrl.indexOf("data:") !== 0) return 0;
+    var base64 = dataUrl.split(",")[1] || "";
+    return Math.ceil(base64.length * 0.75);
+  }
+
+  function imageHasAlpha(ctx, width, height) {
+    try {
+      var sampleW = Math.min(width, 96);
+      var sampleH = Math.min(height, 96);
+      var data = ctx.getImageData(0, 0, sampleW, sampleH).data;
+      for (var i = 3; i < data.length; i += 4) {
+        if (data[i] < 250) return true;
+      }
+    } catch (e) {
+      return false;
+    }
+    return false;
+  }
+
   function compressionOptions(purpose) {
     if (purpose === "stage-bg" || purpose === "stage-mg") {
-      return { maxDim: 1920, quality: 0.8, forceJpeg: true };
+      return { maxDim: 1920, quality: 0.82, forceJpeg: true, maxBytes: 900 * 1024 };
     }
     if (purpose === "stage-fg") {
-      return { maxDim: 1920, quality: 0.92, forceJpeg: false };
+      return { maxDim: 1920, quality: 0.88, forceJpeg: false, maxBytes: 900 * 1024 };
     }
     if (purpose === "sprite") {
-      return { maxDim: 1280, quality: 0.82, forceJpeg: false };
+      return { maxDim: 1280, quality: 0.85, forceJpeg: false, maxBytes: 650 * 1024 };
     }
     if (purpose === "thumb" || purpose === "banner") {
-      return { maxDim: 960, quality: 0.85, forceJpeg: true };
+      return { maxDim: 960, quality: 0.85, forceJpeg: true, maxBytes: 450 * 1024 };
     }
-    return { maxDim: 1280, quality: 0.82, forceJpeg: false };
+    return { maxDim: 1280, quality: 0.82, forceJpeg: false, maxBytes: 650 * 1024 };
   }
 
   function compressImageDataUrl(dataUrl, file, opts) {
     opts = opts || {};
     var maxDim = opts.maxDim || 1280;
-    var quality = opts.quality || 0.82;
+    var maxBytes = opts.maxBytes || 650 * 1024;
     var forceJpeg = opts.forceJpeg || false;
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       var img = new Image();
       img.onload = function () {
-        var w = img.width;
-        var h = img.height;
-        var scale = Math.min(1, maxDim / Math.max(w, h));
-        var canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(w * scale));
-        canvas.height = Math.max(1, Math.round(h * scale));
-        var ctx = canvas.getContext("2d");
-        var mime = forceJpeg ? "image/jpeg" : (file && file.type === "image/png" ? "image/png" : "image/jpeg");
-        if (mime === "image/jpeg") {
-          ctx.fillStyle = "#000000";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        var srcW = img.width;
+        var srcH = img.height;
+        if (!srcW || !srcH) {
+          reject(new Error("Could not read image dimensions."));
+          return;
         }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        try {
-          resolve(canvas.toDataURL(mime, mime === "image/jpeg" ? quality : undefined));
-        } catch (e) {
-          resolve(dataUrl);
+
+        var dimScale = Math.min(1, maxDim / Math.max(srcW, srcH));
+        var best = null;
+        var bestBytes = Infinity;
+        var qualitySteps = [0.88, 0.82, 0.76, 0.7, 0.62, 0.54, 0.46];
+
+        for (var pass = 0; pass < 8; pass++) {
+          var scale = dimScale * Math.pow(0.88, pass);
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(srcW * scale));
+          canvas.height = Math.max(1, Math.round(srcH * scale));
+          if (canvas.width < 64 || canvas.height < 64) break;
+
+          var ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Could not process image."));
+            return;
+          }
+
+          if (forceJpeg) {
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          var usePng = !forceJpeg && (
+            (file && file.type === "image/png") || imageHasAlpha(ctx, canvas.width, canvas.height)
+          );
+          var mime = usePng ? "image/png" : "image/jpeg";
+          var steps = usePng ? [undefined] : qualitySteps;
+
+          for (var qi = 0; qi < steps.length; qi++) {
+            var quality = steps[qi];
+            var encoded = null;
+            try {
+              encoded = canvas.toDataURL(mime, quality);
+            } catch (e) {
+              encoded = null;
+            }
+            if (!encoded) continue;
+            var bytes = dataUrlByteLength(encoded);
+            if (bytes < bestBytes) {
+              best = encoded;
+              bestBytes = bytes;
+            }
+            if (bytes <= maxBytes) {
+              resolve({
+                dataUrl: encoded,
+                width: canvas.width,
+                height: canvas.height,
+                bytes: bytes,
+                compressed: scale < 1 || bytes < dataUrlByteLength(dataUrl),
+              });
+              return;
+            }
+          }
         }
+
+        if (best) {
+          resolve({
+            dataUrl: best,
+            width: srcW,
+            height: srcH,
+            bytes: bestBytes,
+            compressed: true,
+          });
+          return;
+        }
+
+        reject(new Error("Could not compress this image. Try exporting a smaller PNG or JPG from your art app."));
       };
-      img.onerror = function () { resolve(dataUrl); };
+      img.onerror = function () {
+        reject(new Error("This file format is not supported in the browser. Export as PNG or JPG and try again."));
+      };
       img.src = dataUrl;
     });
   }
@@ -2123,6 +2211,26 @@
 
     isCloudEnabled: cloudEnabled,
 
+    consumeUploadWarning: function () {
+      var msg = lastUploadWarning;
+      lastUploadWarning = null;
+      return msg;
+    },
+
+    consumeUploadMeta: function () {
+      var meta = lastUploadMeta;
+      lastUploadMeta = null;
+      return meta;
+    },
+
+    formatUploadMeta: function (meta) {
+      if (!meta) return "";
+      var kb = Math.max(1, Math.round((meta.bytes || 0) / 1024));
+      var dim = meta.width && meta.height ? meta.width + "×" + meta.height : "";
+      if (dim) return dim + " · " + kb + " KB";
+      return kb + " KB";
+    },
+
     READER_UI_PRESETS: READER_UI_PRESETS,
     defaultReaderUi: defaultReaderUi,
 
@@ -2233,8 +2341,16 @@
           if (cloudEnabled() && cloudUserId && seriesId && window.ScenaCloud) {
             var assetId = ScenaCloud.newAssetId("audio");
             return ScenaCloud.uploadImage(cloudUserId, seriesId, "audio", assetId, dataUrl).then(function (url) {
+              if (typeof url === "string" && url.indexOf("data:") === 0) {
+                noteLocalUploadFallback();
+              }
               resolve({ dataUrl: url, mimeType: file.type || "audio/mpeg" });
             }).catch(function (err) {
+              if (typeof dataUrl === "string" && dataUrl.indexOf("data:") === 0) {
+                noteLocalUploadFallback();
+                resolve({ dataUrl: dataUrl, mimeType: file.type || "audio/mpeg" });
+                return;
+              }
               reject(err || new Error("Could not upload audio."));
             });
           }
@@ -2438,22 +2554,39 @@
       var opts = compressionOptions(purpose);
       return new Promise(function (resolve, reject) {
         if (!file) return reject(new Error("No file"));
-        if (file.size > 25 * 1024 * 1024) {
-          return reject(new Error("Image must be under 25 MB before upload."));
+        if (file.size > 80 * 1024 * 1024) {
+          return reject(new Error("Image is very large (over 80 MB). Export a PNG or JPG from your art app first."));
         }
         var reader = new FileReader();
         reader.onload = function () {
-          compressImageDataUrl(reader.result, file, opts).then(function (dataUrl) {
+          compressImageDataUrl(reader.result, file, opts).then(function (result) {
+            var dataUrl = result.dataUrl;
+            lastUploadMeta = {
+              width: result.width,
+              height: result.height,
+              bytes: result.bytes,
+              compressed: result.compressed,
+            };
             if (cloudEnabled() && cloudUserId && seriesId && window.ScenaCloud) {
               var category = purpose.replace(/[^a-z0-9-]/gi, "-") || "upload";
               var assetId = ScenaCloud.newAssetId(category);
-              return ScenaCloud.uploadImage(cloudUserId, seriesId, category, assetId, dataUrl).then(resolve).catch(function (err) {
+              return ScenaCloud.uploadImage(cloudUserId, seriesId, category, assetId, dataUrl).then(function (url) {
+                if (typeof url === "string" && url.indexOf("data:") === 0) {
+                  noteLocalUploadFallback();
+                }
+                resolve(url);
+              }).catch(function (err) {
+                if (typeof dataUrl === "string" && dataUrl.indexOf("data:") === 0) {
+                  noteLocalUploadFallback();
+                  resolve(dataUrl);
+                  return;
+                }
                 reject(err || new Error("Could not upload to cloud."));
               });
             }
             resolve(dataUrl);
-          }).catch(function () {
-            resolve(reader.result);
+          }).catch(function (err) {
+            reject(err || new Error("Could not process image."));
           });
         };
         reader.onerror = function () { reject(new Error("Could not read image file.")); };

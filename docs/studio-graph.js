@@ -3280,15 +3280,15 @@
     if (tab === "characters") {
       var profile = ScenaStore.getCharacter(this.series, id);
       if (!profile) { this.resourcesDetail.innerHTML = ""; return; }
-      var sprites = (profile.sprites || []).map(function (s) {
-        return '<div class="sprite-chip" style="background-image:url(' + (s.dataUrl || "") + ')"><span>' + escapeHtml(s.label) + '</span></div>';
+      var sprites = (profile.sprites || []).map(function (s, i) {
+        return '<div class="sprite-chip" data-sprite-idx="' + i + '"><span>' + escapeHtml(s.label) + '</span></div>';
       }).join("");
       html =
         '<h4>Character</h4>' +
         '<div class="field"><label>Name</label><input type="text" id="resCharName" value="' + escapeAttr(profile.name) + '"></div>' +
         '<div class="field"><label>Color</label><input type="color" id="resCharColor" value="' + escapeAttr(profile.color || "#888888") + '"></div>' +
         '<div class="field"><label>Sprites</label><div class="sprite-grid">' + (sprites || '<span class="field-hint">No sprites</span>') + '</div>' +
-        '<label class="btn btn-sm">+ Add sprite<input type="file" accept="image/*" hidden id="resSpriteUpload"></label></div>' +
+        '<label class="btn btn-sm">+ Add sprite<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden id="resSpriteUpload"></label></div>' +
         '<button type="button" class="btn btn-sm btn-danger" id="resDeleteChar">Delete character</button>' +
         '<button type="button" class="btn btn-sm btn-secondary" id="resSaveToLibrary">Save to my library</button>';
     } else if (tab === "stages") {
@@ -3366,6 +3366,7 @@
     this.resourcesDetail.innerHTML = html;
     var metricIdx = tab === "metrics" ? parseInt(String(id).replace("metric_", ""), 10) : NaN;
     this.bindResourceDetail(tab, id, metricIdx);
+    this.applyResourceImagePreviews(tab, id);
   };
 
   ScenaGraphEditor.prototype.renderKeyItemIconPicker = function (selectedUrl, pickerId) {
@@ -3420,23 +3421,70 @@
     });
   };
 
+  var IMAGE_UPLOAD_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,image/bmp,.png,.jpg,.jpeg,.webp,.gif,.bmp";
+
+  ScenaGraphEditor.prototype.notifyUploadResult = function (okMessage) {
+    var warn = ScenaStore.consumeUploadWarning && ScenaStore.consumeUploadWarning();
+    var meta = ScenaStore.consumeUploadMeta && ScenaStore.consumeUploadMeta();
+    var metaText = ScenaStore.formatUploadMeta ? ScenaStore.formatUploadMeta(meta) : "";
+    if (warn) {
+      this.setSaveStatus(warn);
+    } else if (okMessage) {
+      this.setSaveStatus(metaText ? okMessage + " (" + metaText + ")" : okMessage);
+    }
+  };
+
+  ScenaGraphEditor.prototype.applyResourceImagePreviews = function (tab, id) {
+    if (!this.resourcesDetail) return;
+    if (tab === "characters") {
+      var profile = ScenaStore.getCharacter(this.series, id);
+      if (!profile) return;
+      (profile.sprites || []).forEach(function (sprite, idx) {
+        var chip = this.resourcesDetail.querySelector('[data-sprite-idx="' + idx + '"]');
+        if (chip && sprite.dataUrl) chip.style.backgroundImage = "url(" + sprite.dataUrl + ")";
+      }, this);
+    } else if (tab === "stages") {
+      var bg = ScenaStore.getBackground(this.series, id);
+      if (!bg || !bg.layers) return;
+      ["bg", "mg", "fg"].forEach(function (layerKey) {
+        var el = this.resourcesDetail.querySelector('[data-layer-preview="' + layerKey + '"]');
+        var url = bg.layers[layerKey];
+        if (el && url) {
+          el.style.backgroundImage = "url(" + url + ")";
+          el.textContent = "";
+        }
+      }, this);
+    }
+  };
+
+  ScenaGraphEditor.prototype.spritePoseLabelFromFile = function (file) {
+    var base = (file && file.name ? file.name.replace(/\.[^.]+$/, "") : "") || "pose";
+    var label = window.prompt("Pose name (e.g. happy, angry):", base);
+    if (label === null) return null;
+    return (label.trim() || base).trim();
+  };
+
   ScenaGraphEditor.prototype.layerSlot = function (label, key, dataUrl) {
     return '<div class="layer-slot">' +
       '<span class="layer-slot-label">' + label + '</span>' +
-      '<div class="layer-slot-preview" style="' + (dataUrl ? "background-image:url(" + dataUrl + ")" : "") + '">' + (dataUrl ? "" : "+") + '</div>' +
-      '<label class="btn btn-sm">Upload<input type="file" accept="image/*" hidden data-layer-key="' + key + '"></label></div>';
+      '<div class="layer-slot-preview" data-layer-preview="' + key + '">' + (dataUrl ? "" : "+") + '</div>' +
+      '<label class="btn btn-sm">Upload<input type="file" accept="' + IMAGE_UPLOAD_ACCEPT + '" hidden data-layer-key="' + key + '"></label></div>';
   };
 
   ScenaGraphEditor.prototype.bindResourceDetail = function (tab, id, metricIdx) {
     var self = this;
 
-    function persist() {
+    function persist(done) {
       self.markDirty();
       self.renderResourcesPanel();
       if (!self.learnMode) {
         self.renderInspector();
         self.renderPreview();
-        self.saveNow();
+        self.saveNow().then(function (ok) {
+          if (typeof done === "function") done(ok);
+        });
+      } else if (typeof done === "function") {
+        done(true);
       }
     }
 
@@ -3457,13 +3505,18 @@
       var upload = this.resourcesDetail.querySelector("#resSpriteUpload");
       if (upload) upload.addEventListener("change", function () {
         var file = upload.files[0];
+        upload.value = "";
         if (!file) return;
-        var label = window.prompt("Pose name (e.g. happy, angry):", file.name.replace(/\.[^.]+$/, ""));
+        var label = self.spritePoseLabelFromFile(file);
         if (!label) return;
+        self.setSaveStatus("Uploading sprite…");
         ScenaStore.fileToDataUrl(file, { purpose: "sprite", seriesId: self.series.id }).then(function (url) {
+          if (!url) throw new Error("Upload returned empty image data.");
           profile.sprites = profile.sprites || [];
-          profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label.trim(), dataUrl: url });
-          persist();
+          profile.sprites.push({ id: ScenaStore.assetUid("sp"), label: label, dataUrl: url });
+          persist(function () {
+            self.notifyUploadResult("Sprite added");
+          });
         }).catch(function (err) {
           self.onSaveError((err && err.message) || "Could not upload sprite.");
         });
@@ -3486,12 +3539,17 @@
       this.resourcesDetail.querySelectorAll("[data-layer-key]").forEach(function (input) {
         input.addEventListener("change", function () {
           var file = input.files[0];
+          input.value = "";
           if (!file) return;
           var layerKey = input.getAttribute("data-layer-key");
+          self.setSaveStatus("Uploading layer…");
           ScenaStore.fileToDataUrl(file, { purpose: "stage-" + layerKey, seriesId: self.series.id }).then(function (url) {
+            if (!url) throw new Error("Upload returned empty image data.");
             if (!bg.layers) bg.layers = { bg: null, mg: null, fg: null };
             bg.layers[layerKey] = url;
-            persist();
+            persist(function () {
+              self.notifyUploadResult("Layer uploaded");
+            });
           }).catch(function (err) {
             self.onSaveError((err && err.message) || "Could not upload layer.");
           });
@@ -5658,17 +5716,27 @@
           return;
         }
         btn.disabled = true;
-        ScenaAssetLibrary.importToSeries(self.series, entryId, self.feedbackUserId).then(function (imported) {
-          if (!imported.ok) throw new Error("Could not import asset.");
+        ScenaAssetLibrary.get(self.feedbackUserId, entryId).then(function (entry) {
+          var importTab = "characters";
+          if (entry && entry.category === "stage") importTab = "stages";
+          else if (entry && entry.category === "audio") importTab = "audio";
+          else if (entry && entry.category === "item") importTab = "keyitems";
+          return ScenaAssetLibrary.importToSeries(self.series, entryId, self.feedbackUserId).then(function (imported) {
+            return { imported: imported, importTab: importTab };
+          });
+        }).then(function (payload) {
+          if (!payload.imported.ok) throw new Error("Could not import asset.");
           self.markDirty();
-          return self.saveNow(true);
-        }).then(function (ok) {
+          return self.saveNow(true).then(function (ok) {
+            return { ok: ok, importTab: payload.importTab };
+          });
+        }).then(function (result) {
           btn.disabled = false;
-          if (ok !== false) {
+          if (result.ok !== false) {
             self.setSaveStatus("Imported from your library.");
-            self.resourceTab = "characters";
+            self.resourceTab = result.importTab;
             self.container.querySelectorAll("[data-resource-tab]").forEach(function (b) {
-              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === "characters");
+              b.classList.toggle("is-active", b.getAttribute("data-resource-tab") === result.importTab);
             });
             var split = self.container.querySelector(".resources-split");
             if (split) split.classList.remove("resources-split--store");
