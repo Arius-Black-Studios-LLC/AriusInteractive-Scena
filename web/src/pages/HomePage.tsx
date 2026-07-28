@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { CreatorReviewsCarousel } from "../components/CreatorReviewsCarousel";
 import { LandingDemos } from "../components/LandingDemos";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import "./HomePage.css";
@@ -128,6 +129,8 @@ export function HomePage() {
       </div>
 
       <LandingDemos />
+
+      <CreatorReviewsCarousel />
 
       <section className="section container home-how-it-works">
         <div className="section-head section-head--center">

@@ -4,8 +4,6 @@ import { FeaturedPicks } from "../components/FeaturedPicks";
 import { JamHomeFeed } from "../components/JamHomeFeed";
 import { ADULT_GENRE_FILTERS, CATEGORY_SECTIONS, GENRE_FILTERS } from "../lib/catalog";
 import { useDiscoverData } from "../hooks/useDiscoverData";
-import { useEffect } from "react";
-import { mountHomepageReviews } from "../legacy/adapters";
 import "./HomePage.css";
 
 export function DiscoverPage() {
@@ -28,11 +26,6 @@ export function DiscoverPage() {
     viewerIsAdult,
     entriesForCategory,
   } = useDiscoverData();
-
-  useEffect(() => {
-    if (!ready) return;
-    mountHomepageReviews("creatorReviewsMount");
-  }, [ready]);
 
   return (
     <>
@@ -130,10 +123,6 @@ export function DiscoverPage() {
           </section>
         );
       })}
-
-      <section className="section container creator-reviews-section">
-        <div id="creatorReviewsMount" />
-      </section>
 
       <section className="section container" id="discover-browse">
         <div className="section-head section-head--center">
