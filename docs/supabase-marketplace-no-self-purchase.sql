@@ -1,6 +1,8 @@
--- Block sellers from purchasing their own marketplace listings.
--- Run in Supabase SQL Editor after supabase-marketplace.sql (safe to re-run).
+-- FULL SCRIPT — paste this entire file into Supabase SQL Editor (not just the IF line).
+-- 1) Blocks buying your own listing going forward
+-- 2) Removes past self-purchases and refunds Ducats spent on them
 
+-- ── A) Fix purchase RPC ─────────────────────────────────────────────────────
 create or replace function public.purchase_marketplace_listing(p_listing_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -51,7 +53,6 @@ begin
     );
   end if;
 
-  -- Prefer economics helper when present; fall back to 80% creator share.
   begin
     v_share := public._ducat_creator_share();
   exception when undefined_function then
@@ -145,3 +146,47 @@ begin
   );
 end;
 $$;
+
+-- ── B) Clean up past self-purchases + refund Ducats ─────────────────────────
+-- Preview first (optional):
+-- select mp.*, l.title, l.seller_id
+-- from public.marketplace_purchases mp
+-- join public.marketplace_listings l on l.id = mp.listing_id
+-- where mp.user_id = l.seller_id;
+
+do $$
+declare
+  r record;
+begin
+  for r in
+    select
+      mp.user_id,
+      mp.listing_id,
+      coalesce(mp.ducats_spent, 0) as spent
+    from public.marketplace_purchases mp
+    join public.marketplace_listings l on l.id = mp.listing_id
+    where mp.user_id = l.seller_id
+  loop
+    -- Refund Ducats spent on the silly self-buy
+    if r.spent > 0 then
+      update public.profiles
+      set ducat_balance = coalesce(ducat_balance, 0) + r.spent
+      where id = r.user_id;
+    end if;
+
+    -- Fix inflated purchase count
+    update public.marketplace_listings
+    set purchase_count = greatest(0, coalesce(purchase_count, 0) - 1),
+        updated_at = now()
+    where id = r.listing_id;
+
+    delete from public.marketplace_purchases
+    where user_id = r.user_id and listing_id = r.listing_id;
+  end loop;
+end $$;
+
+-- Verify nothing left:
+-- select count(*) as leftover_self_buys
+-- from public.marketplace_purchases mp
+-- join public.marketplace_listings l on l.id = mp.listing_id
+-- where mp.user_id = l.seller_id;

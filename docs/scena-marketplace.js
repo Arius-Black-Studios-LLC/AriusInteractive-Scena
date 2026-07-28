@@ -192,30 +192,61 @@
     var bundle = { characterProfiles: [], backgroundScenes: [], assets: [], metrics: [] };
     var preview = spec.previewDataUrl || "";
 
-    if (spec.characterId) {
-      var ch = ScenaStore.getCharacter(series, spec.characterId);
-      if (ch) {
-        bundle.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
-        preview = preview || ((ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "");
-      }
-    }
-    if (spec.stageId) {
-      var bg = ScenaStore.getBackground(series, spec.stageId);
-      if (bg) {
-        bundle.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
-        preview = preview || (bg.layers && bg.layers.bg) || "";
-      }
-    }
-    if (spec.assetId) {
-      var asset = ScenaStore.ensureAssets(series).find(function (a) { return a.id === spec.assetId; });
-      if (asset) {
-        bundle.assets.push(JSON.parse(JSON.stringify(asset)));
-        preview = preview || asset.dataUrl || "";
-      }
-    }
+    var characterIds = [];
+    if (Array.isArray(spec.characterIds)) characterIds = spec.characterIds.slice();
+    else if (spec.characterId) characterIds = [spec.characterId];
+
+    var stageIds = [];
+    if (Array.isArray(spec.stageIds)) stageIds = spec.stageIds.slice();
+    else if (spec.stageId) stageIds = [spec.stageId];
+
+    var assetIds = [];
+    if (Array.isArray(spec.assetIds)) assetIds = spec.assetIds.slice();
+    else if (spec.assetId) assetIds = [spec.assetId];
+
+    characterIds.forEach(function (id) {
+      var ch = ScenaStore.getCharacter(series, id);
+      if (!ch) return;
+      bundle.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
+      if (!preview) preview = (ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "";
+    });
+    stageIds.forEach(function (id) {
+      var bg = ScenaStore.getBackground(series, id);
+      if (!bg) return;
+      bundle.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
+      if (!preview) preview = (bg.layers && bg.layers.bg) || "";
+    });
+    assetIds.forEach(function (id) {
+      var asset = ScenaStore.ensureAssets(series).find(function (a) { return a.id === id; });
+      if (!asset) return;
+      bundle.assets.push(JSON.parse(JSON.stringify(asset)));
+      if (!preview) preview = asset.dataUrl || "";
+    });
 
     var empty = !bundle.characterProfiles.length && !bundle.backgroundScenes.length && !bundle.assets.length;
-    return { bundle: bundle, preview: preview, empty: empty };
+    var pieceCount =
+      bundle.characterProfiles.length + bundle.backgroundScenes.length + bundle.assets.length;
+    return { bundle: bundle, preview: preview, empty: empty, pieceCount: pieceCount };
+  }
+
+  function inferListingCategory(bundle, preferred) {
+    if (preferred && preferred !== "pack") return preferred;
+    if (!bundle) return preferred || "pack";
+    var types = 0;
+    if ((bundle.characterProfiles || []).length) types++;
+    if ((bundle.backgroundScenes || []).length) types++;
+    if ((bundle.assets || []).length) types++;
+    var pieces =
+      (bundle.characterProfiles || []).length +
+      (bundle.backgroundScenes || []).length +
+      (bundle.assets || []).length;
+    if (types > 1 || pieces > 1) return "pack";
+    if ((bundle.characterProfiles || []).length) return "character";
+    if ((bundle.backgroundScenes || []).length) return "stage";
+    var assets = bundle.assets || [];
+    if (assets.some(function (a) { return a.kind === "keyItem"; })) return "item";
+    if (assets.length) return "audio";
+    return preferred || "pack";
   }
 
   window.ScenaMarketplace = {
@@ -362,6 +393,34 @@
     importBundleToSeries: importBundleToSeries,
 
     buildBundleFromSeries: buildBundleFromSeries,
+    inferListingCategory: inferListingCategory,
+
+    /** Merge several library/project bundles into one pack listing payload. */
+    mergeBundles: function (bundles) {
+      var out = { characterProfiles: [], backgroundScenes: [], assets: [], metrics: [] };
+      var preview = "";
+      (bundles || []).forEach(function (bundle) {
+        if (!bundle) return;
+        (bundle.characterProfiles || []).forEach(function (ch) {
+          out.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
+          if (!preview) preview = (ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "";
+        });
+        (bundle.backgroundScenes || []).forEach(function (bg) {
+          out.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
+          if (!preview) preview = (bg.layers && bg.layers.bg) || "";
+        });
+        (bundle.assets || []).forEach(function (a) {
+          out.assets.push(JSON.parse(JSON.stringify(a)));
+          if (!preview) preview = a.dataUrl || "";
+        });
+        (bundle.metrics || []).forEach(function (m) {
+          out.metrics.push(JSON.parse(JSON.stringify(m)));
+        });
+      });
+      var empty = !out.characterProfiles.length && !out.backgroundScenes.length && !out.assets.length;
+      var pieceCount = out.characterProfiles.length + out.backgroundScenes.length + out.assets.length;
+      return { bundle: out, preview: preview, empty: empty, pieceCount: pieceCount };
+    },
 
     renderStorePanel: function (listings, opts) {
       opts = opts || {};
@@ -470,29 +529,60 @@
       var stages = ScenaStore.ensureBackgrounds(series);
       var assets = ScenaStore.ensureAssets(series).filter(function (a) { return !a.isDefault; });
 
-      function options(list, prefix) {
+      function checkRows(list, prefix, nameAttr) {
+        if (!list.length) return '<p class="field-hint">None in this project yet.</p>';
         return list.map(function (item) {
-          return '<option value="' + escapeAttr(prefix + ":" + item.id) + '">' + escapeHtml(item.name || item.label || "Untitled") + "</option>";
+          var id = prefix + ":" + item.id;
+          return (
+            '<label class="check-row">' +
+              '<input type="checkbox" data-mp-pack-item="' + escapeAttr(id) + '" name="' + escapeAttr(nameAttr) + '">' +
+              escapeHtml(item.name || item.label || "Untitled") +
+            "</label>"
+          );
         }).join("");
       }
 
       return (
-        '<div class="field"><label>Title</label><input type="text" id="mpSellTitle" maxlength="80" placeholder="Aurora sprite set"></div>' +
-        '<div class="field"><label>Description</label><textarea id="mpSellDesc" rows="2" maxlength="400"></textarea></div>' +
+        '<div class="field"><label>Pack title</label><input type="text" id="mpSellTitle" maxlength="80" placeholder="e.g. Café starter kit"></div>' +
+        '<div class="field"><label>Description</label><textarea id="mpSellDesc" rows="2" maxlength="400" placeholder="What buyers get in this pack…"></textarea></div>' +
         '<div class="field"><label>Category</label><select id="mpSellCategory">' +
           CATEGORIES.filter(function (c) { return c.id; }).map(function (c) {
-            return '<option value="' + escapeAttr(c.id) + '">' + escapeHtml(c.label) + "</option>";
+            var selected = c.id === "pack" ? " selected" : "";
+            return '<option value="' + escapeAttr(c.id) + '"' + selected + ">" + escapeHtml(c.label) + "</option>";
           }).join("") +
-        "</select></div>" +
+        "</select>" +
+          '<p class="field-hint">Pick <strong>Packs</strong> when including more than one piece. Single items can use Characters / Stages / etc.</p></div>' +
         '<div class="field"><label>Price (Ducats, 0 = free)</label><input type="number" id="mpSellPrice" min="0" max="9999" value="0"></div>' +
-        '<div class="field"><label>Include from this project</label><select id="mpSellSource">' +
-          '<option value="">— pick one —</option>' +
-          (chars.length ? '<optgroup label="Characters">' + options(chars, "char") + "</optgroup>" : "") +
-          (stages.length ? '<optgroup label="Stages">' + options(stages, "stage") + "</optgroup>" : "") +
-          (assets.length ? '<optgroup label="Audio / items">' + options(assets, "asset") + "</optgroup>" : "") +
-        "</select></div>" +
-        '<p class="field-hint">Listings ship as engine-ready packs — buyers import directly into their graph editor.</p>'
+        '<div class="field"><label>Build your pack — select anything to include</label>' +
+          '<div class="mp-pack-builder">' +
+            '<div class="mp-pack-group"><strong>Characters</strong><div class="check-grid">' +
+              checkRows(chars, "char", "mpChar") +
+            "</div></div>" +
+            '<div class="mp-pack-group"><strong>Stages</strong><div class="check-grid">' +
+              checkRows(stages, "stage", "mpStage") +
+            "</div></div>" +
+            '<div class="mp-pack-group"><strong>Audio &amp; items</strong><div class="check-grid">' +
+              checkRows(assets, "asset", "mpAsset") +
+            "</div></div>" +
+          "</div>" +
+          '<p class="field-hint">Check multiple items to sell them together as one pack buyers import in one click.</p>' +
+        "</div>"
       );
+    },
+
+    readSellModalSelection: function (root) {
+      root = root || document;
+      var characterIds = [];
+      var stageIds = [];
+      var assetIds = [];
+      root.querySelectorAll("[data-mp-pack-item]:checked").forEach(function (el) {
+        var raw = el.getAttribute("data-mp-pack-item") || "";
+        var parts = raw.split(":");
+        if (parts[0] === "char" && parts[1]) characterIds.push(parts[1]);
+        else if (parts[0] === "stage" && parts[1]) stageIds.push(parts[1]);
+        else if (parts[0] === "asset" && parts[1]) assetIds.push(parts[1]);
+      });
+      return { characterIds: characterIds, stageIds: stageIds, assetIds: assetIds };
     },
   };
 

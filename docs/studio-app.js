@@ -1510,7 +1510,7 @@
       '<div class="page page-library">' +
         '<div class="page-head">' +
           '<div><h1>Asset library</h1>' +
-          '<p>Reuse characters, stages, and audio across projects. Purchased assets stay yours — import anytime without paying again.</p></div>' +
+          '<p>Reuse characters, stages, and audio across projects. Build packs from several assets and sell them in the shop.</p></div>' +
         '</div>' +
         '<div id="libraryRoot" class="library-root"><p class="field-hint">Loading…</p></div>' +
         '<div class="workspace-modal-backdrop" id="librarySellModal" hidden>' +
@@ -1520,6 +1520,17 @@
             '<div class="modal-actions">' +
               '<button type="button" class="btn" id="librarySellCancel">Cancel</button>' +
               '<button type="button" class="btn btn-primary" id="librarySellSave">Publish listing</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="workspace-modal-backdrop" id="libraryPackModal" hidden>' +
+          '<div class="modal" role="dialog">' +
+            '<h2>Create pack</h2>' +
+            '<div id="libraryPackBody"></div>' +
+            '<div class="modal-actions">' +
+              '<button type="button" class="btn" id="libraryPackCancel">Cancel</button>' +
+              '<button type="button" class="btn btn-secondary" id="libraryPackSaveOnly">Save to My assets</button>' +
+              '<button type="button" class="btn btn-primary" id="libraryPackPublish">Publish to shop</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -1565,6 +1576,7 @@
       });
       bindLibraryAssetsPanel(root);
       bindLibrarySellModal();
+      bindLibraryPackModal();
     }).catch(function (err) {
       root.innerHTML =
         '<p class="field-hint">Could not load assets' +
@@ -1700,6 +1712,10 @@
         openLibrarySellModal(btn.getAttribute("data-library-id"));
       });
     });
+    var createPackBtns = root.querySelectorAll("#libraryCreatePackBtn");
+    createPackBtns.forEach(function (btn) {
+      btn.addEventListener("click", openLibraryPackModal);
+    });
   }
 
   var librarySellEntryId = null;
@@ -1719,6 +1735,70 @@
     librarySellEntryId = null;
     var modal = $("#librarySellModal");
     if (modal) modal.hidden = true;
+  }
+
+  function openLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (!modal || !window.ScenaAssetLibrary) return;
+    ScenaAssetLibrary.list(userId, { source: "made" }).then(function (entries) {
+      $("#libraryPackBody").innerHTML = ScenaAssetLibrary.renderPackBuilderBody(entries);
+      modal.hidden = false;
+    });
+  }
+
+  function closeLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (modal) modal.hidden = true;
+  }
+
+  function submitLibraryPack(publish) {
+    var ids = [];
+    document.querySelectorAll("#libraryPackBody [data-lib-pack-id]:checked").forEach(function (el) {
+      ids.push(el.getAttribute("data-lib-pack-id"));
+    });
+    if (ids.length < 1) {
+      toast("Select at least one asset for the pack.");
+      return;
+    }
+    var title = (($("#libPackTitle") || {}).value || "").trim();
+    var desc = (($("#libPackDesc") || {}).value || "").trim();
+    var price = parseInt(($("#libPackPrice") || {}).value, 10) || 0;
+    if (title.length < 2) {
+      toast("Enter a pack title.");
+      return;
+    }
+    var pubBtn = $("#libraryPackPublish");
+    var saveBtn = $("#libraryPackSaveOnly");
+    if (pubBtn) pubBtn.disabled = true;
+    if (saveBtn) saveBtn.disabled = true;
+    ScenaAssetLibrary.createPackFromLibrary(userId, ids, {
+      title: title,
+      description: desc,
+      priceDucats: price,
+      publish: !!publish,
+      sellerName: (userProfile && userProfile.displayName) || "Creator",
+    }).then(function (result) {
+      closeLibraryPackModal();
+      libraryUiState.selectedId = result.entry && result.entry.id ? result.entry.id : "";
+      libraryUiState.category = "pack";
+      toast(publish ? "Pack published to the shop." : "Pack saved to My assets.");
+      paintLibraryRoot();
+    }).catch(function (err) {
+      toast((err && err.message) || "Could not create pack.");
+    }).then(function () {
+      if (pubBtn) pubBtn.disabled = false;
+      if (saveBtn) saveBtn.disabled = false;
+    });
+  }
+
+  function bindLibraryPackModal() {
+    var modal = $("#libraryPackModal");
+    if (!modal || modal.dataset.bound === "1") return;
+    modal.dataset.bound = "1";
+    $("#libraryPackCancel").addEventListener("click", closeLibraryPackModal);
+    modal.addEventListener("click", function (e) { if (e.target === modal) closeLibraryPackModal(); });
+    $("#libraryPackSaveOnly").addEventListener("click", function () { submitLibraryPack(false); });
+    $("#libraryPackPublish").addEventListener("click", function () { submitLibraryPack(true); });
   }
 
   function bindLibrarySellModal() {
@@ -1791,6 +1871,9 @@
         btn.disabled = true;
         ScenaMarketplace.purchase(userId, listingId).then(function (result) {
           return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
             if (window.ScenaAssetLibrary && listing) {
               ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
             }

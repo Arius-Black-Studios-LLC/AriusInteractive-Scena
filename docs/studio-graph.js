@@ -5657,6 +5657,9 @@
         btn.disabled = true;
         ScenaMarketplace.purchase(userId, listingId).then(function (result) {
           return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+            if (listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId)) {
+              throw new Error("You cannot buy your own listing — it is already in your library.");
+            }
             if (window.ScenaAssetLibrary && listing) {
               ScenaAssetLibrary.recordPurchase(userId, Object.assign({}, listing, { bundle: result.bundle || listing.bundle }));
             }
@@ -5843,10 +5846,10 @@
     }
 
     this._workspaceModalMode = "marketplace_sell";
-    this.container.querySelector("#workspaceModalTitle").textContent = "Sell asset pack";
+    this.container.querySelector("#workspaceModalTitle").textContent = "Create & sell pack";
     this.container.querySelector("#workspaceModalBody").innerHTML =
       ScenaMarketplace.renderSellModalBody(this.series);
-    this.container.querySelector("#workspaceModalSave").textContent = "Publish listing";
+    this.container.querySelector("#workspaceModalSave").textContent = "Publish pack";
     this.workspaceModal.hidden = false;
   };
 
@@ -5857,30 +5860,38 @@
     var desc = (modal.querySelector("#mpSellDesc") || {}).value || "";
     var category = (modal.querySelector("#mpSellCategory") || {}).value || "pack";
     var price = parseInt((modal.querySelector("#mpSellPrice") || {}).value, 10) || 0;
-    var source = (modal.querySelector("#mpSellSource") || {}).value || "";
     var saveBtn = modal.querySelector("#workspaceModalSave");
+    var selection = ScenaMarketplace.readSellModalSelection
+      ? ScenaMarketplace.readSellModalSelection(modal)
+      : { characterIds: [], stageIds: [], assetIds: [] };
 
     title = title.trim();
     if (title.length < 2) {
       this.onSaveError("Enter a listing title.");
       return;
     }
-    if (!source) {
-      this.onSaveError("Pick a character, stage, or asset to sell.");
+    var picked =
+      (selection.characterIds && selection.characterIds.length) ||
+      (selection.stageIds && selection.stageIds.length) ||
+      (selection.assetIds && selection.assetIds.length);
+    if (!picked) {
+      this.onSaveError("Select at least one character, stage, or audio/item for the pack.");
       return;
     }
 
-    var parts = source.split(":");
-    var spec = { title: title, description: desc, category: category, priceDucats: Math.max(0, price) };
-    if (parts[0] === "char") spec.characterId = parts[1];
-    else if (parts[0] === "stage") spec.stageId = parts[1];
-    else if (parts[0] === "asset") spec.assetId = parts[1];
-
-    var built = ScenaMarketplace.buildBundleFromSeries(this.series, spec);
+    var built = ScenaMarketplace.buildBundleFromSeries(this.series, {
+      characterIds: selection.characterIds,
+      stageIds: selection.stageIds,
+      assetIds: selection.assetIds,
+    });
     if (built.empty) {
       this.onSaveError("Could not build asset pack from selection.");
       return;
     }
+
+    category = ScenaMarketplace.inferListingCategory
+      ? ScenaMarketplace.inferListingCategory(built.bundle, category)
+      : category;
 
     if (saveBtn) saveBtn.disabled = true;
     ScenaMarketplace.publishListing(this.feedbackUserId, {
@@ -5893,7 +5904,9 @@
       sellerName: (this.feedbackProfile && this.feedbackProfile.displayName) || "Creator",
     }).then(function () {
       self.closeModal();
-      self.setSaveStatus("Listing published on the asset store.");
+      self.setSaveStatus(
+        (built.pieceCount > 1 ? "Pack" : "Listing") + " published on the asset store."
+      );
       if (self.resourceTab === "store") self.renderMarketplacePanel();
     }).catch(function (err) {
       if (saveBtn) saveBtn.disabled = false;

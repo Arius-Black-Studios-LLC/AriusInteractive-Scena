@@ -92,18 +92,111 @@
           return null;
         }
         return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
-          if (listing && listing.bundle) ScenaAssetLibrary.recordPurchase(userId, listing);
+          if (!listing || !listing.bundle) return null;
+          // Never treat your own shop listing as a "purchase" in My assets.
+          if (listing.is_seller || listing.isSeller || listing.seller_id === userId) return null;
+          return ScenaAssetLibrary.recordPurchase(userId, listing);
         });
       });
     }, Promise.resolve());
   }
 
+  /** Remove mistaken self-buy copies from My assets + local purchase flags. */
+  function purgeSelfPurchaseCopies(userId) {
+    if (!userId) return Promise.resolve({ removed: 0 });
+    var purchases = {};
+    try {
+      purchases = JSON.parse(localStorage.getItem("arleco_marketplace_purchases_" + scopeKey(userId)) || "{}");
+    } catch (e) { /* ignore */ }
+
+    var list = readLibrary(userId);
+    var purchaseEntries = list.filter(function (e) {
+      return e.source === "purchase" || String(e.id || "").indexOf("purchase_") === 0;
+    });
+    if (!purchaseEntries.length && !Object.keys(purchases).length) {
+      return Promise.resolve({ removed: 0 });
+    }
+
+    var checks = purchaseEntries.map(function (entry) {
+      var listingId = entry.listingId || String(entry.id || "").replace(/^purchase_/, "");
+      if (!listingId || !window.ScenaMarketplace) {
+        return Promise.resolve({ entry: entry, isSelf: false });
+      }
+      return ScenaMarketplace.getListing(listingId, userId).then(function (listing) {
+        var isSelf = !!(listing && (listing.is_seller || listing.isSeller || listing.seller_id === userId));
+        // Also self if local seller listing map says so
+        if (!isSelf && window.ScenaMarketplace.listSellerListings) {
+          return ScenaMarketplace.listSellerListings(userId).then(function (mine) {
+            var mineIds = (mine || []).map(function (l) { return l.id; });
+            return { entry: entry, listingId: listingId, isSelf: mineIds.indexOf(listingId) >= 0 };
+          });
+        }
+        return { entry: entry, listingId: listingId, isSelf: isSelf };
+      }).catch(function () {
+        return { entry: entry, listingId: listingId, isSelf: false };
+      });
+    });
+
+    return Promise.all(checks).then(function (results) {
+      var removeIds = {};
+      var clearPurchaseKeys = {};
+      results.forEach(function (r) {
+        if (r && r.isSelf) {
+          if (r.entry && r.entry.id) removeIds[r.entry.id] = true;
+          if (r.listingId) clearPurchaseKeys[r.listingId] = true;
+        }
+      });
+
+      // Also clear purchase flags for listings you sell (local list)
+      var sellerPromise = window.ScenaMarketplace && ScenaMarketplace.listSellerListings
+        ? ScenaMarketplace.listSellerListings(userId)
+        : Promise.resolve([]);
+
+      return sellerPromise.then(function (mine) {
+        (mine || []).forEach(function (l) {
+          if (l && l.id) clearPurchaseKeys[l.id] = true;
+          removeIds["purchase_" + l.id] = true;
+        });
+
+        var nextList = list.filter(function (e) {
+          if (removeIds[e.id]) return false;
+          if (e.source === "purchase" && e.listingId && clearPurchaseKeys[e.listingId]) return false;
+          return true;
+        });
+        var removed = list.length - nextList.length;
+        if (removed > 0) writeLibrary(userId, nextList);
+
+        var nextPurchases = Object.assign({}, purchases);
+        var changedPurchases = false;
+        Object.keys(clearPurchaseKeys).forEach(function (id) {
+          if (nextPurchases[id]) {
+            delete nextPurchases[id];
+            changedPurchases = true;
+          }
+        });
+        if (changedPurchases) {
+          try {
+            localStorage.setItem(
+              "arleco_marketplace_purchases_" + scopeKey(userId),
+              JSON.stringify(nextPurchases)
+            );
+          } catch (e) { /* ignore */ }
+        }
+        return { removed: removed };
+      });
+    });
+  }
+
   window.ScenaAssetLibrary = {
     CATEGORIES: CATEGORIES,
 
+    purgeSelfPurchaseCopies: purgeSelfPurchaseCopies,
+
     list: function (userId, opts) {
       opts = opts || {};
-      return syncPurchasedListings(userId).then(function () {
+      return purgeSelfPurchaseCopies(userId).then(function () {
+        return syncPurchasedListings(userId);
+      }).then(function () {
         var rows = readLibrary(userId).slice();
         if (opts.category) {
           rows = rows.filter(function (r) { return r.category === opts.category; });
@@ -128,6 +221,7 @@
 
     recordPurchase: function (userId, listing) {
       if (!userId || !listing || !listing.bundle) return null;
+      if (listing.is_seller || listing.isSeller || listing.seller_id === userId) return null;
       return upsertEntry(userId, {
         id: "purchase_" + listing.id,
         listingId: listing.id,
@@ -261,7 +355,8 @@
         '<div class="marketplace-detail-empty">' +
           "<h4>Your asset library</h4>" +
           "<p>Characters, stages, audio, and items you made or purchased — reuse them in any project without paying again.</p>" +
-          '<p class="field-hint">Select an asset to import into the current series.</p>' +
+          '<p class="field-hint">Select an asset to import into a series, sell it, or build a multi-item pack.</p>' +
+          '<button type="button" class="btn btn-secondary btn-sm" id="libraryCreatePackBtn">Create pack from My assets</button>' +
         "</div>"
       );
 
@@ -276,6 +371,7 @@
           (opts.pageTab === "shop" ? (opts.shopHtml || "") :
             '<div class="marketplace-toolbar">' +
               '<input type="search" class="marketplace-search library-search" placeholder="Search your library…" value="' + escapeAttr(opts.query || "") + '">' +
+              '<button type="button" class="btn btn-secondary btn-sm" id="libraryCreatePackBtn">Create pack</button>' +
             "</div>" +
             '<div class="marketplace-chips">' + chips + "</div>" +
             '<div class="marketplace-layout">' +
@@ -285,6 +381,78 @@
           ) +
         "</div>"
       );
+    },
+
+    renderPackBuilderBody: function (entries) {
+      var made = (entries || []).filter(function (e) { return e.source === "made" && e.bundle; });
+      if (!made.length) {
+        return '<p class="field-hint">Save characters, stages, or audio to My assets first (from a project’s story editor), then combine them into a pack here.</p>';
+      }
+      var rows = made.map(function (e) {
+        return (
+          '<label class="check-row">' +
+            '<input type="checkbox" data-lib-pack-id="' + escapeAttr(e.id) + '">' +
+            escapeHtml(e.title || "Untitled") +
+            ' <span class="field-hint">(' + escapeHtml(categoryLabel(e.category)) + ")</span>" +
+          "</label>"
+        );
+      }).join("");
+      return (
+        '<p class="field-hint">Select two or more assets you made, then publish them as one Pack listing.</p>' +
+        '<div class="field"><label>Pack title</label><input type="text" id="libPackTitle" maxlength="80" placeholder="e.g. Romance starter kit"></div>' +
+        '<div class="field"><label>Description</label><textarea id="libPackDesc" rows="2" maxlength="400" placeholder="What buyers get…"></textarea></div>' +
+        '<div class="field"><label>Price (Ducats, 0 = free)</label><input type="number" id="libPackPrice" min="0" max="9999" value="0"></div>' +
+        '<div class="field"><label>Include</label><div class="check-grid mp-pack-builder">' + rows + "</div></div>"
+      );
+    },
+
+    createPackFromLibrary: function (userId, entryIds, spec) {
+      spec = spec || {};
+      if (!userId) return Promise.reject(new Error("Sign in to create a pack."));
+      var ids = (entryIds || []).filter(Boolean);
+      if (ids.length < 1) return Promise.reject(new Error("Select at least one asset for the pack."));
+      return Promise.all(ids.map(function (id) {
+        return ScenaAssetLibrary.get(userId, id);
+      })).then(function (entries) {
+        var made = (entries || []).filter(function (e) {
+          return e && e.source === "made" && e.bundle;
+        });
+        if (!made.length) throw new Error("Only assets you created can go into a pack.");
+        if (!window.ScenaMarketplace || !ScenaMarketplace.mergeBundles) {
+          throw new Error("Marketplace unavailable.");
+        }
+        var merged = ScenaMarketplace.mergeBundles(made.map(function (e) { return e.bundle; }));
+        if (merged.empty) throw new Error("Could not build pack from selection.");
+        var title = String(spec.title || "").trim() || "Asset pack";
+        var packEntry = upsertEntry(userId, {
+          id: "made_pack_" + Date.now().toString(36),
+          source: "made",
+          title: title,
+          category: "pack",
+          bundle: merged.bundle,
+          preview_data_url: merged.preview || made[0].preview_data_url || "",
+        });
+        if (spec.publish) {
+          return ScenaMarketplace.publishListing(userId, {
+            title: title,
+            description: String(spec.description || "").trim(),
+            category: "pack",
+            priceDucats: Math.max(0, parseInt(spec.priceDucats, 10) || 0),
+            bundle: merged.bundle,
+            previewDataUrl: merged.preview || "",
+            sellerName: spec.sellerName || "Creator",
+          }).then(function (result) {
+            upsertEntry(userId, {
+              id: packEntry.id,
+              listingId: result.id,
+              forSale: true,
+              saleTitle: title,
+            });
+            return { entry: packEntry, listing: result };
+          });
+        }
+        return { entry: packEntry, listing: null };
+      });
     },
 
     renderEntryDetail: function (entry, opts) {

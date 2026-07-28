@@ -4185,6 +4185,47 @@ body.is-resizing-center {
   align-items: center;
 }
 
+.mp-pack-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 280px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--scena-border);
+  border-radius: 10px;
+  background: var(--scena-surface-2, #f3f1ec);
+}
+
+.mp-pack-group strong {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--scena-text-faint, #9a9893);
+  margin-bottom: 6px;
+}
+
+.mp-pack-builder .check-grid,
+.check-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.check-row input {
+  margin-top: 3px;
+}
+
 .marketplace-search {
   flex: 1;
   min-width: 0;
