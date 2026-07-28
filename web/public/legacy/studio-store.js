@@ -188,6 +188,9 @@
     if (purpose === "sprite") {
       return { maxDim: 1280, quality: 0.85, forceJpeg: false, maxBytes: 650 * 1024 };
     }
+    if (purpose === "pixel-art") {
+      return { maxDim: 512, quality: 1, forceJpeg: false, maxBytes: 2 * 1024 * 1024, preservePixels: true };
+    }
     if (purpose === "thumb" || purpose === "banner") {
       return { maxDim: 960, quality: 0.85, forceJpeg: true, maxBytes: 450 * 1024 };
     }
@@ -199,6 +202,7 @@
     var maxDim = opts.maxDim || 1280;
     var maxBytes = opts.maxBytes || 650 * 1024;
     var forceJpeg = opts.forceJpeg || false;
+    var preservePixels = !!opts.preservePixels;
     return new Promise(function (resolve, reject) {
       var img = new Image();
       img.onload = function () {
@@ -207,6 +211,20 @@
         if (!srcW || !srcH) {
           reject(new Error("Could not read image dimensions."));
           return;
+        }
+
+        if (preservePixels) {
+          var rawBytes = dataUrlByteLength(dataUrl);
+          if (Math.max(srcW, srcH) <= maxDim && rawBytes <= maxBytes) {
+            resolve({
+              dataUrl: dataUrl,
+              width: srcW,
+              height: srcH,
+              bytes: rawBytes,
+              compressed: false,
+            });
+            return;
+          }
         }
 
         var dimScale = Math.min(1, maxDim / Math.max(srcW, srcH));
@@ -219,7 +237,7 @@
           var canvas = document.createElement("canvas");
           canvas.width = Math.max(1, Math.round(srcW * scale));
           canvas.height = Math.max(1, Math.round(srcH * scale));
-          if (canvas.width < 64 || canvas.height < 64) break;
+          if (!preservePixels && (canvas.width < 64 || canvas.height < 64)) break;
 
           var ctx = canvas.getContext("2d");
           if (!ctx) {
@@ -299,6 +317,7 @@
       genres: [],
       metrics: [],
       assets: [],
+      artFolder: [],
       characterProfiles: [],
       backgroundScenes: [],
       nodes: [],
@@ -3319,6 +3338,7 @@
       if (!series.episodes) series.episodes = [];
       if (!series.characterProfiles) series.characterProfiles = [];
       if (!series.backgroundScenes) series.backgroundScenes = [];
+      if (!Array.isArray(series.artFolder)) series.artFolder = [];
       if (!series.metrics) series.metrics = [];
       series.metrics = series.metrics.map(function (m) { return normalizeMetric(m); });
       if (!series.assets) series.assets = [];
@@ -3560,6 +3580,87 @@
       if (!resolved.hasBgm) return "None yet — set background music on the opening beat";
       var asset = this.getAudioAsset(series, resolved.bgmAssetId);
       return asset ? asset.label : "Unknown clip";
+    },
+
+    ART_KINDS: [
+      { id: "character", label: "Character" },
+      { id: "background", label: "Background" },
+      { id: "ui", label: "UI sprite" },
+    ],
+
+    ensureArtFolder: function (series) {
+      this.normalizeSeries(series);
+      return series.artFolder;
+    },
+
+    listArtFolder: function (series, kind) {
+      var items = this.ensureArtFolder(series);
+      if (!kind || kind === "all") return items.slice();
+      return items.filter(function (a) { return a.kind === kind; });
+    },
+
+    getArtAsset: function (series, artId) {
+      return this.ensureArtFolder(series).find(function (a) { return a.id === artId; }) || null;
+    },
+
+    upsertArtAsset: function (series, asset) {
+      this.ensureArtFolder(series);
+      var kind = asset.kind === "background" || asset.kind === "ui" ? asset.kind : "character";
+      var next = {
+        id: asset.id || this.assetUid("art"),
+        name: String(asset.name || "Untitled").trim() || "Untitled",
+        kind: kind,
+        width: Math.max(1, parseInt(asset.width, 10) || 64),
+        height: Math.max(1, parseInt(asset.height, 10) || 64),
+        dataUrl: asset.dataUrl || "",
+        updatedAt: new Date().toISOString(),
+        createdAt: asset.createdAt || new Date().toISOString(),
+      };
+      var idx = series.artFolder.findIndex(function (a) { return a.id === next.id; });
+      if (idx >= 0) {
+        next.createdAt = series.artFolder[idx].createdAt || next.createdAt;
+        series.artFolder[idx] = next;
+      } else {
+        series.artFolder.unshift(next);
+      }
+      return next;
+    },
+
+    removeArtAsset: function (series, artId) {
+      this.ensureArtFolder(series);
+      series.artFolder = series.artFolder.filter(function (a) { return a.id !== artId; });
+    },
+
+    /** Store a canvas/PNG data URL (keeps pixels; optional cloud upload). */
+    storePixelDataUrl: function (dataUrl, options) {
+      options = options || {};
+      var purpose = options.purpose || "pixel-art";
+      var seriesId = options.seriesId || activeSeriesId;
+      var opts = compressionOptions(purpose);
+      var fileLike = { type: "image/png" };
+      return compressImageDataUrl(dataUrl, fileLike, opts).then(function (result) {
+        var out = result.dataUrl;
+        lastUploadMeta = {
+          width: result.width,
+          height: result.height,
+          bytes: result.bytes,
+          compressed: result.compressed,
+        };
+        if (cloudEnabled() && cloudUserId && seriesId && window.ScenaCloud) {
+          var category = "art";
+          var assetId = options.assetId || ScenaCloud.newAssetId(category);
+          return ScenaCloud.uploadImage(cloudUserId, seriesId, category, assetId, out).then(function (url) {
+            if (typeof url === "string" && url.indexOf("data:") === 0) {
+              noteLocalUploadFallback();
+            }
+            return url;
+          }).catch(function () {
+            noteLocalUploadFallback();
+            return out;
+          });
+        }
+        return out;
+      });
     },
 
     ensureProfiles: function (series) {

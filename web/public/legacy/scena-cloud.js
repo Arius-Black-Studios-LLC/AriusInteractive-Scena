@@ -404,6 +404,18 @@
 
 
 
+    (series.artFolder || []).forEach(function (art) {
+
+      queue("art", art.id, function () { return art.dataUrl; }, function (url) {
+
+        art.dataUrl = url;
+
+      });
+
+    });
+
+
+
     if (!tasks.length) return Promise.resolve(series);
 
 

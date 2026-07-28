@@ -138,6 +138,7 @@ export const LEGACY_BUNDLES = {
     "scena-audio.js",
     "scena-reader-menu.js",
     "studio-graph.js",
+    "studio-pixel.js",
     "studio-app.js",
   ],
   learn: [

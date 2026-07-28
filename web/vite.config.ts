@@ -31,6 +31,7 @@ const LEGACY_JS = [
   "studio-store.js",
   "studio-app.js",
   "studio-graph.js",
+  "studio-pixel.js",
   "learn-app.js",
   "learn-lessons.js",
   "learn-sandbox.js",

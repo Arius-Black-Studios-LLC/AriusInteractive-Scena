@@ -6,6 +6,7 @@
   var userEmail = "";
   var userProfile = null;
   var graphEditor = null;
+  var pixelArtEditor = null;
   var toastTimer = null;
 
   function $(sel, root) {
@@ -92,12 +93,13 @@
         return { view: "settings", seriesId: seriesId, settingsTab: settingsTab };
       }
       if (parts[2] === "graph") return { view: "graph", seriesId: seriesId };
+      if (parts[2] === "art" || parts[2] === "pixel") return { view: "art", seriesId: seriesId };
       if (parts[2] === "resources") return { view: "resources", seriesId: seriesId, tab: parts[3] || "characters" };
       if (parts[2] === "episodes") return { view: "episodes", seriesId: seriesId };
       var savedView = "graph";
       try {
         var stored = sessionStorage.getItem("scena.studioView." + seriesId);
-        if (stored === "episodes" || stored === "settings" || stored === "graph") savedView = stored;
+        if (stored === "episodes" || stored === "settings" || stored === "graph" || stored === "art") savedView = stored;
       } catch (e) { /* ignore */ }
       return { view: savedView, seriesId: seriesId };
     }
@@ -106,7 +108,7 @@
 
   function rememberStudioView(seriesId, view) {
     if (!seriesId || !view || view === "resources") return;
-    try { sessionStorage.setItem("scena.studioView." + seriesId, view); } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem("scena.studioView." + seriesId, view === "pixel" ? "art" : view); } catch (e) { /* ignore */ }
   }
 
   function navigate(hash) {
@@ -182,6 +184,7 @@
         '<div class="sidebar-section-label">Workspace</div>' +
         sidebarLink("#/series/" + series.id + "/graph", "Story editor", activeView === "graph") +
         sidebarLink("#/series/" + series.id + "/episodes", "Episodes", activeView === "episodes") +
+        sidebarLink("#/series/" + series.id + "/art", "Art", activeView === "art") +
         '<div class="sidebar-section-label">Series</div>' +
         sidebarLink("#/series/" + series.id + "/settings", "Settings", activeView === "settings" && (!window.__scenaSettingsTab || window.__scenaSettingsTab === "basics")) +
         sidebarLink("#/series/" + series.id + "/settings/monetization", "Monetization", activeView === "settings" && window.__scenaSettingsTab === "monetization") +
@@ -215,6 +218,13 @@
     graphEditor = null;
   }
 
+  function destroyPixelArtEditor() {
+    if (pixelArtEditor && pixelArtEditor.destroy) {
+      pixelArtEditor.destroy();
+    }
+    pixelArtEditor = null;
+  }
+
   function mountGraphEditor(container, opts) {
     if (window.ScenaGraphEditorBridge && window.ScenaGraphEditorBridge.create) {
       return window.ScenaGraphEditorBridge.create(container, opts);
@@ -227,6 +237,7 @@
     var main = $("#studioMain");
     if (!main) return;
     destroyGraphEditor();
+    destroyPixelArtEditor();
     updateTopbarForRoute(route);
 
     try {
@@ -360,6 +371,21 @@
     } else if (route.view === "episodes") {
       main.innerHTML = renderEpisodes(series);
       bindEpisodes(series);
+    } else if (route.view === "art") {
+      main.innerHTML = '<div id="pixelArtRoot"></div>';
+      if (window.ScenaPixelArt && ScenaPixelArt.mount) {
+        if (pixelArtEditor && pixelArtEditor.destroy) pixelArtEditor.destroy();
+        pixelArtEditor = ScenaPixelArt.mount($("#pixelArtRoot"), {
+          series: series,
+          userId: userId,
+          toast: toast,
+          persist: function (updated) {
+            return persistSeries(updated);
+          },
+        });
+      } else {
+        main.innerHTML = '<div class="page"><p class="field-hint">Pixel art editor failed to load. Refresh the page.</p></div>';
+      }
     }
   }
 
