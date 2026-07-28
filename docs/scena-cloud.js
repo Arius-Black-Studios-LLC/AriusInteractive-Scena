@@ -560,6 +560,8 @@
 
             if (data.templateSource) return false;
 
+            if (data.adminHidden) return false;
+
             if (data.status === "published") return true;
 
             return (data.episodes || []).some(function (ep) {
@@ -811,6 +813,102 @@
         return false;
 
       });
+
+    },
+
+
+
+    upsertGameJam: function (hostUserId, jam) {
+
+      var sb = getClient();
+
+      if (!sb || !hostUserId || !jam || !jam.id) return Promise.resolve({ ok: false });
+
+      if (jam.status !== "published") return Promise.resolve({ ok: false });
+
+      var payload = JSON.parse(JSON.stringify(jam));
+
+      return sb.from("game_jams")
+
+        .upsert({
+
+          id: jam.id,
+
+          host_user_id: hostUserId,
+
+          data: payload,
+
+          updated_at: new Date().toISOString(),
+
+        }, { onConflict: "id" })
+
+        .then(function (result) {
+
+          if (result.error) throw result.error;
+
+          return { ok: true };
+
+        })
+
+        .catch(function (err) {
+
+          return { ok: false, error: errorMessage(err) };
+
+        });
+
+    },
+
+
+
+    listPublishedGameJams: function () {
+
+      var sb = getClient();
+
+      if (!sb) return Promise.resolve([]);
+
+      return sb.from("game_jams")
+
+        .select("id, host_user_id, data, updated_at, hidden_at")
+
+        .is("hidden_at", null)
+
+        .order("updated_at", { ascending: false })
+
+        .then(function (result) {
+
+          if (result.error) throw result.error;
+
+          return (result.data || [])
+
+            .filter(function (row) {
+
+              var data = row.data || {};
+
+              return data.status === "published";
+
+            })
+
+            .map(function (row) {
+
+              var jam = row.data || {};
+
+              jam.id = row.id;
+
+              jam.hostUserId = row.host_user_id;
+
+              jam.updatedAt = row.updated_at || jam.updatedAt;
+
+              return jam;
+
+            });
+
+        })
+
+        .catch(function () {
+
+          return [];
+
+        });
 
     },
 

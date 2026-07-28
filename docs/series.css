@@ -178,11 +178,37 @@
 
   margin: 10px 0 0;
 
-  max-width: 52ch;
+  color: rgba(255, 255, 255, 0.72);
+
+  font-size: 1rem;
+
+  line-height: 1.5;
+
+  max-width: 36rem;
+
+}
+
+
+
+.series-about-wrap {
+
+  margin: 24px 0 8px;
+
+}
+
+
+
+.series-about-body {
 
   color: rgba(255, 255, 255, 0.72);
 
-  line-height: 1.5;
+  font-size: 1rem;
+
+  line-height: 1.65;
+
+  max-width: 42rem;
+
+  white-space: pre-wrap;
 
 }
 

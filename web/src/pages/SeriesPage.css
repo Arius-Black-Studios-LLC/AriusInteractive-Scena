@@ -12,8 +12,53 @@
 
 .series-header {
   padding: 24px 20px 0;
-  max-width: 880px;
+  max-width: 920px;
   margin: 0 auto;
+}
+
+.series-hero {
+  position: relative;
+  margin-top: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 0;
+  background: linear-gradient(135deg, #1a2438, #0c1220);
+}
+
+.series-hero--banner {
+  min-height: 200px;
+}
+
+.series-banner {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.45;
+}
+
+.series-hero-text {
+  position: relative;
+  padding: 28px 24px 32px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.15));
+}
+
+.series-hero-text h1 {
+  margin: 0;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 600;
+}
+
+.series-about {
+  margin-bottom: 36px;
+}
+
+.series-about-body {
+  color: var(--muted);
+  line-height: 1.65;
+  max-width: 42rem;
+  white-space: pre-wrap;
 }
 
 .series-back,
@@ -37,6 +82,8 @@
   line-height: 1.6;
   max-width: 42rem;
 }
+
+/* legacy selectors — prefer .series-hero-text h1 in React overview */
 
 .series-main {
   padding: 32px 20px 64px;

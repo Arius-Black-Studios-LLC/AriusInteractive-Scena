@@ -62,6 +62,7 @@
       avatarUrl: row.avatar_url || row.avatarUrl || base.avatarUrl || "",
       birthYear: row.birth_year || row.birthYear || base.birthYear || null,
       adultVerifiedAt: row.adult_verified_at || row.adultVerifiedAt || base.adultVerifiedAt || "",
+      isAdmin: !!(row.is_admin || row.isAdmin),
     };
   }
 
@@ -165,7 +166,6 @@
 
     get: function (userId, session) {
       if (!userId) return Promise.resolve(null);
-      if (cache[userId]) return Promise.resolve(cache[userId]);
 
       var fallback = defaultFromSession(session) || normalize({ id: userId }, { id: userId, displayName: "Reader" });
       var local = readLocal(userId);
@@ -186,7 +186,7 @@
       }
 
       return sb.from("profiles")
-        .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at")
+        .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin")
         .eq("id", userId)
         .maybeSingle()
         .then(function (r) {
@@ -212,7 +212,7 @@
 
       function refetchProfile() {
         return sb.from("profiles")
-          .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at")
+          .select("id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin")
           .eq("id", userId)
           .maybeSingle()
           .then(function (retry) {
@@ -277,6 +277,14 @@
         }
 
         if (!next.displayName) next.displayName = "Reader";
+
+        if (patch.displayName != null && window.ScenaContentPolicy && ScenaContentPolicy.assertProfileName) {
+          try {
+            ScenaContentPolicy.assertProfileName(next.displayName);
+          } catch (policyErr) {
+            return Promise.reject(policyErr);
+          }
+        }
 
         if (next.username && !/^[a-zA-Z0-9_]{3,24}$/.test(next.username)) {
           return Promise.reject(new Error("Username must be 3–24 letters, numbers, or underscores."));

@@ -502,7 +502,55 @@
     if (idx >= 0) list[idx] = jam;
     else list.unshift(jam);
     writeAll(list);
+    if (
+      jam.status === "published" &&
+      jam.hostUserId &&
+      window.ScenaCloud &&
+      ScenaCloud.upsertGameJam
+    ) {
+      ScenaCloud.upsertGameJam(jam.hostUserId, jam);
+    }
     return jam;
+  }
+
+  var cloudJamPromise = null;
+
+  function fetchCloudJams() {
+    if (cloudJamPromise) return cloudJamPromise;
+    if (!window.ScenaCloud || !ScenaCloud.listPublishedGameJams) {
+      cloudJamPromise = Promise.resolve([]);
+      return cloudJamPromise;
+    }
+    cloudJamPromise = ScenaCloud.listPublishedGameJams().catch(function () {
+      return [];
+    });
+    return cloudJamPromise;
+  }
+
+  function mergeJamLists(localRows, cloudRows) {
+    var byId = {};
+    (localRows || []).forEach(function (j) {
+      byId[j.id] = migrateJam(j);
+    });
+    (cloudRows || []).forEach(function (j) {
+      var existing = byId[j.id];
+      if (!existing || String(j.updatedAt || "").localeCompare(String(existing.updatedAt || "")) >= 0) {
+        byId[j.id] = migrateJam(j);
+        if (!readAll().some(function (x) { return x.id === j.id; })) {
+          var importList = readAll();
+          importList.unshift(byId[j.id]);
+          writeAll(importList);
+        }
+      }
+    });
+    return Object.keys(byId).map(function (id) { return byId[id]; });
+  }
+
+  function withMergedJams(work) {
+    return fetchCloudJams().then(function (cloudRows) {
+      var merged = mergeJamLists(readAll().slice(), cloudRows);
+      return work(merged);
+    });
   }
 
   function newId() {
@@ -586,6 +634,13 @@
     allowedCategories = allowedCategories.filter(function (id) {
       return ASSET_CATEGORIES.some(function (c) { return c.id === id; });
     });
+
+    if (window.ScenaContentPolicy && ScenaContentPolicy.assertJamText) {
+      ScenaContentPolicy.assertJamText({
+        tagline: tagline,
+        rules: String(spec.rules || "").trim(),
+      });
+    }
 
     return {
       title: title,
@@ -831,11 +886,13 @@
 
     list: function (opts) {
       opts = opts || {};
-      var rows = readAll().slice().map(migrateJam);
-      if (opts.publishedOnly) rows = rows.filter(function (j) { return j.status === "published"; });
-      if (opts.hostUserId) rows = rows.filter(function (j) { return j.hostUserId === opts.hostUserId; });
-      rows.forEach(finalizeIfDue);
-      return Promise.resolve(queryJams(rows, opts));
+      return withMergedJams(function (rows) {
+        rows = rows.slice().map(migrateJam);
+        if (opts.publishedOnly) rows = rows.filter(function (j) { return j.status === "published"; });
+        if (opts.hostUserId) rows = rows.filter(function (j) { return j.hostUserId === opts.hostUserId; });
+        rows.forEach(finalizeIfDue);
+        return queryJams(rows, opts);
+      });
     },
 
     groupBySprint: groupBySprint,
@@ -846,7 +903,8 @@
     listHomeSubmissionFeed: function (opts) {
       opts = opts || {};
       var perJam = Math.max(1, parseInt(opts.perJam, 10) || 4);
-      var rows = readAll().slice().map(migrateJam).filter(function (j) {
+      return withMergedJams(function (merged) {
+      var rows = merged.slice().map(migrateJam).filter(function (j) {
         return j.status === "published";
       });
       rows.forEach(finalizeIfDue);
@@ -951,6 +1009,7 @@
       return Promise.resolve({
         featured: toFeedGroup(rows[0]),
         others: rows.slice(1).map(toMenuItem),
+      });
       });
     },
 

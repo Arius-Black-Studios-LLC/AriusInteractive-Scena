@@ -1,0 +1,143 @@
+.admin-mod-page {
+  padding: 48px 0 80px;
+  max-width: 920px;
+}
+
+.admin-mod-loading,
+.admin-mod-error {
+  padding: 80px 24px;
+  text-align: center;
+  color: var(--faint);
+}
+
+.admin-mod-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.admin-mod-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.admin-mod-head h1 {
+  margin: 0 0 12px;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 2rem;
+}
+
+.admin-mod-lede {
+  margin: 0;
+  color: var(--muted);
+  max-width: 56ch;
+  line-height: 1.5;
+}
+
+.admin-mod-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.admin-mod-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.admin-mod-tab {
+  border: 1px solid var(--line);
+  background: var(--scena-surface);
+  color: inherit;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-mod-tab.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.admin-mod-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-mod-empty {
+  padding: 28px;
+  border-radius: 12px;
+  background: var(--scena-surface);
+  color: var(--muted);
+}
+
+.admin-mod-card {
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--scena-surface);
+  border: 1px solid var(--line);
+}
+
+.admin-mod-card.is-muted {
+  opacity: 0.72;
+}
+
+.admin-mod-card header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-mod-card h2 {
+  margin: 0 0 8px;
+  font-size: 1.125rem;
+}
+
+.admin-mod-meta {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+.admin-mod-rules {
+  font-size: 0.9375rem;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.admin-mod-warn {
+  margin: 0 0 8px;
+  color: #b45309;
+  font-size: 0.875rem;
+}
+
+.admin-mod-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--scena-bg);
+  color: var(--faint);
+}
+
+.admin-mod-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-mod-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 40;
+}

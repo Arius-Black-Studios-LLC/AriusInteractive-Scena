@@ -2526,6 +2526,12 @@
     },
 
     saveSeries: function (userId, series) {
+      if (window.ScenaContentPolicy && ScenaContentPolicy.assertSeriesDescriptions) {
+        var policy = ScenaContentPolicy.assertSeriesDescriptions(series);
+        if (!policy.ok) {
+          return Promise.resolve({ ok: false, error: policy.message });
+        }
+      }
       var data = readAll();
       if (!data[userId]) data[userId] = [];
       series.updatedAt = new Date().toISOString();

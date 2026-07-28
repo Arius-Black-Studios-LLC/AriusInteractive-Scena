@@ -314,6 +314,13 @@
       if (!userId) return Promise.reject(new Error("Sign in to sell on the marketplace."));
       if (!spec.bundle || spec.empty) return Promise.reject(new Error("Nothing to list — pick a character, stage, or asset."));
 
+      if (window.ScenaContentPolicy) {
+        var titleCheck = ScenaContentPolicy.check(spec.title || "");
+        if (!titleCheck.ok) return Promise.reject(new Error(titleCheck.message));
+        var descCheck = ScenaContentPolicy.check(spec.description || "");
+        if (!descCheck.ok) return Promise.reject(new Error(descCheck.message));
+      }
+
       var sb = getClient();
       if (!sb) {
         var list = readLocalListings();

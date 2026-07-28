@@ -775,6 +775,9 @@
         '<div class="player-comment-actions">' +
           '<div class="player-comment-reactions">' + reactionHtml + "</div>" +
           '<button type="button" class="comment-reply-btn" data-reply-to="' + escapeAttr(comment.id) + '">Reply</button>' +
+          (self.userProfile && self.userProfile.id
+            ? ('<button type="button" class="comment-report-btn" data-report-comment="' + escapeAttr(comment.id) + '">Report</button>')
+            : "") +
         "</div>" +
         repliesHtml +
       "</article>"
@@ -826,6 +829,37 @@
         return;
       }
 
+      var reportBtn = e.target.closest("[data-report-comment]");
+      if (reportBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!self.userProfile || !self.userProfile.id) {
+          self.setCommentStatus("Sign in to report comments.", true);
+          return;
+        }
+        if (!window.ScenaAdmin || !ScenaAdmin.submitReport) {
+          self.setCommentStatus("Reporting is not available right now.", true);
+          return;
+        }
+        var commentId = reportBtn.getAttribute("data-report-comment");
+        var reason = window.prompt("Why are you reporting this comment?", "Spam or harassment");
+        if (!reason || !reason.trim()) return;
+        ScenaAdmin.submitReport({
+          targetType: "comment",
+          targetId: commentId,
+          reason: reason.trim(),
+          targetMeta: {
+            seriesId: self.series.id,
+            episodeId: self.episode.id,
+          },
+        }).then(function () {
+          self.setCommentStatus("Report submitted. Thanks — our team will review it.");
+        }).catch(function (err) {
+          self.setCommentStatus((err && err.message) || "Could not submit report.", true);
+        });
+        return;
+      }
+
       var cancelReply = e.target.closest("[data-cancel-reply]");
       if (cancelReply) {
         e.preventDefault();
@@ -867,6 +901,8 @@
         self.replyToId = null;
         self.setCommentStatus("");
         self.refreshCommentsUI();
+      }).catch(function (err) {
+        self.setCommentStatus((err && err.message) || "Could not post comment. Try again.", true);
       });
     });
   };

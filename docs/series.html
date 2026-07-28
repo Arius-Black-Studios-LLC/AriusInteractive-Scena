@@ -48,6 +48,8 @@
 
     <main class="series-main">
 
+      <div class="series-about-wrap" id="seriesAbout" hidden></div>
+
       <div class="series-summary" id="seriesSummary"></div>
 
       <p class="series-alert" id="seriesAlert" hidden></p>
@@ -792,9 +794,9 @@
 
           hero.innerHTML =
 
-            (series.bannerDataUrl || series.thumbnailDataUrl
+            (series.bannerDataUrl
 
-              ? ('<div class="series-banner" style="background-image:url(' + escapeHtml(series.bannerDataUrl || series.thumbnailDataUrl) + ')"></div>')
+              ? ('<div class="series-banner" style="background-image:url(' + escapeHtml(series.bannerDataUrl) + ')"></div>')
 
               : "") +
 
@@ -802,13 +804,31 @@
 
               '<h1>' + escapeHtml(series.title || "Story") + "</h1>" +
 
-              (series.shortDescription
-
-                ? ('<p class="series-tagline">' + escapeHtml(series.shortDescription) + "</p>")
-
-                : "") +
-
             "</div>";
+
+
+
+          var aboutEl = document.getElementById("seriesAbout");
+
+          var longDesc = String(series.longDescription || "").trim();
+
+          if (aboutEl) {
+
+            if (longDesc) {
+
+              aboutEl.innerHTML = '<div class="series-about-body">' + escapeHtml(longDesc) + "</div>";
+
+              aboutEl.hidden = false;
+
+            } else {
+
+              aboutEl.innerHTML = "";
+
+              aboutEl.hidden = true;
+
+            }
+
+          }
 
 
 

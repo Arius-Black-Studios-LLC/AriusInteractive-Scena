@@ -11,6 +11,8 @@ import {
 import { LoginModal } from "./components/LoginModal";
 import { SiteHeader } from "./components/SiteHeader";
 import { AuthProvider } from "./context/AuthContext";
+import { AdminFeaturedPage } from "./pages/AdminFeaturedPage";
+import { AdminModerationPage } from "./pages/AdminModerationPage";
 import { AccountPage } from "./pages/AccountPage";
 import { BlogPage } from "./pages/BlogPage";
 import { HomePage } from "./pages/HomePage";
@@ -73,6 +75,8 @@ function AppRoutes() {
       <Route path="/play" element={<PlayPage />} />
       <Route path="/studio/*" element={<StudioLayout />} />
       <Route path="/account" element={<AccountPage />} />
+      <Route path="/admin/featured" element={<AdminFeaturedPage />} />
+      <Route path="/admin/moderation" element={<AdminModerationPage />} />
       <Route path="/learn" element={<LearnLayout />}>
         <Route index element={<LearnCatalogPage />} />
         <Route path=":lessonId" element={<LearnLessonPage />} />

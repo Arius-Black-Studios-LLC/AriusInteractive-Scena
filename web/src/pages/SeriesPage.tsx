@@ -33,7 +33,8 @@ export function SeriesPage() {
   ]);
 
   const [title, setTitle] = useState("Loading…");
-  const [description, setDescription] = useState("");
+  const [longDescription, setLongDescription] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [saves, setSaves] = useState<SaveRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -74,9 +75,15 @@ export function SeriesPage() {
       (store.normalizeSeries as (s: unknown) => void)(series);
       await (progress.ready as (scope: string, sid: string) => Promise<void>)(scope, seriesId);
 
-      const s = series as { title?: string; shortDescription?: string; longDescription?: string };
+      const s = series as {
+        title?: string;
+        shortDescription?: string;
+        longDescription?: string;
+        bannerDataUrl?: string;
+      };
       setTitle(s.title || "Untitled");
-      setDescription(s.shortDescription || s.longDescription || "");
+      setLongDescription((s.longDescription || "").trim());
+      setBannerUrl((s.bannerDataUrl || "").trim());
 
       const eps = (
         store.orderedEpisodes as (ser: unknown) => Episode[]
@@ -176,13 +183,27 @@ export function SeriesPage() {
             </Link>
           </div>
         ) : null}
-        <div className="series-hero">
-          <h1>{title}</h1>
-          {description ? <p>{description}</p> : null}
+        <div className={`series-hero${bannerUrl ? " series-hero--banner" : ""}`}>
+          {bannerUrl ? (
+            <div
+              className="series-banner"
+              style={{ backgroundImage: `url(${bannerUrl})` }}
+              role="img"
+              aria-label=""
+            />
+          ) : null}
+          <div className="series-hero-text">
+            <h1>{title}</h1>
+          </div>
         </div>
       </header>
 
       <main className="series-main container">
+        {longDescription ? (
+          <section className="series-about" aria-label="About this series">
+            <div className="series-about-body">{longDescription}</div>
+          </section>
+        ) : null}
         <section className="series-saves">
           <div className="series-saves-toolbar">
             <h2>Save files</h2>

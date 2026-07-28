@@ -123,6 +123,29 @@ declare global {
       isAdultVerified?: (profile?: Record<string, unknown>) => boolean;
       seriesNeedsAgeGate?: (series: { contentFlags?: string[] }) => boolean;
     };
+    ScenaAdmin?: {
+      isAdmin: (profile: Record<string, unknown>) => boolean;
+      submitReport: (opts: {
+        targetType: string;
+        targetId: string;
+        reason: string;
+        details?: string;
+        targetMeta?: Record<string, unknown>;
+      }) => Promise<unknown>;
+      listPublishedSeries: () => Promise<Array<Record<string, unknown>>>;
+      setSeriesFeatured: (opts: Record<string, unknown>) => Promise<unknown>;
+      listRecentComments: (limit?: number) => Promise<Array<Record<string, unknown>>>;
+      hideComment: (commentId: string, reason?: string) => Promise<void>;
+      unhideComment: (commentId: string) => Promise<void>;
+      setSeriesModeration: (opts: Record<string, unknown>) => Promise<unknown>;
+      listGameJams: (limit?: number) => Promise<Array<Record<string, unknown>>>;
+      hideGameJam: (jamId: string, reason?: string) => Promise<void>;
+      unhideGameJam: (jamId: string) => Promise<void>;
+      listMarketplaceListings: (limit?: number) => Promise<Array<Record<string, unknown>>>;
+      removeMarketplaceListing: (listingId: string, reason?: string) => Promise<void>;
+      listContentReports: (limit?: number) => Promise<Array<Record<string, unknown>>>;
+      resolveContentReport: (reportId: string, status?: string) => Promise<void>;
+    };
     ScenaAccount?: {
       renderPage: (profile: Record<string, unknown>, ctx: Record<string, unknown>) => string;
       bindPage: (profile: Record<string, unknown>, ctx: Record<string, unknown>) => void;

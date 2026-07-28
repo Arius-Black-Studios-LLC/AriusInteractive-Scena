@@ -8,7 +8,7 @@ type Props = {
 };
 
 export function SiteHeader({ onOpenLogin }: Props) {
-  const { userId, signOut } = useAuth();
+  const { userId, signOut, isAdmin, profileLoading } = useAuth();
 
   return (
     <header className="site-header">
@@ -26,6 +26,16 @@ export function SiteHeader({ onOpenLogin }: Props) {
         </nav>
         <div className="site-header-actions">
           <DucatBalance />
+          {userId && !profileLoading && isAdmin ? (
+            <>
+              <Link className="btn btn-ghost btn-sm" to="/admin/moderation">
+                Moderation
+              </Link>
+              <Link className="btn btn-ghost btn-sm" to="/admin/featured">
+                Staff picks
+              </Link>
+            </>
+          ) : null}
           {userId ? (
             <>
               <Link className="btn btn-ghost btn-sm" to="/account">

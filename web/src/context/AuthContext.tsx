@@ -14,6 +14,8 @@ type AuthContextValue = {
   session: LegacySession;
   userId: string | null;
   loading: boolean;
+  profileLoading: boolean;
+  isAdmin: boolean;
   configured: boolean;
   signIn: (email: string, role?: string, postLogin?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -25,6 +27,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<LegacySession>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [configured, setConfigured] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -50,6 +54,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().catch(() => setLoading(false));
   }, [refresh]);
 
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || !session) {
+      setIsAdmin(false);
+      setProfileLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setProfileLoading(true);
+    loadLegacyScripts(["scena-auth.js", "scena-profile.js"])
+      .then(() => window.ScenaProfile?.get(userId, session))
+      .then((profile) => {
+        if (cancelled) return;
+        setIsAdmin(!!profile?.isAdmin);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdmin(false);
+      })
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
   const signIn = useCallback(
     async (email: string, role?: string, postLogin?: string) => {
       if (postLogin) {
@@ -70,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadLegacyScripts(["scena-auth.js"]);
     await window.ScenaAuth?.signOut();
     setSession(null);
+    setIsAdmin(false);
   }, []);
 
   const value = useMemo(
@@ -77,12 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       userId: session?.user?.id ?? null,
       loading,
+      profileLoading,
+      isAdmin,
       configured,
       signIn,
       signOut,
       refresh,
     }),
-    [session, loading, configured, signIn, signOut, refresh],
+    [session, loading, profileLoading, isAdmin, configured, signIn, signOut, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -78,6 +78,7 @@
   function shouldListInCatalog(series) {
     if (!series || !series.id) return false;
     if (series.templateSource) return false;
+    if (series.adminHidden) return false;
     return isPublishedSeries(series);
   }
 
