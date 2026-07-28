@@ -1754,7 +1754,7 @@ body.is-resizing-center {
 .ui-mock-menu-panel > .player-menu-header,
 .ui-mock-menu-panel > .player-menu-tabs,
 .ui-mock-menu-panel > .player-menu-body {
-  pointer-events: none;
+  pointer-events: auto;
 }
 .ui-mock-menu-close,
 .ui-mock-menu-panel > .ui-mock-resize-handle {
@@ -1835,6 +1835,82 @@ body.is-resizing-center {
   text-align: left;
   width: 100%;
   pointer-events: none;
+}
+.ui-mock-dialogue,
+.ui-mock-nameplate,
+.ui-mock-choice,
+.ui-mock-menu,
+.ui-mock-menu-panel,
+.ui-mock-inventory-item {
+  image-rendering: pixelated;
+}
+.ui-mock-frame[data-smooth-dialogue="1"] .ui-mock-dialogue,
+.ui-mock-frame[data-smooth-choices="1"] .ui-mock-choice,
+.ui-mock-frame[data-smooth-nameplate="1"] .ui-mock-nameplate,
+.ui-mock-frame[data-smooth-menu="1"] .ui-mock-menu,
+.ui-mock-frame[data-smooth-menu-panel="1"] .ui-mock-menu-panel,
+.ui-mock-frame[data-smooth-inventory-item="1"] .ui-mock-inventory-item { image-rendering: auto; }
+
+.ui-mock-dialogue {
+  opacity: var(--ui-dialogue-opacity, 1);
+  border: var(--ui-dialogue-border-width, 0px) solid var(--ui-dialogue-border-color, transparent);
+  box-shadow: 0 0 var(--ui-dialogue-glow-size, 0px) var(--ui-dialogue-glow-color, transparent);
+}
+.ui-mock-dialogue-text {
+  font-size: var(--ui-dialogue-font-size, 100%);
+}
+.ui-mock-frame[data-bestfit-dialogue="1"] .ui-mock-dialogue-text { font-size: clamp(0.8rem, 1.1vw, 1.1rem); }
+.ui-mock-nameplate {
+  opacity: var(--ui-nameplate-opacity, 1);
+  border: var(--ui-nameplate-border-width, 0px) solid var(--ui-nameplate-border-color, transparent);
+  box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
+  background-image: var(--ui-nameplate-sprite, none);
+  background-size: 100% 100%;
+}
+.ui-mock-speaker { font-size: var(--ui-nameplate-font-size, 100%); }
+.ui-mock-choice {
+  opacity: var(--ui-choices-opacity, 1);
+  border-width: var(--ui-choices-border-width, 1px);
+  border-color: var(--ui-choices-border-color, var(--ui-choice-border));
+  box-shadow: 0 0 var(--ui-choices-glow-size, 0px) var(--ui-choices-glow-color, transparent);
+  font-size: var(--ui-choices-font-size, 100%);
+}
+.ui-mock-menu {
+  opacity: var(--ui-menu-opacity, 1);
+  border-width: var(--ui-menu-border-width, 1px);
+  border-color: var(--ui-menu-border-color, rgba(255,255,255,0.25));
+  box-shadow: 0 0 var(--ui-menu-glow-size, 0px) var(--ui-menu-glow-color, transparent);
+  background-image: var(--ui-menu-button-sprite, none);
+  background-size: 100% 100%;
+}
+.ui-mock-menu-panel {
+  opacity: var(--ui-menupanel-opacity, 1);
+  border-width: var(--ui-menupanel-border-width, 1px);
+  border-color: var(--ui-menupanel-border-color, rgba(255,255,255,0.12));
+  box-shadow: 0 0 var(--ui-menupanel-glow-size, 0px) var(--ui-menupanel-glow-color, transparent);
+  background-image: var(--ui-menu-panel-sprite, none);
+  background-size: 100% 100%;
+}
+.ui-mock-menu-panel .player-menu-title,
+.ui-mock-menu-panel .player-menu-tab,
+.ui-mock-menu-panel .player-menu-empty {
+  font-size: var(--ui-menupanel-font-size, 100%);
+}
+.ui-mock-inventory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  opacity: var(--ui-inventory-opacity, 1);
+  border: var(--ui-inventory-border-width, 0px) solid var(--ui-inventory-border-color, transparent);
+  box-shadow: 0 0 var(--ui-inventory-glow-size, 0px) var(--ui-inventory-glow-color, transparent);
+  background-image: var(--ui-inventory-item-sprite, none);
+  background-size: 100% 100%;
+  font-size: var(--ui-inventory-font-size, 100%);
+  cursor: pointer;
 }
 .ui-mock-frame[data-custom-choice="1"] .ui-mock-choice {
   background: var(--ui-choice-sprite) center / 100% 100% no-repeat;

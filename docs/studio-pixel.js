@@ -748,6 +748,10 @@
       if (frameLabel) {
         frameLabel.textContent = "Frame " + (state.frameIndex + 1) + " / " + state.frames.length;
       }
+      var saveBtn = rootEl.querySelector("#pixelSaveBtn");
+      if (saveBtn && !saveBtn.disabled) {
+        saveBtn.textContent = state.editingId ? "Update in Art folder" : "Save to Art folder";
+      }
     }
 
     function renderTimeline() {
@@ -893,7 +897,7 @@
       }).then(function () {
         if (btn) {
           btn.disabled = false;
-          btn.textContent = "Save to Art folder";
+          btn.textContent = state.editingId ? "Update in Art folder" : "Save to Art folder";
         }
       });
     }

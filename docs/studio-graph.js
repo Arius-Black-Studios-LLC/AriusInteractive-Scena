@@ -1202,7 +1202,11 @@
   ScenaGraphEditor.prototype.syncInspectorPanel = function () {
     if (!this.workspaceEditor || this.isMobileLayout()) return;
     var hasSelection = !!(this.selectedId || this.selectedEdgeId || this.selectedBoundaryId);
-    this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection);
+    var shouldAutoOpenDetails = !this.playMode;
+    this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection && shouldAutoOpenDetails);
+    if (!shouldAutoOpenDetails) {
+      return;
+    }
     if (hasSelection) {
       // Open Details when binder is closed; don't yank away from Blocks/Assets mid-edit.
       if (!this.binderTab || this.binderTab === "details") {

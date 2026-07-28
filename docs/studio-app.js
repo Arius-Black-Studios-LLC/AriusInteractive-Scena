@@ -715,6 +715,7 @@
   function collectReaderUi(form, series) {
     ScenaStore.ensureReaderUi(series);
     var ui = series.readerUi;
+    ensureUiAppearance(ui);
     var presetActive = document.querySelector("#uiPresetCards .ui-preset-card.is-active");
     if (presetActive) ui.preset = presetActive.getAttribute("data-ui-preset");
     var aspect = form.querySelector('[name="uiAspectRatio"]');
@@ -786,6 +787,38 @@
     if (panelBg) ui.menu.panelBg = panelBg.value;
     var panelText = form.querySelector('[name="uiMenuPanelText"]');
     if (panelText) ui.menu.panelText = panelText.value;
+    var typingEnabled = form.querySelector('[name="uiTypingEnabled"]');
+    var typingSpeed = form.querySelector('[name="uiTypingSpeed"]');
+    var typingSound = form.querySelector('[name="uiTypingSound"]');
+    if (!ui.typing) ui.typing = { enabled: true, speed: 28, sound: true };
+    if (typingEnabled) ui.typing.enabled = typingEnabled.checked;
+    if (typingSpeed) ui.typing.speed = Math.max(8, Math.min(80, parseInt(typingSpeed.value, 10) || 28));
+    if (typingSound) ui.typing.sound = typingSound.checked;
+    [["dialogue", true], ["choices", true], ["nameplate", true], ["menu", false], ["menuPanel", true], ["inventoryItem", true]].forEach(function (cfg) {
+      var key = cfg[0];
+      var includeFont = cfg[1];
+      var prefix = "uiAp" + key.charAt(0).toUpperCase() + key.slice(1);
+      var ap = getUiAppearance(ui, key);
+      var opacity = form.querySelector('[name="' + prefix + 'Opacity"]');
+      var smooth = form.querySelector('[name="' + prefix + 'Smooth"]');
+      var borderWidth = form.querySelector('[name="' + prefix + 'BorderWidth"]');
+      var borderColor = form.querySelector('[name="' + prefix + 'BorderColor"]');
+      var glowSize = form.querySelector('[name="' + prefix + 'GlowSize"]');
+      var glowColor = form.querySelector('[name="' + prefix + 'GlowColor"]');
+      var fontSize = form.querySelector('[name="' + prefix + 'FontSize"]');
+      var bestFit = form.querySelector('[name="' + prefix + 'BestFit"]');
+      if (opacity) ap.opacity = Math.max(0, Math.min(100, parseInt(opacity.value, 10) || 100));
+      if (smooth) ap.smooth = !!smooth.checked;
+      if (borderWidth) ap.borderWidth = Math.max(0, Math.min(16, parseInt(borderWidth.value, 10) || 0));
+      if (borderColor) ap.borderColor = borderColor.value || "#ffffff";
+      if (glowSize) ap.glowSize = Math.max(0, Math.min(24, parseInt(glowSize.value, 10) || 0));
+      if (glowColor) ap.glowColor = glowColor.value || "#2a9d8f";
+      if (includeFont) {
+        if (fontSize) ap.fontSize = Math.max(70, Math.min(180, parseInt(fontSize.value, 10) || 100));
+        if (bestFit) ap.bestFit = !!bestFit.checked;
+      }
+      ui.appearance[key] = ap;
+    });
   }
 
   function toColorInput(value) {
@@ -940,6 +973,7 @@
       { id: "choices", label: "Choices", hint: "Option buttons" },
       { id: "menu", label: "Menu button", hint: "☰ position" },
       { id: "menuPanel", label: "Menu panel", hint: "Open menu UI" },
+      { id: "inventoryItem", label: "Inventory item", hint: "Sample row/card" },
     ];
     return (
       '<div class="game-ui-hierarchy-list" id="uiHierarchyList">' +
@@ -1049,6 +1083,7 @@
               "</nav>" +
               '<div class="player-menu-body">' +
                 '<p class="player-menu-empty">Sample transcript and inventory appear here during play.</p>' +
+                '<div class="ui-mock-inventory-item" data-ui-select="inventoryItem"><span>Sample Potion</span><strong>x2</strong></div>' +
               "</div>" +
               uiMockResizeHandlesHtml(["n", "s", "e", "w", "ne", "nw", "se", "sw"]) +
             "</div>" +
@@ -1068,6 +1103,55 @@
     };
   }
 
+  function defaultUiAppearance() {
+    return {
+      opacity: 100,
+      smooth: false,
+      borderWidth: 0,
+      borderColor: "#ffffff",
+      glowSize: 0,
+      glowColor: "#2a9d8f",
+      fontSize: 100,
+      bestFit: true,
+    };
+  }
+
+  function ensureUiAppearance(ui) {
+    ui.appearance = ui.appearance || {};
+    ["dialogue", "choices", "nameplate", "menu", "menuPanel", "inventoryItem"].forEach(function (key) {
+      ui.appearance[key] = Object.assign({}, defaultUiAppearance(), ui.appearance[key] || {});
+    });
+    if (!ui.typing) ui.typing = { enabled: true, speed: 28, sound: true };
+    else {
+      if (ui.typing.enabled == null) ui.typing.enabled = true;
+      if (ui.typing.speed == null) ui.typing.speed = 28;
+      if (ui.typing.sound == null) ui.typing.sound = true;
+    }
+    return ui.appearance;
+  }
+
+  function getUiAppearance(ui, key) {
+    ensureUiAppearance(ui);
+    return ui.appearance[key] || defaultUiAppearance();
+  }
+
+  function uiAppearanceFields(key, ap, opts) {
+    opts = opts || {};
+    var prefix = "uiAp" + key.charAt(0).toUpperCase() + key.slice(1);
+    return (
+      '<div class="field"><label>Opacity</label><input type="range" name="' + prefix + 'Opacity" min="0" max="100" step="1" value="' + (ap.opacity || 100) + '"></div>' +
+      '<div class="field"><label class="field-inline"><input type="checkbox" name="' + prefix + 'Smooth"' + (ap.smooth ? " checked" : "") + '> Smooth edges</label></div>' +
+      '<div class="field"><label>Border width</label><input type="range" name="' + prefix + 'BorderWidth" min="0" max="16" step="1" value="' + (ap.borderWidth || 0) + '"></div>' +
+      '<div class="field"><label>Border color</label><input type="color" name="' + prefix + 'BorderColor" value="' + escapeAttr(toColorInput(ap.borderColor) || "#ffffff") + '"></div>' +
+      '<div class="field"><label>Glow / shadow strength</label><input type="range" name="' + prefix + 'GlowSize" min="0" max="24" step="1" value="' + (ap.glowSize || 0) + '"></div>' +
+      '<div class="field"><label>Glow / shadow color</label><input type="color" name="' + prefix + 'GlowColor" value="' + escapeAttr(toColorInput(ap.glowColor) || "#2a9d8f") + '"></div>' +
+      (opts.includeFont ? (
+        '<div class="field"><label>Font size (%)</label><input type="range" name="' + prefix + 'FontSize" min="70" max="180" step="1" value="' + (ap.fontSize || 100) + '"></div>' +
+        '<div class="field"><label class="field-inline"><input type="checkbox" name="' + prefix + 'BestFit"' + (ap.bestFit !== false ? " checked" : "") + '> Best fit text</label></div>'
+      ) : "")
+    );
+  }
+
   function renderUiInspector(series, selected) {
     ScenaStore.ensureReaderUi(series);
     var ui = series.readerUi;
@@ -1085,8 +1169,20 @@
     var clickOpts = '<option value="">— Default (Button tap) —</option>' + uiAssets.map(function (a) {
       return '<option value="' + a.id + '"' + (ui.sounds.clickAssetId === a.id ? " selected" : "") + '>' + escapeHtml(a.label) + '</option>';
     }).join("");
-    var hasDlgSprite = !!(ui.customSprites && ui.customSprites.dialogueBox);
-    var hasChoiceSprite = !!(ui.customSprites && ui.customSprites.choiceButton);
+    ensureUiAppearance(ui);
+    if (!ui.customSprites) ui.customSprites = {};
+    var hasDlgSprite = !!ui.customSprites.dialogueBox;
+    var hasChoiceSprite = !!ui.customSprites.choiceButton;
+    var hasNameplateSprite = !!ui.customSprites.nameplate;
+    var hasMenuButtonSprite = !!ui.customSprites.menuButton;
+    var hasMenuPanelSprite = !!ui.customSprites.menuPanel;
+    var hasInvSprite = !!ui.customSprites.inventoryItem;
+    var apDialogue = getUiAppearance(ui, "dialogue");
+    var apChoices = getUiAppearance(ui, "choices");
+    var apName = getUiAppearance(ui, "nameplate");
+    var apMenu = getUiAppearance(ui, "menu");
+    var apMenuPanel = getUiAppearance(ui, "menuPanel");
+    var apInv = getUiAppearance(ui, "inventoryItem");
 
     return (
       '<div id="readerUiSection" class="game-ui-inspector-body">' +
@@ -1111,11 +1207,22 @@
             artImportActionsHtml({ inputId: "uiDialogueSpriteInput", kind: "ui", pixelBtnId: "uiDialogueSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiDialogueSpriteClear"' + (hasDlgSprite ? "" : " hidden") + ">Remove sprite</button>" +
           "</div>" +
+          uiAppearanceFields("dialogue", apDialogue, { includeFont: true }) +
+          '<div class="field"><label class="field-inline"><input type="checkbox" name="uiTypingEnabled"' + (ui.typing.enabled ? " checked" : "") + '> Typing speed effect</label></div>' +
+          '<div class="field"><label>Typing speed (chars/s)</label><input type="range" name="uiTypingSpeed" min="8" max="80" step="1" value="' + (ui.typing.speed || 28) + '"></div>' +
+          '<div class="field"><label class="field-inline"><input type="checkbox" name="uiTypingSound"' + (ui.typing.sound ? " checked" : "") + '> Typing sound</label></div>' +
+          '<div class="modal-actions" style="justify-content:flex-start"><button type="button" class="btn btn-sm btn-ghost" id="uiTypingSampleBtn">Sample typing sound</button></div>' +
         "</div>" +
         '<div class="game-ui-inspector-panel" data-ui-panel="nameplate"' + (selected === "nameplate" ? "" : " hidden") + ">" +
           "<h2>Nameplate</h2>" +
-          '<p class="field-hint">Drag and resize on the canvas. Color follows the scene accent / speaker setting.</p>' +
+          '<p class="field-hint">Drag and resize on the canvas.</p>' +
+          '<div class="field"><label>Override sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiNameplateSpritePreview" style="' + (hasNameplateSprite ? "background-image:url(" + ui.customSprites.nameplate + ")" : "") + '"></div>' +
+            artImportActionsHtml({ inputId: "uiNameplateSpriteInput", kind: "ui", pixelBtnId: "uiNameplateSpritePixel" }) +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiNameplateSpriteClear"' + (hasNameplateSprite ? "" : " hidden") + ">Remove sprite</button>" +
+          "</div>" +
           '<div class="field"><label>Speaker color</label><input type="color" name="uiSpeaker" value="' + escapeAttr(resolved.colors.speaker || "#2a9d8f") + '"></div>' +
+          uiAppearanceFields("nameplate", apName, { includeFont: true }) +
         "</div>" +
         '<div class="game-ui-inspector-panel" data-ui-panel="choices"' + (selected === "choices" ? "" : " hidden") + ">" +
           "<h2>Choices</h2>" +
@@ -1126,6 +1233,7 @@
             artImportActionsHtml({ inputId: "uiChoiceSpriteInput", kind: "ui", pixelBtnId: "uiChoiceSpritePixel" }) +
             '<button type="button" class="btn btn-sm btn-ghost" id="uiChoiceSpriteClear"' + (hasChoiceSprite ? "" : " hidden") + ">Remove sprite</button>" +
           "</div>" +
+          uiAppearanceFields("choices", apChoices, { includeFont: true }) +
         "</div>" +
         '<div class="game-ui-inspector-panel" data-ui-panel="menu"' + (selected === "menu" ? "" : " hidden") + ">" +
           "<h2>Menu button</h2>" +
@@ -1133,6 +1241,12 @@
           '<div class="field"><label class="field-inline">' +
             '<input type="checkbox" name="uiMenuEnabled"' + (ui.menu && ui.menu.enabled !== false ? " checked" : "") + "> " +
             "Show ☰ menu during play</label></div>" +
+          '<div class="field"><label>Override button sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiMenuButtonSpritePreview" style="' + (hasMenuButtonSprite ? "background-image:url(" + ui.customSprites.menuButton + ")" : "") + '"></div>' +
+            artImportActionsHtml({ inputId: "uiMenuButtonSpriteInput", kind: "ui", pixelBtnId: "uiMenuButtonSpritePixel" }) +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiMenuButtonSpriteClear"' + (hasMenuButtonSprite ? "" : " hidden") + ">Remove sprite</button>" +
+          "</div>" +
+          uiAppearanceFields("menu", apMenu, { includeFont: false }) +
           '<div class="modal-actions" style="justify-content:flex-start;margin-top:4px">' +
             '<button type="button" class="btn btn-sm btn-secondary" id="uiOpenMenuFromInspector">Open menu panel</button>' +
           "</div>" +
@@ -1161,6 +1275,23 @@
             escapeAttr(toColorInput((ui.menu && ui.menu.panelBg) || "#12100e") || "#12100e") + '"></div>' +
           '<div class="field"><label>Panel text</label><input type="color" name="uiMenuPanelText" value="' +
             escapeAttr(toColorInput((ui.menu && ui.menu.panelText) || "#f5f0e6") || "#f5f0e6") + '"></div>' +
+          '<div class="field"><label>Panel override sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiMenuPanelSpritePreview" style="' + (hasMenuPanelSprite ? "background-image:url(" + ui.customSprites.menuPanel + ")" : "") + '"></div>' +
+            artImportActionsHtml({ inputId: "uiMenuPanelSpriteInput", kind: "ui", pixelBtnId: "uiMenuPanelSpritePixel" }) +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiMenuPanelSpriteClear"' + (hasMenuPanelSprite ? "" : " hidden") + ">Remove sprite</button>" +
+          "</div>" +
+          uiAppearanceFields("menuPanel", apMenuPanel, { includeFont: true }) +
+          '<p class="field-hint">Select "Inventory item" from the hierarchy (or click sample item) to style it separately.</p>' +
+        "</div>" +
+        '<div class="game-ui-inspector-panel" data-ui-panel="inventoryItem"' + (selected === "inventoryItem" ? "" : " hidden") + ">" +
+          "<h2>Inventory item</h2>" +
+          '<p class="field-hint">Style sample inventory rows/cards shown in the menu panel.</p>' +
+          '<div class="field"><label>Override sprite</label>' +
+            '<div class="ui-sprite-preview" id="uiInventoryItemSpritePreview" style="' + (hasInvSprite ? "background-image:url(" + ui.customSprites.inventoryItem + ")" : "") + '"></div>' +
+            artImportActionsHtml({ inputId: "uiInventoryItemSpriteInput", kind: "ui", pixelBtnId: "uiInventoryItemSpritePixel" }) +
+            '<button type="button" class="btn btn-sm btn-ghost" id="uiInventoryItemSpriteClear"' + (hasInvSprite ? "" : " hidden") + ">Remove sprite</button>" +
+          "</div>" +
+          uiAppearanceFields("inventoryItem", apInv, { includeFont: true }) +
         "</div>" +
       "</div>"
     );
@@ -1169,11 +1300,11 @@
   function setGameUiSelection(id) {
     if (!id) return;
     gameUiSelectedEl = id;
-    if (id === "menuPanel") gameUiMenuOpen = true;
+    if (id === "menuPanel" || id === "inventoryItem") gameUiMenuOpen = true;
     document.querySelectorAll("[data-ui-select]").forEach(function (el) {
       var match = el.getAttribute("data-ui-select") === id;
       if (el.classList.contains("game-ui-hierarchy-item") || el.classList.contains("ui-mock-layer") ||
-          el.classList.contains("ui-mock-menu-panel")) {
+          el.classList.contains("ui-mock-menu-panel") || el.classList.contains("ui-mock-inventory-item")) {
         el.classList.toggle("is-selected", match);
         el.classList.toggle("is-active", match && el.classList.contains("game-ui-hierarchy-item"));
       }
@@ -1442,50 +1573,58 @@
 
     bindSoundPreview("#uiClickPreviewBtn", '[name="uiClickAsset"]', series, false);
 
-    bindImageUpload("#uiDialogueSpriteInput", "#uiDialogueSpritePreview", function (url) {
-      series.readerUi.customSprites.dialogueBox = url;
-      $("#uiDialogueSpriteClear").hidden = false;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
-    }, "reader-ui-dialogue", series.id);
-    bindImageUpload("#uiChoiceSpriteInput", "#uiChoiceSpritePreview", function (url) {
-      series.readerUi.customSprites.choiceButton = url;
-      $("#uiChoiceSpriteClear").hidden = false;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
-    }, "reader-ui-choice", series.id);
-    bindPixelArtImportBtn("#uiDialogueSpritePixel", "ui", function (url) {
-      series.readerUi.customSprites.dialogueBox = url;
-      applyImagePreview("#uiDialogueSpritePreview", url);
-      $("#uiDialogueSpriteClear").hidden = false;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
-      toast("Pixel art applied");
-    }, "Choose dialogue box sprite");
-    bindPixelArtImportBtn("#uiChoiceSpritePixel", "ui", function (url) {
-      series.readerUi.customSprites.choiceButton = url;
-      applyImagePreview("#uiChoiceSpritePreview", url);
-      $("#uiChoiceSpriteClear").hidden = false;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
-      toast("Pixel art applied");
-    }, "Choose choice button sprite");
-
-    var clearDlg = $("#uiDialogueSpriteClear");
-    if (clearDlg) clearDlg.addEventListener("click", function () {
-      series.readerUi.customSprites.dialogueBox = null;
-      $("#uiDialogueSpritePreview").style.backgroundImage = "";
-      clearDlg.hidden = true;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
-    });
-    var clearCh = $("#uiChoiceSpriteClear");
-    if (clearCh) clearCh.addEventListener("click", function () {
-      series.readerUi.customSprites.choiceButton = null;
-      $("#uiChoiceSpritePreview").style.backgroundImage = "";
-      clearCh.hidden = true;
-      scheduleAutoSave();
-      if ($("#uiMockFrame")) refreshUiMockup(series);
+    function bindUiSpriteField(config) {
+      bindImageUpload(config.input, config.preview, function (url) {
+        series.readerUi.customSprites[config.key] = url;
+        var clearBtn = $(config.clear);
+        if (clearBtn) clearBtn.hidden = false;
+        scheduleAutoSave();
+        if ($("#uiMockFrame")) refreshUiMockup(series);
+      }, config.uploadPurpose, series.id);
+      bindPixelArtImportBtn(config.pixelBtn, "ui", function (url) {
+        series.readerUi.customSprites[config.key] = url;
+        applyImagePreview(config.preview, url);
+        var clearBtn = $(config.clear);
+        if (clearBtn) clearBtn.hidden = false;
+        scheduleAutoSave();
+        if ($("#uiMockFrame")) refreshUiMockup(series);
+        toast("Pixel art applied");
+      }, config.prompt);
+      var clear = $(config.clear);
+      if (clear) clear.addEventListener("click", function () {
+        series.readerUi.customSprites[config.key] = null;
+        var preview = $(config.preview);
+        if (preview) preview.style.backgroundImage = "";
+        clear.hidden = true;
+        scheduleAutoSave();
+        if ($("#uiMockFrame")) refreshUiMockup(series);
+      });
+    }
+    bindUiSpriteField({ key: "dialogueBox", input: "#uiDialogueSpriteInput", preview: "#uiDialogueSpritePreview", clear: "#uiDialogueSpriteClear", pixelBtn: "#uiDialogueSpritePixel", uploadPurpose: "reader-ui-dialogue", prompt: "Choose dialogue box sprite" });
+    bindUiSpriteField({ key: "choiceButton", input: "#uiChoiceSpriteInput", preview: "#uiChoiceSpritePreview", clear: "#uiChoiceSpriteClear", pixelBtn: "#uiChoiceSpritePixel", uploadPurpose: "reader-ui-choice", prompt: "Choose choice button sprite" });
+    bindUiSpriteField({ key: "nameplate", input: "#uiNameplateSpriteInput", preview: "#uiNameplateSpritePreview", clear: "#uiNameplateSpriteClear", pixelBtn: "#uiNameplateSpritePixel", uploadPurpose: "reader-ui-nameplate", prompt: "Choose nameplate sprite" });
+    bindUiSpriteField({ key: "menuButton", input: "#uiMenuButtonSpriteInput", preview: "#uiMenuButtonSpritePreview", clear: "#uiMenuButtonSpriteClear", pixelBtn: "#uiMenuButtonSpritePixel", uploadPurpose: "reader-ui-menu-button", prompt: "Choose menu button sprite" });
+    bindUiSpriteField({ key: "menuPanel", input: "#uiMenuPanelSpriteInput", preview: "#uiMenuPanelSpritePreview", clear: "#uiMenuPanelSpriteClear", pixelBtn: "#uiMenuPanelSpritePixel", uploadPurpose: "reader-ui-menu-panel", prompt: "Choose menu panel sprite" });
+    bindUiSpriteField({ key: "inventoryItem", input: "#uiInventoryItemSpriteInput", preview: "#uiInventoryItemSpritePreview", clear: "#uiInventoryItemSpriteClear", pixelBtn: "#uiInventoryItemSpritePixel", uploadPurpose: "reader-ui-inventory-item", prompt: "Choose inventory item sprite" });
+    var typingSample = $("#uiTypingSampleBtn");
+    if (typingSample) typingSample.addEventListener("click", function () {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      var ac = new Ctx();
+      var t = ac.currentTime;
+      for (var i = 0; i < 10; i++) {
+        var osc = ac.createOscillator();
+        var gain = ac.createGain();
+        osc.type = "square";
+        osc.frequency.value = 1200 + Math.random() * 1800;
+        gain.gain.setValueAtTime(0.0001, t + i * 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.06, t + i * 0.03 + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.03 + 0.028);
+        osc.connect(gain);
+        gain.connect(ac.destination);
+        osc.start(t + i * 0.03);
+        osc.stop(t + i * 0.03 + 0.03);
+      }
     });
 
     var saveSettingsBtn = $("#saveSettingsBtn");
@@ -1634,6 +1773,11 @@
         setGameUiSelection(btn.getAttribute("data-ui-select"));
       });
     });
+    document.querySelectorAll("#uiMockFrame [data-ui-select]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        setGameUiSelection(el.getAttribute("data-ui-select"));
+      });
+    });
 
     var toggleMenu = $("#uiToggleMenuBtn");
     if (toggleMenu) {
@@ -1739,6 +1883,28 @@
       " preview-shape-dialogue--" + ui.shapes.dialogue +
       " preview-shape-choice--" + ui.shapes.choice +
       (gameUiMenuOpen ? " is-menu-open" : "");
+    ensureUiAppearance(ui);
+    var appearanceKeys = [
+      ["dialogue", "dialogue"],
+      ["choices", "choices"],
+      ["nameplate", "nameplate"],
+      ["menu", "menu"],
+      ["menuPanel", "menupanel"],
+      ["inventoryItem", "inventory"],
+    ];
+    appearanceKeys.forEach(function (entry) {
+      var key = entry[0];
+      var css = entry[1];
+      var ap = getUiAppearance(ui, key);
+      frame.style.setProperty("--ui-" + css + "-opacity", ((ap.opacity == null ? 100 : ap.opacity) / 100).toFixed(3));
+      frame.style.setProperty("--ui-" + css + "-border-width", (ap.borderWidth || 0) + "px");
+      frame.style.setProperty("--ui-" + css + "-border-color", ap.borderColor || "#ffffff");
+      frame.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
+      frame.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
+      frame.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
+      frame.dataset["bestfit" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.bestFit === false ? "0" : "1";
+      frame.dataset["smooth" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.smooth ? "1" : "0";
+    });
     if (ui.customSprites.dialogueBox) {
       frame.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
       frame.dataset.customDialogue = "1";
@@ -1753,6 +1919,14 @@
       frame.style.removeProperty("--ui-choice-sprite");
       delete frame.dataset.customChoice;
     }
+    if (ui.customSprites.nameplate) frame.style.setProperty("--ui-nameplate-sprite", "url(" + ui.customSprites.nameplate + ")");
+    else frame.style.removeProperty("--ui-nameplate-sprite");
+    if (ui.customSprites.menuButton) frame.style.setProperty("--ui-menu-button-sprite", "url(" + ui.customSprites.menuButton + ")");
+    else frame.style.removeProperty("--ui-menu-button-sprite");
+    if (ui.customSprites.menuPanel) frame.style.setProperty("--ui-menu-panel-sprite", "url(" + ui.customSprites.menuPanel + ")");
+    else frame.style.removeProperty("--ui-menu-panel-sprite");
+    if (ui.customSprites.inventoryItem) frame.style.setProperty("--ui-inventory-item-sprite", "url(" + ui.customSprites.inventoryItem + ")");
+    else frame.style.removeProperty("--ui-inventory-item-sprite");
     var layout = ui.layout || defaultUiLayout();
     var dlg = frame.querySelector('[data-ui-drag="dialogue"]');
     var name = frame.querySelector('[data-ui-drag="nameplate"]');

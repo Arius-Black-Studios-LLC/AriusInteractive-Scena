@@ -38,6 +38,8 @@
     this.frozenBeatHtml = "";
     this.discussHintVisible = false;
     this.discussHintTimer = null;
+    this.typingTimer = null;
+    this.typingAudioCtx = null;
     this.dialogueLog = [];
     this.readerMenu = null;
 
@@ -63,6 +65,10 @@
     }
     window.removeEventListener("keydown", this.boundKey);
     if (window.ScenaAudio) ScenaAudio.stopBgm();
+    if (this.typingTimer) {
+      clearInterval(this.typingTimer);
+      this.typingTimer = null;
+    }
   };
 
   ScenaPlayer.prototype.syncChoicesMade = function () {
@@ -541,6 +547,27 @@
     el.className = "preview-frame player-frame preview-ui--" + ui.preset +
       " preview-shape-dialogue--" + ui.shapes.dialogue +
       " preview-shape-choice--" + ui.shapes.choice;
+    var appearance = ui.appearance || {};
+    [
+      ["dialogue", "dialogue"],
+      ["choices", "choices"],
+      ["nameplate", "nameplate"],
+      ["menu", "menu"],
+      ["menuPanel", "menupanel"],
+      ["inventoryItem", "inventory"],
+    ].forEach(function (pair) {
+      var key = pair[0];
+      var css = pair[1];
+      var ap = appearance[key] || {};
+      el.style.setProperty("--ui-" + css + "-opacity", ((ap.opacity == null ? 100 : ap.opacity) / 100).toFixed(3));
+      el.style.setProperty("--ui-" + css + "-border-width", (ap.borderWidth || 0) + "px");
+      el.style.setProperty("--ui-" + css + "-border-color", ap.borderColor || "#ffffff");
+      el.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
+      el.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
+      el.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
+      el.dataset["smooth" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.smooth ? "1" : "0";
+      el.dataset["bestfit" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.bestFit === false ? "0" : "1";
+    });
     if (ui.customSprites.dialogueBox) {
       el.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
       el.dataset.customDialogue = "1";
@@ -555,6 +582,14 @@
       el.style.removeProperty("--ui-choice-sprite");
       delete el.dataset.customChoice;
     }
+    if (ui.customSprites && ui.customSprites.nameplate) el.style.setProperty("--ui-nameplate-sprite", "url(" + ui.customSprites.nameplate + ")");
+    else el.style.removeProperty("--ui-nameplate-sprite");
+    if (ui.customSprites && ui.customSprites.menuButton) el.style.setProperty("--ui-menu-button-sprite", "url(" + ui.customSprites.menuButton + ")");
+    else el.style.removeProperty("--ui-menu-button-sprite");
+    if (ui.customSprites && ui.customSprites.menuPanel) el.style.setProperty("--ui-menu-panel-sprite", "url(" + ui.customSprites.menuPanel + ")");
+    else el.style.removeProperty("--ui-menu-panel-sprite");
+    if (ui.customSprites && ui.customSprites.inventoryItem) el.style.setProperty("--ui-inventory-item-sprite", "url(" + ui.customSprites.inventoryItem + ")");
+    else el.style.removeProperty("--ui-inventory-item-sprite");
     var layout = ui.layout || {};
     var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
     var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
@@ -1194,9 +1229,69 @@
     this.frozenBeatHtml = stageHtml + dialogueHtml;
     this.storyEl.className = this.readingStoryClassName();
     this.storyEl.innerHTML = '<div class="player-story-inner">' + this.frozenBeatHtml + "</div>";
+    this.applyTypingEffect();
     this.refreshCommentsUI();
     if (canParallax && this.parallaxEnabled) this.bindParallax();
     this.bindInput(node);
+  };
+
+  ScenaPlayer.prototype.applyTypingEffect = function () {
+    if (!this.storyEl) return;
+    if (this.typingTimer) {
+      clearInterval(this.typingTimer);
+      this.typingTimer = null;
+    }
+    var ui = ScenaStore.resolveReaderUi(this.series);
+    var typing = (ui && ui.typing) || { enabled: true, speed: 28, sound: true };
+    if (!typing.enabled) return;
+    var speed = Math.max(8, Math.min(80, parseInt(typing.speed, 10) || 28));
+    var textEls = this.storyEl.querySelectorAll(".player-dialogue-text");
+    if (!textEls.length) return;
+    var jobs = [];
+    textEls.forEach(function (el) {
+      var full = el.textContent || "";
+      el.textContent = "";
+      jobs.push({ el: el, full: full, i: 0 });
+    });
+    var self = this;
+    var tickMs = Math.max(12, Math.round(1000 / speed));
+    this.typingTimer = setInterval(function () {
+      var done = true;
+      jobs.forEach(function (job) {
+        if (job.i < job.full.length) {
+          done = false;
+          job.i += 1;
+          job.el.textContent = job.full.slice(0, job.i);
+        }
+      });
+      if (typing.sound && !done) self.playTypingTick();
+      if (done) {
+        clearInterval(self.typingTimer);
+        self.typingTimer = null;
+      }
+    }, tickMs);
+  };
+
+  ScenaPlayer.prototype.playTypingTick = function () {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      if (!this.typingAudioCtx) this.typingAudioCtx = new Ctx();
+      var ac = this.typingAudioCtx;
+      var osc = ac.createOscillator();
+      var gain = ac.createGain();
+      osc.type = "square";
+      osc.frequency.value = 1500 + Math.random() * 1300;
+      gain.gain.setValueAtTime(0.0001, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.018, ac.currentTime + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.02);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + 0.022);
+    } catch (e) {
+      /* ignore */
+    }
   };
 
   ScenaPlayer.prototype.bindInput = function (node) {

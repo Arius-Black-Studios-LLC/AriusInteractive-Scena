@@ -827,7 +827,23 @@
       colors: {},
       sizes: { dialogueScale: 1, choiceScale: 1, cornerRadius: 6 },
       shapes: { dialogue: "bar", choice: "rounded" },
-      customSprites: { dialogueBox: null, choiceButton: null },
+      customSprites: {
+        dialogueBox: null,
+        choiceButton: null,
+        nameplate: null,
+        menuButton: null,
+        menuPanel: null,
+        inventoryItem: null,
+      },
+      appearance: {
+        dialogue: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+        choices: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+        nameplate: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+        menu: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+        menuPanel: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+        inventoryItem: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true },
+      },
+      typing: { enabled: true, speed: 28, sound: true },
       sounds: { clickAssetId: null },
       layout: {
         dialogue: { x: 4, y: 68, w: 92, h: 24 },
@@ -2300,6 +2316,15 @@
         sizes: Object.assign({}, base.sizes, saved.sizes || {}),
         shapes: Object.assign({}, preset.shapes, saved.shapes || {}),
         customSprites: Object.assign({}, base.customSprites, saved.customSprites || {}),
+        appearance: {
+          dialogue: Object.assign({}, base.appearance.dialogue, (saved.appearance && saved.appearance.dialogue) || {}),
+          choices: Object.assign({}, base.appearance.choices, (saved.appearance && saved.appearance.choices) || {}),
+          nameplate: Object.assign({}, base.appearance.nameplate, (saved.appearance && saved.appearance.nameplate) || {}),
+          menu: Object.assign({}, base.appearance.menu, (saved.appearance && saved.appearance.menu) || {}),
+          menuPanel: Object.assign({}, base.appearance.menuPanel, (saved.appearance && saved.appearance.menuPanel) || {}),
+          inventoryItem: Object.assign({}, base.appearance.inventoryItem, (saved.appearance && saved.appearance.inventoryItem) || {}),
+        },
+        typing: Object.assign({}, base.typing, saved.typing || {}),
         sounds: Object.assign({}, base.sounds, saved.sounds || {}),
         layout: {
           dialogue: Object.assign({}, base.layout.dialogue, (saved.layout && saved.layout.dialogue) || {}),
@@ -2326,6 +2351,15 @@
         series.readerUi.sizes = Object.assign(defaultReaderUi().sizes, series.readerUi.sizes || {});
         series.readerUi.shapes = Object.assign(defaultReaderUi().shapes, series.readerUi.shapes || {});
         series.readerUi.customSprites = Object.assign(defaultReaderUi().customSprites, series.readerUi.customSprites || {});
+        series.readerUi.appearance = {
+          dialogue: Object.assign({}, defaultReaderUi().appearance.dialogue, (series.readerUi.appearance && series.readerUi.appearance.dialogue) || {}),
+          choices: Object.assign({}, defaultReaderUi().appearance.choices, (series.readerUi.appearance && series.readerUi.appearance.choices) || {}),
+          nameplate: Object.assign({}, defaultReaderUi().appearance.nameplate, (series.readerUi.appearance && series.readerUi.appearance.nameplate) || {}),
+          menu: Object.assign({}, defaultReaderUi().appearance.menu, (series.readerUi.appearance && series.readerUi.appearance.menu) || {}),
+          menuPanel: Object.assign({}, defaultReaderUi().appearance.menuPanel, (series.readerUi.appearance && series.readerUi.appearance.menuPanel) || {}),
+          inventoryItem: Object.assign({}, defaultReaderUi().appearance.inventoryItem, (series.readerUi.appearance && series.readerUi.appearance.inventoryItem) || {}),
+        };
+        series.readerUi.typing = Object.assign(defaultReaderUi().typing, series.readerUi.typing || {});
         series.readerUi.sounds = Object.assign(defaultReaderUi().sounds, series.readerUi.sounds || {});
         series.readerUi.menu = Object.assign(defaultReaderUi().menu, series.readerUi.menu || {});
         series.readerUi.layout = {
