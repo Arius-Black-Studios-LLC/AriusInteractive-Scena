@@ -171,9 +171,15 @@
 
     listMarketplaceListings: function (limit) {
       var sb = getClient();
-      if (!sb) return Promise.reject(new Error("Cloud is not configured."));
+      if (!sb) return Promise.resolve([]);
       return sb.rpc("admin_list_marketplace_listings", { p_limit: limit || 80 }).then(function (result) {
-        if (result.error) throw result.error;
+        if (result.error) {
+          var msg = String(result.error.message || "");
+          if (/marketplace_listings|does not exist|schema cache|PGRST/i.test(msg)) {
+            return [];
+          }
+          throw result.error;
+        }
         return (result.data || []).map(function (row) {
           return {
             listingId: row.listing_id,

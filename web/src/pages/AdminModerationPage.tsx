@@ -53,14 +53,15 @@ export function AdminModerationPage() {
     setLoading(true);
     setLoadError(null);
     const admin = window.ScenaAdmin;
-    const tasks: Promise<unknown>[] = [
-      admin.listContentReports?.() ?? Promise.resolve([]),
-      admin.listRecentComments?.() ?? Promise.resolve([]),
-      admin.listPublishedSeries?.() ?? Promise.resolve([]),
-      admin.listGameJams?.() ?? Promise.resolve([]),
-      admin.listMarketplaceListings?.() ?? Promise.resolve([]),
-    ];
-    return Promise.all(tasks)
+    const soft = (p: Promise<unknown> | undefined, fallback: unknown[]) =>
+      (p ?? Promise.resolve(fallback)).catch(() => fallback);
+    return Promise.all([
+      soft(admin.listContentReports?.(), []),
+      soft(admin.listRecentComments?.(), []),
+      soft(admin.listPublishedSeries?.(), []),
+      soft(admin.listGameJams?.(), []),
+      soft(admin.listMarketplaceListings?.(), []),
+    ])
       .then(([reportRows, commentRows, seriesRows, jamRows, listingRows]) => {
         setReports((reportRows as Array<Record<string, unknown>>) || []);
         setComments((commentRows as Array<Record<string, unknown>>) || []);

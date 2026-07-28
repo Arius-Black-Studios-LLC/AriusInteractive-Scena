@@ -1948,6 +1948,14 @@
                 if (cats.length) {
                   rows = rows.filter(function (e) { return cats.indexOf(e.category) >= 0; });
                 }
+                // Default asset jams only accept packs created during the submission window.
+                if ((jam.assetSubmissionMode || "new_listing") !== "existing_listing") {
+                  var subStart = jam.submissionStart ? new Date(jam.submissionStart).getTime() : 0;
+                  rows = rows.filter(function (e) {
+                    var created = new Date(e.createdAt || e.updatedAt || 0).getTime();
+                    return !subStart || created >= subStart;
+                  });
+                }
                 detailCtx.libraryEntries = rows;
               })
             );

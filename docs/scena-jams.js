@@ -23,9 +23,9 @@
   ];
 
   var ASSET_SUBMISSION_MODES = [
-    { id: "new_listing", label: "Publish from library only", hint: "Entrants list a new free asset pack created during the jam." },
-    { id: "existing_listing", label: "Existing marketplace listing", hint: "Entrants submit a live listing they already published." },
-    { id: "either", label: "New listing or existing", hint: "Either publish from library or link an existing listing." },
+    { id: "new_listing", label: "Made during jam only", hint: "Entrants submit assets they created in their library during the submission window (not purchases, not older assets)." },
+    { id: "either", label: "Made during jam, or new shop listing", hint: "Submit a library asset made during the jam, or publish one to the shop and enter it." },
+    { id: "existing_listing", label: "Existing shop listing", hint: "Entrants may submit a live listing they already published (still must be seller-owned, not a purchase)." },
   ];
 
   var ASSET_CATEGORIES = [
@@ -368,6 +368,7 @@
     jam.ageRestricted = !!(jam.ageRestricted || (jam.contentFlags || []).length > 0);
     if (!jam.jamType) {
       if (jam.requireFreeListing === true ||
+          jam.assetSubmissionMode ||
           (Array.isArray(jam.allowedCategories) && jam.allowedCategories.length > 0) ||
           (jam.submissions || []).some(function (s) { return s.entryType === "asset" || s.listingId; })) {
         jam.jamType = "asset";
@@ -375,7 +376,9 @@
         jam.jamType = "game";
       }
     }
-    if (!jam.assetSubmissionMode) jam.assetSubmissionMode = "either";
+    if (!jam.assetSubmissionMode) {
+      jam.assetSubmissionMode = jam.jamType === "asset" ? "new_listing" : "either";
+    }
     if (!Array.isArray(jam.allowedCategories)) jam.allowedCategories = [];
     if (jam.requireFreeListing == null) jam.requireFreeListing = jam.jamType === "asset";
     if (!jam.coverStyle) jam.coverStyle = defaultCoverStyle();
@@ -626,9 +629,9 @@
     }
 
     var jamType = spec.jamType === "asset" ? "asset" : "game";
-    var assetSubmissionMode = spec.assetSubmissionMode || "either";
+    var assetSubmissionMode = spec.assetSubmissionMode || (jamType === "asset" ? "new_listing" : "either");
     if (ASSET_SUBMISSION_MODES.every(function (m) { return m.id !== assetSubmissionMode; })) {
-      assetSubmissionMode = "either";
+      assetSubmissionMode = jamType === "asset" ? "new_listing" : "either";
     }
     var allowedCategories = Array.isArray(spec.allowedCategories) ? spec.allowedCategories.slice() : [];
     allowedCategories = allowedCategories.filter(function (id) {
@@ -739,6 +742,14 @@
     }
   }
 
+  function assetMadeDuringJam(jam, entry) {
+    if (!entry || entry.source !== "made") return false;
+    var subStart = parseIso(jam && jam.submissionStart);
+    var created = parseIso(entry.createdAt || entry.updatedAt);
+    if (!subStart || !created) return false;
+    return created.getTime() >= subStart.getTime();
+  }
+
   function validateAssetLibraryEntry(jam, userId, entry) {
     if (!jam || jam.status !== "published") throw new Error("This jam is not accepting entries.");
     if (!isAssetJam(jam)) throw new Error("This is a game jam — submit a published episode instead.");
@@ -748,13 +759,16 @@
       throw new Error("Only assets you created can be submitted — purchased assets cannot be entered.");
     }
     if (!entry.bundle) throw new Error("This library entry has no asset data.");
+    var mode = jam.assetSubmissionMode || "new_listing";
+    if (mode === "existing_listing") {
+      throw new Error("This jam only accepts existing marketplace listings — publish your asset to the shop first.");
+    }
+    if (mode !== "existing_listing" && !assetMadeDuringJam(jam, entry)) {
+      throw new Error("Only assets you made during this jam’s submission window can be entered.");
+    }
     var cats = jam.allowedCategories || [];
     if (cats.length && cats.indexOf(entry.category) < 0) {
       throw new Error("This jam only accepts: " + cats.join(", ") + ".");
-    }
-    var mode = jam.assetSubmissionMode || "either";
-    if (mode === "existing_listing") {
-      throw new Error("This jam only accepts existing marketplace listings — publish your asset to the shop first.");
     }
     if ((jam.submissions || []).some(function (s) {
       return s.userId === userId && s.libraryEntryId === entry.id;
@@ -1078,6 +1092,13 @@
       if (!jam) return Promise.reject(new Error("Jam not found."));
       if (jam.hostUserId !== userId) return Promise.reject(new Error("Only the host can edit this jam."));
       var validated = validateJamSpec(spec);
+      // Never demote an existing asset jam to a game jam if the form omitted jamType.
+      if (jam.jamType === "asset" && validated.jamType !== "asset") {
+        validated.jamType = "asset";
+        if (!validated.assetSubmissionMode) {
+          validated.assetSubmissionMode = jam.assetSubmissionMode || "new_listing";
+        }
+      }
       var published = jam.status === "published";
       var funded = Math.max(0, parseInt(jam.prize && jam.prize.hostContribution, 10) || 0);
 
@@ -1225,11 +1246,14 @@
         if (!window.ScenaAssetLibrary || !ScenaAssetLibrary.publishFromLibrary) {
           return Promise.reject(new Error("Asset library unavailable."));
         }
-        chain = ScenaAssetLibrary.publishFromLibrary(userId, pick.libraryEntryId, {
-          title: pick.title,
-          description: pick.description || "",
-          category: pick.category,
-          priceDucats: jam.requireFreeListing ? 0 : Math.max(0, parseInt(pick.priceDucats, 10) || 0),
+        chain = ScenaAssetLibrary.get(userId, pick.libraryEntryId).then(function (entry) {
+          validateAssetLibraryEntry(jam, userId, entry);
+          return ScenaAssetLibrary.publishFromLibrary(userId, pick.libraryEntryId, {
+            title: pick.title,
+            description: pick.description || "",
+            category: pick.category,
+            priceDucats: jam.requireFreeListing ? 0 : Math.max(0, parseInt(pick.priceDucats, 10) || 0),
+          });
         }).then(function (result) {
           return ScenaMarketplace.getListing(result.id, userId).then(function (listing) {
             if (!listing) {
@@ -1436,9 +1460,12 @@
           escapeHtml(m.label) + "</option>";
       }).join("");
 
+      var jamType = draft.jamType || opts.jamType || "game";
+      var isAsset = jamType === "asset";
+
       var assetSubModes = ASSET_SUBMISSION_MODES.map(function (m) {
         return '<option value="' + escapeAttr(m.id) + '"' +
-          ((draft.assetSubmissionMode || "either") === m.id ? " selected" : "") + ">" +
+          ((draft.assetSubmissionMode || (isAsset ? "new_listing" : "either")) === m.id ? " selected" : "") + ">" +
           escapeHtml(m.label) + "</option>";
       }).join("");
 
@@ -1458,17 +1485,15 @@
           escapeHtml(m.label) + "</option>";
       }).join("");
 
-      var jamType = draft.jamType || opts.jamType || "game";
-      var isAsset = jamType === "asset";
       var entryRequirements = isAsset
         ? (
           '<section class="form-section"><h2>Asset entry requirements</h2>' +
-            '<p class="field-hint">Entrants submit marketplace asset packs — characters, stages, items, audio, or bundles.</p>' +
+            '<p class="field-hint">Entrants submit assets they <strong>made</strong> in Studio → My assets during the jam window. Purchased shop assets cannot be entered.</p>' +
             '<div class="field"><label>What can entrants submit?</label><select name="assetSubmissionMode">' + assetSubModes + "</select></div>" +
             '<div class="field"><label>Allowed categories</label><div class="check-grid">' + assetCatChecks +
               '</div><p class="field-hint">Leave all unchecked to allow every category.</p></div>' +
             '<label class="check-row"><input type="checkbox" name="requireFreeListing"' +
-              (draft.requireFreeListing !== false ? " checked" : "") + "> Require free listings (0 Ducats)</label>" +
+              (draft.requireFreeListing !== false ? " checked" : "") + "> Require free listings (0 Ducats) when publishing to the shop</label>" +
             '<div class="field"><label>Winner selection</label><select name="winnerMode">' + winModes + "</select></div></section>"
         )
         : (
@@ -1502,8 +1527,14 @@
             escapeAttr(String(draft.hostContribution || 0)) + '"></div>';
       return (
         '<form class="jam-form" id="jamForm">' +
-          '<input type="hidden" name="jamType" value="' + escapeAttr(jamType) + '">' +
-          '<p class="jam-type-badge jam-type-badge--' + escapeAttr(jamType) + '">' + escapeHtml(jamTypeLabel(jamType)) + "</p>" +
+          (published
+            ? '<input type="hidden" name="jamType" value="' + escapeAttr(jamType) + '">' +
+              '<p class="jam-type-badge jam-type-badge--' + escapeAttr(jamType) + '">' + escapeHtml(jamTypeLabel(jamType)) + "</p>"
+            : '<div class="field"><label>Jam type</label><select name="jamType" id="jamTypeSelect">' +
+                '<option value="game"' + (jamType === "game" ? " selected" : "") + ">Game jam (series / episodes)</option>" +
+                '<option value="asset"' + (jamType === "asset" ? " selected" : "") + ">Asset jam (library assets you made)</option>" +
+              "</select>" +
+              '<p class="field-hint">Asset jams accept packs you created in My assets during the jam — not purchased assets, and not series.</p></div>') +
           '<div class="field"><label>Jam title</label><input type="text" name="title" maxlength="80" value="' +
             escapeAttr(draft.title || "") + '" required></div>' +
           '<div class="field"><label>Home page tagline</label><input type="text" name="tagline" maxlength="140" value="' +
@@ -1703,22 +1734,22 @@
           var listOpts = (ctx.sellerListings || []).map(function (l) {
             return '<option value="' + escapeAttr(l.id) + '">' + escapeHtml(l.title || "Listing") + "</option>";
           }).join("");
-          var mode = jam.assetSubmissionMode || "either";
-          var showPublish = mode !== "existing_listing";
-          var showExisting = mode !== "new_listing";
+          var mode = jam.assetSubmissionMode || "new_listing";
+          var showPublish = mode === "either";
+          var showExisting = mode === "existing_listing";
           var showDirect = mode !== "existing_listing";
           submitPanel =
             '<section class="form-section jam-submit-panel jam-submit-panel--asset">' +
               "<h2>Submit your asset</h2>" +
               ageWarn +
-              '<p class="field-hint">Choose an asset you <strong>made</strong> in your library (Studio → Assets → My library). Purchased assets cannot be submitted.</p>' +
+              '<p class="field-hint">Submit an asset you <strong>created during this jam</strong> (Studio → My assets). Purchased assets and older library packs are not eligible.</p>' +
               (showDirect
                 ? '<div class="jam-asset-submit-block" id="jamAssetLibraryBlock">' +
                     '<h3 class="jam-asset-submit-subhead">From my library</h3>' +
-                    '<div class="field"><label>Library asset</label><select id="jamSubmitLibrary">' +
-                      (libOpts || '<option value="">No made assets yet — save one from the graph editor</option>') +
+                    '<div class="field"><label>Library asset (made during jam)</label><select id="jamSubmitLibrary">' +
+                      (libOpts || '<option value="">No eligible assets yet — save one to My assets during the jam window</option>') +
                     "</select></div>" +
-                    '<p class="field-hint">Save characters, stages, or packs to <strong>My library</strong> from the story editor, then pick them here.</p>' +
+                    '<p class="field-hint">Save characters, stages, or packs to <strong>My assets</strong> from the story editor after the jam starts, then pick them here.</p>' +
                     '<button type="button" class="btn btn-primary" id="jamSubmitAssetDirectBtn"' +
                       (libOpts ? "" : " disabled") + ">Submit asset</button>" +
                   "</div>"
@@ -1727,7 +1758,7 @@
                 ? '<div class="jam-asset-submit-block" id="jamAssetPublishBlock">' +
                     '<h3 class="jam-asset-submit-subhead">Publish to shop &amp; submit</h3>' +
                     '<div class="field"><label>Library asset</label><select id="jamSubmitLibraryPublish">' +
-                      (libOpts || '<option value="">No made assets in library</option>') +
+                      (libOpts || '<option value="">No eligible assets in library</option>') +
                     "</select></div>" +
                     '<div class="field"><label>Listing title</label><input type="text" id="jamSubmitAssetTitle" maxlength="80" placeholder="Title for the shop listing"></div>' +
                     '<div class="field"><label>Description</label><textarea id="jamSubmitAssetDesc" rows="2" maxlength="400" placeholder="What buyers get…"></textarea></div>' +

@@ -58,12 +58,17 @@
   function upsertEntry(userId, entry) {
     var list = readLibrary(userId);
     var idx = list.findIndex(function (e) { return e.id === entry.id; });
+    var prev = idx >= 0 ? list[idx] : null;
     entry.updatedAt = new Date().toISOString();
-    if (!entry.createdAt) entry.createdAt = entry.updatedAt;
-    if (idx >= 0) list[idx] = Object.assign({}, list[idx], entry);
+    if (!entry.createdAt) {
+      entry.createdAt = (prev && prev.createdAt) || entry.updatedAt;
+    }
+    if (idx >= 0) list[idx] = Object.assign({}, prev, entry, {
+      createdAt: prev.createdAt || entry.createdAt,
+    });
     else list.unshift(entry);
     writeLibrary(userId, list);
-    return entry;
+    return list[idx >= 0 ? idx : 0];
   }
 
   function importBundle(series, bundle) {

@@ -491,6 +491,10 @@ begin
     raise exception 'Admin only';
   end if;
 
+  if to_regclass('public.marketplace_listings') is null then
+    return;
+  end if;
+
   return query
   select
     l.id,
@@ -524,6 +528,9 @@ as $$
 begin
   if not public.is_platform_admin() then
     raise exception 'Admin only';
+  end if;
+  if to_regclass('public.marketplace_listings') is null then
+    raise exception 'Marketplace is not set up yet. Run docs/supabase-marketplace.sql.';
   end if;
   update public.marketplace_listings
   set status = 'removed',
