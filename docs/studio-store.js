@@ -834,6 +834,7 @@
         nameplate: { x: 6, y: 62, w: 28 },
         choices: { x: 52, y: 28, w: 42, h: 40 },
         menu: { x: 92, y: 4 },
+        menuPanel: { x: 58, y: 0, w: 42, h: 100 },
       },
       menu: {
         enabled: true,
@@ -2305,6 +2306,7 @@
           nameplate: Object.assign({}, base.layout.nameplate, (saved.layout && saved.layout.nameplate) || {}),
           choices: Object.assign({}, base.layout.choices, (saved.layout && saved.layout.choices) || {}),
           menu: Object.assign({}, base.layout.menu, (saved.layout && saved.layout.menu) || {}),
+          menuPanel: Object.assign({}, base.layout.menuPanel || { x: 58, y: 0, w: 42, h: 100 }, (saved.layout && saved.layout.menuPanel) || {}),
         },
         menu: Object.assign({}, base.menu, saved.menu || {}),
       };
@@ -2331,6 +2333,14 @@
           nameplate: Object.assign({}, defaultReaderUi().layout.nameplate, (series.readerUi.layout && series.readerUi.layout.nameplate) || {}),
           choices: Object.assign({}, defaultReaderUi().layout.choices, (series.readerUi.layout && series.readerUi.layout.choices) || {}),
           menu: Object.assign({}, defaultReaderUi().layout.menu, (series.readerUi.layout && series.readerUi.layout.menu) || {}),
+          menuPanel: (function () {
+            var savedMp = series.readerUi.layout && series.readerUi.layout.menuPanel;
+            if (savedMp) return Object.assign({}, defaultReaderUi().layout.menuPanel, savedMp);
+            var menu = series.readerUi.menu || {};
+            var pw = Math.max(28, Math.min(70, parseInt(menu.panelWidth, 10) || 42));
+            if (menu.panelSide === "left") return { x: 0, y: 0, w: pw, h: 100 };
+            return { x: Math.max(0, 100 - pw), y: 0, w: pw, h: 100 };
+          })(),
         };
       }
       series.readerUi.aspectRatio = "16:9";

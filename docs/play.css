@@ -916,6 +916,26 @@
   box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
 }
 
+.player-frame--menu-laid-out .player-menu-backdrop {
+  display: block;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.player-frame--menu-laid-out .player-menu-backdrop[hidden] {
+  display: none !important;
+}
+.player-frame--menu-laid-out .player-menu-panel {
+  position: absolute;
+  left: var(--ui-layout-menupanel-x, 58%);
+  top: var(--ui-layout-menupanel-y, 0%);
+  width: var(--ui-layout-menupanel-w, 42%);
+  height: var(--ui-layout-menupanel-h, 100%);
+  max-height: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
 .player-menu-header {
   display: flex;
   align-items: center;

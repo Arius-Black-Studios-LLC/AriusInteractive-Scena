@@ -575,8 +575,19 @@
     el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
     el.style.setProperty("--ui-layout-menu-right", "auto");
     var menuCfg = ui.menu || {};
-    var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
-    el.style.setProperty("--ui-menu-panel-w", panelW + "%");
+    var mp = layout.menuPanel || null;
+    if (mp) {
+      el.style.setProperty("--ui-layout-menupanel-x", (mp.x != null ? mp.x : 58) + "%");
+      el.style.setProperty("--ui-layout-menupanel-y", (mp.y != null ? mp.y : 0) + "%");
+      el.style.setProperty("--ui-layout-menupanel-w", (mp.w != null ? mp.w : 42) + "%");
+      el.style.setProperty("--ui-layout-menupanel-h", (mp.h != null ? mp.h : 100) + "%");
+      el.classList.add("player-frame--menu-laid-out");
+      el.style.setProperty("--ui-menu-panel-w", (mp.w != null ? mp.w : 42) + "%");
+    } else {
+      var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
+      el.style.setProperty("--ui-menu-panel-w", panelW + "%");
+      el.classList.remove("player-frame--menu-laid-out");
+    }
     if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
     if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
     var accent = String(ui.colors.accent || "#2a9d8f");
