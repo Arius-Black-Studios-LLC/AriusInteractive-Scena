@@ -8,6 +8,8 @@ import {
   getForumTopic,
   type ForumTopicDetail,
 } from "../lib/forums";
+import { ForumImagePicker, type ForumImageDraft } from "../components/ForumImagePicker";
+import { ForumPostContent } from "../components/ForumPostContent";
 import "./ForumsPage.css";
 
 export function ForumTopicPage() {
@@ -19,6 +21,7 @@ export function ForumTopicPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState("");
+  const [replyImages, setReplyImages] = useState<ForumImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   async function reload() {
@@ -51,8 +54,14 @@ export function ForumTopicPage() {
     setSaving(true);
     setError(null);
     try {
-      await createForumPost({ topicId, body: reply });
+      await createForumPost({
+        topicId,
+        body: reply,
+        imageFiles: replyImages.map((img) => img.file),
+      });
+      replyImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
       setReply("");
+      setReplyImages([]);
       await reload();
     } catch (err) {
       setError((err as Error)?.message || "Could not post reply.");
@@ -96,7 +105,7 @@ export function ForumTopicPage() {
           <strong>{topic.author?.displayName || "Member"}</strong>
           <span>{formatForumWhen(topic.created_at)}</span>
         </div>
-        <div className="forums-post-body">{topic.body}</div>
+        <ForumPostContent body={topic.body} imageUrls={topic.image_urls} />
       </article>
 
       <section className="forums-replies">
@@ -113,7 +122,7 @@ export function ForumTopicPage() {
                   <strong>{post.author?.displayName || "Member"}</strong>
                   <span>{formatForumWhen(post.created_at)}</span>
                 </div>
-                <div className="forums-post-body">{post.body}</div>
+                <ForumPostContent body={post.body} imageUrls={post.image_urls} />
               </li>
             ))}
           </ul>
@@ -141,9 +150,13 @@ export function ForumTopicPage() {
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   placeholder="Write a reply…"
-                  required
                 />
               </label>
+              <ForumImagePicker
+                images={replyImages}
+                onChange={setReplyImages}
+                disabled={saving}
+              />
               <button type="submit" className="btn btn-primary" disabled={saving || authLoading}>
                 {saving ? "Posting…" : "Post reply"}
               </button>

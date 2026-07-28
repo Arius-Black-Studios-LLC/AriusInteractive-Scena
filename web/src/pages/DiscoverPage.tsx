@@ -8,7 +8,6 @@ import "./HomePage.css";
 
 export function DiscoverPage() {
   const {
-    ready,
     filter,
     setFilter,
     adultFilter,

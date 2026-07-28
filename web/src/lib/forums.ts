@@ -1,3 +1,4 @@
+import { filesToDataUrls, uploadForumImages } from "./forumImages";
 import { loadLegacyScripts } from "../legacy/loadLegacy";
 
 export const FORUM_CATEGORIES = [
@@ -39,6 +40,7 @@ export type ForumPost = {
   user_id: string;
   parent_id?: string | null;
   body: string;
+  image_urls?: string[];
   author: ForumAuthor;
   created_at: string;
 };
@@ -49,6 +51,7 @@ export type ForumTopicDetail = {
   title: string;
   category: string;
   body: string;
+  image_urls?: string[];
   author: ForumAuthor;
   user_id: string;
   reply_count: number;
@@ -61,6 +64,8 @@ export type ForumTopicDetail = {
 
 const LOCAL_TOPICS = "arleco_forum_topics";
 const LOCAL_POSTS = "arleco_forum_posts";
+const LOCAL_TOPIC_IMAGES = "arleco_forum_topic_images";
+const LOCAL_POST_IMAGES = "arleco_forum_post_images";
 
 type SbClient = {
   rpc: (
@@ -204,6 +209,7 @@ export async function getForumTopic(topicId: string): Promise<ForumTopicDetail |
     title: topic.title,
     category: topic.category,
     body: readLocalTopicBody(topic.id) || topic.excerpt,
+    image_urls: readLocalTopicImages(topic.id),
     author: topic.author,
     user_id: topic.user_id,
     reply_count: topic.reply_count,
@@ -211,7 +217,10 @@ export async function getForumTopic(topicId: string): Promise<ForumTopicDetail |
     created_at: topic.created_at,
     pinned: topic.pinned,
     locked: topic.locked,
-    posts,
+    posts: posts.map((post) => ({
+      ...post,
+      image_urls: readLocalPostImages(post.id),
+    })),
   };
 }
 
@@ -234,25 +243,80 @@ function writeLocalTopicBody(id: string, body: string) {
   }
 }
 
+function readLocalTopicImages(id: string): string[] {
+  try {
+    const map = JSON.parse(localStorage.getItem(LOCAL_TOPIC_IMAGES) || "{}");
+    return Array.isArray(map[id]) ? map[id] : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalTopicImages(id: string, urls: string[]) {
+  try {
+    const map = JSON.parse(localStorage.getItem(LOCAL_TOPIC_IMAGES) || "{}");
+    map[id] = urls;
+    localStorage.setItem(LOCAL_TOPIC_IMAGES, JSON.stringify(map));
+  } catch {
+    /* quota */
+  }
+}
+
+function readLocalPostImages(id: string): string[] {
+  try {
+    const map = JSON.parse(localStorage.getItem(LOCAL_POST_IMAGES) || "{}");
+    return Array.isArray(map[id]) ? map[id] : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalPostImages(id: string, urls: string[]) {
+  try {
+    const map = JSON.parse(localStorage.getItem(LOCAL_POST_IMAGES) || "{}");
+    map[id] = urls;
+    localStorage.setItem(LOCAL_POST_IMAGES, JSON.stringify(map));
+  } catch {
+    /* quota */
+  }
+}
+
+async function resolveImageUrls(
+  files: File[] | undefined,
+  contextKey: string,
+  useCloud: boolean,
+): Promise<string[]> {
+  if (!files?.length) return [];
+  if (useCloud) {
+    return uploadForumImages(files, contextKey);
+  }
+  return filesToDataUrls(files);
+}
+
 export async function createForumTopic(input: {
   title: string;
   body: string;
   category: string;
+  imageFiles?: File[];
 }): Promise<{ id: string; slug: string }> {
   const title = input.title.trim();
   const body = input.body.trim();
   const category = input.category || "general";
   if (title.length < 3) throw new Error("Title needs at least 3 characters.");
-  if (!body) throw new Error("Write an opening post.");
+  if (!body && !input.imageFiles?.length) throw new Error("Write an opening post or attach a photo.");
 
   const author = await authorFromProfile();
   const sb = await getClient();
+  const draftKey = `draft-${crypto.randomUUID()}`;
+  const imageUrls = await resolveImageUrls(input.imageFiles, draftKey, Boolean(sb));
+
   if (sb) {
     const res = await sb.rpc("create_forum_topic", {
       p_title: title,
       p_body: body,
       p_category: category,
       p_author: author,
+      p_image_urls: imageUrls,
     });
     if (res.error) throw new Error(res.error.message || "Could not create thread.");
     const data = res.data as { id: string; slug: string };
@@ -281,6 +345,7 @@ export async function createForumTopic(input: {
   };
   writeLocalTopics([row, ...readLocalTopics()]);
   writeLocalTopicBody(id, body);
+  if (imageUrls.length) writeLocalTopicImages(id, imageUrls);
   return { id, slug };
 }
 
@@ -288,17 +353,25 @@ export async function createForumPost(input: {
   topicId: string;
   body: string;
   parentId?: string | null;
+  imageFiles?: File[];
 }): Promise<string> {
   const body = input.body.trim();
-  if (!body) throw new Error("Reply is empty.");
+  if (!body && !input.imageFiles?.length) throw new Error("Reply is empty.");
   const author = await authorFromProfile();
   const sb = await getClient();
+  const imageUrls = await resolveImageUrls(
+    input.imageFiles,
+    input.topicId,
+    Boolean(sb),
+  );
+
   if (sb) {
     const res = await sb.rpc("create_forum_post", {
       p_topic_id: input.topicId,
       p_body: body,
       p_parent_id: input.parentId || null,
       p_author: author,
+      p_image_urls: imageUrls,
     });
     if (res.error) throw new Error(res.error.message || "Could not post reply.");
     return String(res.data);
@@ -322,10 +395,12 @@ export async function createForumPost(input: {
     user_id: userId,
     parent_id: input.parentId || null,
     body,
+    image_urls: imageUrls,
     author,
     created_at: now,
   };
   writeLocalPosts([...readLocalPosts(), post]);
+  if (imageUrls.length) writeLocalPostImages(id, imageUrls);
   topic.reply_count = (topic.reply_count || 0) + 1;
   topic.last_post_at = now;
   writeLocalTopics(topics);

@@ -82,15 +82,45 @@
     return [
       {
         rating: 5,
-        message: "Mapping branches on the graph before I write dialogue makes planning and plotting so much easier — I can see the whole story at once.",
+        message: "Mapping branches on the graph before I write dialogue makes planning and plotting so much easier — I can see the whole story at once. Can't wait to see how deep the editor gets.",
         author_display_name: "Mira K.",
         context: "studio",
       },
       {
         rating: 5,
-        message: "Browser publishing without Ren'Py headaches. My playtesters just open a link.",
+        message: "Browser publishing without Ren'Py headaches. My playtesters just open a link. Eager to see what release tools and analytics look like as Arleco grows.",
         author_display_name: "Devon L.",
         context: "publish",
+      },
+      {
+        rating: 5,
+        message: "The pixel sprite tools live right inside the studio — I sketched a walk cycle without bouncing between apps. Really curious how the asset library and sharing will evolve.",
+        author_display_name: "Sora T.",
+        context: "pixel",
+      },
+      {
+        rating: 5,
+        message: "The guided tutorials run in the real editor, not a fake demo. I finished my first branching scene in one afternoon. Excited for more advanced lessons as the platform matures.",
+        author_display_name: "Alex R.",
+        context: "tutorials",
+      },
+      {
+        rating: 5,
+        message: "Discover feels like a curated shelf, not an algorithm dump. I binged three indie series in a weekend and picked up exactly where I left off. Hope the catalog keeps growing.",
+        author_display_name: "Jordan M.",
+        context: "discover",
+      },
+      {
+        rating: 5,
+        message: "Dialogue boxes, name plates, and choice buttons already feel like a proper VN player in the browser. Looking forward to seeing how custom themes and UI polish develop.",
+        author_display_name: "Priya N.",
+        context: "reader",
+      },
+      {
+        rating: 5,
+        message: "Game jams gave me a deadline, a theme, and a community — shipped a mini episode in two weeks. Can't wait to see how jam tooling and showcases expand on Arleco.",
+        author_display_name: "Casey W.",
+        context: "jams",
       },
     ];
   }

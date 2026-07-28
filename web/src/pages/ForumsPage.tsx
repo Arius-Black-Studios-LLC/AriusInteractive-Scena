@@ -9,6 +9,7 @@ import {
   listForumTopics,
   type ForumTopicListItem,
 } from "../lib/forums";
+import { ForumImagePicker, type ForumImageDraft } from "../components/ForumImagePicker";
 import "./ForumsPage.css";
 
 export function ForumsPage() {
@@ -24,6 +25,7 @@ export function ForumsPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [newCategory, setNewCategory] = useState("general");
+  const [images, setImages] = useState<ForumImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   const categoryOptions = useMemo(
@@ -70,7 +72,10 @@ export function ForumsPage() {
         title,
         body,
         category: newCategory,
+        imageFiles: images.map((img) => img.file),
       });
+      images.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      setImages([]);
       navigate(`/forums/${created.id}`);
     } catch (err) {
       setError((err as Error)?.message || "Could not create thread.");
@@ -150,9 +155,9 @@ export function ForumsPage() {
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Share context, a question, or a prompt for replies…"
-              required
             />
           </label>
+          <ForumImagePicker images={images} onChange={setImages} disabled={saving} />
           <div className="forums-composer-actions">
             <button type="submit" className="btn btn-primary" disabled={saving || authLoading}>
               {saving ? "Posting…" : "Post thread"}

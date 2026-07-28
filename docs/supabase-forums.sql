@@ -1,8 +1,8 @@
 -- Arleco community forums (topic threads)
 -- Run AFTER docs/supabase-setup.sql
 -- Prefer also running docs/supabase-content-policy.sql first (assert_content_allowed).
--- Safe to re-run.
--- Fixes: "Could not find the function public.create_forum_topic(...) in the schema cache"
+-- For image attachments on existing DBs, also run docs/supabase-forum-images.sql.
+-- Safe to re-run.-- Fixes: "Could not find the function public.create_forum_topic(...) in the schema cache"
 --   (also creates list/get/reply RPCs). After running, PostgREST schema is reloaded.
 
 do $$
@@ -21,7 +21,8 @@ create table if not exists public.forum_topics (
   title text not null check (char_length(trim(title)) between 3 and 120),
   category text not null default 'general'
     check (category in ('general', 'craft', 'jams', 'marketplace', 'feedback', 'help')),
-  body text not null check (char_length(trim(body)) between 1 and 8000),
+  body text not null default '' check (char_length(trim(body)) <= 8000),
+  image_urls text[] not null default '{}'::text[],
   author jsonb not null default '{}'::jsonb,
   user_id uuid not null references auth.users (id) on delete cascade,
   pinned_at timestamptz,
@@ -47,7 +48,8 @@ create table if not exists public.forum_posts (
   topic_id uuid not null references public.forum_topics (id) on delete cascade,
   user_id uuid not null references auth.users (id) on delete cascade,
   parent_id uuid references public.forum_posts (id) on delete cascade,
-  body text not null check (char_length(trim(body)) between 1 and 8000),
+  body text not null default '' check (char_length(trim(body)) <= 8000),
+  image_urls text[] not null default '{}'::text[],
   author jsonb not null default '{}'::jsonb,
   hidden_at timestamptz,
   hidden_by uuid references auth.users (id) on delete set null,
@@ -98,6 +100,30 @@ begin
   if length(v) < 2 then v := 'topic'; end if;
   if length(v) > 60 then v := left(v, 60); end if;
   return v;
+end;
+$$;
+
+create or replace function public._forum_sanitize_image_urls(p_urls text[])
+returns text[]
+language plpgsql
+immutable
+as $$
+declare
+  v_out text[] := '{}'::text[];
+  v_url text;
+  v_count int := 0;
+begin
+  if p_urls is null then return '{}'::text[]; end if;
+  foreach v_url in array p_urls loop
+    v_url := trim(coalesce(v_url, ''));
+    if v_url = '' then continue; end if;
+    if length(v_url) > 2048 then raise exception 'Image URL is too long'; end if;
+    if v_url !~* '^https?://' then raise exception 'Invalid image URL'; end if;
+    v_count := v_count + 1;
+    if v_count > 4 then raise exception 'At most 4 images per post'; end if;
+    v_out := array_append(v_out, v_url);
+  end loop;
+  return v_out;
 end;
 $$;
 
@@ -160,6 +186,7 @@ begin
     'title', title,
     'category', category,
     'body', body,
+    'image_urls', coalesce(image_urls, '{}'::text[]),
     'author', author,
     'user_id', user_id,
     'reply_count', reply_count,
@@ -185,6 +212,7 @@ begin
       user_id,
       parent_id,
       body,
+      image_urls,
       author,
       created_at
     from public.forum_posts
@@ -200,7 +228,8 @@ create or replace function public.create_forum_topic(
   p_title text,
   p_body text,
   p_category text default 'general',
-  p_author jsonb default '{}'::jsonb
+  p_author jsonb default '{}'::jsonb,
+  p_image_urls text[] default '{}'::text[]
 )
 returns jsonb
 language plpgsql
@@ -212,10 +241,18 @@ declare
   v_slug text;
   v_base text;
   v_cat text;
+  v_body text;
+  v_images text[];
 begin
   if auth.uid() is null then raise exception 'Sign in to start a thread'; end if;
+
+  v_body := trim(coalesce(p_body, ''));
+  v_images := public._forum_sanitize_image_urls(p_image_urls);
+
   if length(trim(coalesce(p_title, ''))) < 3 then raise exception 'Title is too short'; end if;
-  if length(trim(coalesce(p_body, ''))) < 1 then raise exception 'Write something for the opening post'; end if;
+  if length(v_body) < 1 and coalesce(array_length(v_images, 1), 0) < 1 then
+    raise exception 'Write something or attach an image for the opening post';
+  end if;
 
   v_cat := coalesce(nullif(trim(p_category), ''), 'general');
   if v_cat not in ('general', 'craft', 'jams', 'marketplace', 'feedback', 'help') then
@@ -224,23 +261,17 @@ begin
 
   if to_regprocedure('public.assert_content_allowed(text)') is not null then
     perform public.assert_content_allowed(p_title);
-    perform public.assert_content_allowed(p_body);
+    if length(v_body) >= 1 then perform public.assert_content_allowed(v_body); end if;
   end if;
 
   v_base := public._forum_slugify(p_title);
   v_slug := v_base || '-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8);
 
   insert into public.forum_topics (
-    slug, title, category, body, author, user_id, reply_count, last_post_at
+    slug, title, category, body, image_urls, author, user_id, reply_count, last_post_at
   ) values (
-    v_slug,
-    trim(p_title),
-    v_cat,
-    trim(p_body),
-    coalesce(p_author, '{}'::jsonb),
-    auth.uid(),
-    0,
-    now()
+    v_slug, trim(p_title), v_cat, v_body, v_images,
+    coalesce(p_author, '{}'::jsonb), auth.uid(), 0, now()
   )
   returning id into v_id;
 
@@ -252,7 +283,8 @@ create or replace function public.create_forum_post(
   p_topic_id uuid,
   p_body text,
   p_parent_id uuid default null,
-  p_author jsonb default '{}'::jsonb
+  p_author jsonb default '{}'::jsonb,
+  p_image_urls text[] default '{}'::text[]
 )
 returns uuid
 language plpgsql
@@ -263,13 +295,20 @@ declare
   v_id uuid;
   v_locked timestamptz;
   v_hidden timestamptz;
+  v_body text;
+  v_images text[];
 begin
   if auth.uid() is null then raise exception 'Sign in to reply'; end if;
-  if length(trim(coalesce(p_body, ''))) < 1 then raise exception 'Reply is empty'; end if;
+
+  v_body := trim(coalesce(p_body, ''));
+  v_images := public._forum_sanitize_image_urls(p_image_urls);
+
+  if length(v_body) < 1 and coalesce(array_length(v_images, 1), 0) < 1 then
+    raise exception 'Reply is empty';
+  end if;
 
   select locked_at, hidden_at into v_locked, v_hidden
-  from public.forum_topics
-  where id = p_topic_id;
+  from public.forum_topics where id = p_topic_id;
 
   if not found then raise exception 'Thread not found'; end if;
   if v_hidden is not null then raise exception 'Thread is unavailable'; end if;
@@ -278,28 +317,20 @@ begin
   if p_parent_id is not null and not exists (
     select 1 from public.forum_posts
     where id = p_parent_id and topic_id = p_topic_id and hidden_at is null
-  ) then
-    raise exception 'Parent reply not found';
-  end if;
+  ) then raise exception 'Parent reply not found'; end if;
 
-  if to_regprocedure('public.assert_content_allowed(text)') is not null then
-    perform public.assert_content_allowed(p_body);
+  if to_regprocedure('public.assert_content_allowed(text)') is not null and length(v_body) >= 1 then
+    perform public.assert_content_allowed(v_body);
   end if;
 
   insert into public.forum_posts (
-    topic_id, user_id, parent_id, body, author
+    topic_id, user_id, parent_id, body, image_urls, author
   ) values (
-    p_topic_id,
-    auth.uid(),
-    p_parent_id,
-    trim(p_body),
-    coalesce(p_author, '{}'::jsonb)
+    p_topic_id, auth.uid(), p_parent_id, v_body, v_images, coalesce(p_author, '{}'::jsonb)
   )
   returning id into v_id;
 
-  update public.forum_topics
-  set reply_count = reply_count + 1,
-      last_post_at = now()
+  update public.forum_topics set reply_count = reply_count + 1, last_post_at = now()
   where id = p_topic_id;
 
   return v_id;
@@ -312,11 +343,11 @@ grant execute on function public.list_forum_topics(text, int, int) to anon, auth
 revoke all on function public.get_forum_topic(uuid) from public;
 grant execute on function public.get_forum_topic(uuid) to anon, authenticated;
 
-revoke all on function public.create_forum_topic(text, text, text, jsonb) from public;
-grant execute on function public.create_forum_topic(text, text, text, jsonb) to authenticated;
+revoke all on function public.create_forum_topic(text, text, text, jsonb, text[]) from public;
+grant execute on function public.create_forum_topic(text, text, text, jsonb, text[]) to authenticated;
 
-revoke all on function public.create_forum_post(uuid, text, uuid, jsonb) from public;
-grant execute on function public.create_forum_post(uuid, text, uuid, jsonb) to authenticated;
+revoke all on function public.create_forum_post(uuid, text, uuid, jsonb, text[]) from public;
+grant execute on function public.create_forum_post(uuid, text, uuid, jsonb, text[]) to authenticated;
 
 notify pgrst, 'reload schema';
 
