@@ -116,7 +116,9 @@ begin
     'price_ducats', v_row.price_ducats,
     'preview_data_url', v_row.preview_data_url,
     'purchase_count', v_row.purchase_count,
+    'seller_id', v_row.seller_id,
     'seller_name', v_row.seller_name,
+    'is_seller', auth.uid() is not null and v_row.seller_id = auth.uid(),
     'owned', v_owned,
     'created_at', v_row.created_at
   );
@@ -179,6 +181,10 @@ begin
 
   if not found then raise exception 'Listing not found'; end if;
 
+  if v_listing.seller_id = auth.uid() then
+    raise exception 'You cannot buy your own listing — it is already in your library.';
+  end if;
+
   if exists (
     select 1 from public.marketplace_purchases
     where user_id = auth.uid() and listing_id = p_listing_id
@@ -223,7 +229,7 @@ begin
   where id = auth.uid()
   returning ducat_balance into v_balance;
 
-  if v_listing.seller_id <> auth.uid() and v_creator_ducats > 0 then
+  if v_creator_ducats > 0 then
     update public.profiles
     set creator_earned_ducats = creator_earned_ducats + v_creator_ducats
     where id = v_listing.seller_id;

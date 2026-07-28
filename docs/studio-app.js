@@ -1596,7 +1596,10 @@
         var detailHtml = "";
         if (libraryUiState.shopSelectedId) {
           return ScenaMarketplace.getListing(libraryUiState.shopSelectedId, userId).then(function (listing) {
-            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, {
+              showPackUpsell: true,
+              viewerUserId: userId,
+            });
             return { listings: listings, detailHtml: detailHtml, balance: balance };
           });
         }

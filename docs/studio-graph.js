@@ -5584,7 +5584,10 @@
         var detailHtml = "";
         if (self.marketplaceSelectedId) {
           return ScenaMarketplace.getListing(self.marketplaceSelectedId, userId).then(function (listing) {
-            detailHtml = ScenaMarketplace.renderListingDetail(listing, { showPackUpsell: true });
+            detailHtml = ScenaMarketplace.renderListingDetail(listing, {
+              showPackUpsell: true,
+              viewerUserId: userId,
+            });
             return { listings: listings, detailHtml: detailHtml, balance: balance };
           });
         }

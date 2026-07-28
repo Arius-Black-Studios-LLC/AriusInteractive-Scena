@@ -266,6 +266,10 @@
       var local = findLocalListing(listingId, userId);
       var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
 
+      if (local && local.seller_id === userId) {
+        return Promise.reject(new Error("You cannot buy your own listing — it is already in your library."));
+      }
+
       if (local && isLocalId) {
         var price = local.price_ducats || 0;
         var finish = function () {
@@ -431,21 +435,30 @@
         : '<div class="marketplace-preview marketplace-preview--empty">' + escapeHtml(categoryLabel(listing.category)) + "</div>";
 
       var owned = listing.owned;
+      var isSeller = listing.is_seller || listing.isSeller ||
+        (opts.viewerUserId && listing.seller_id && listing.seller_id === opts.viewerUserId);
       var price = listing.price_ducats || 0;
-      var actionLabel = owned ? "Add to project" : (price ? "Buy · " + formatPrice(price) : "Get free");
+      var actionHtml;
+      if (isSeller) {
+        actionHtml =
+          '<button type="button" class="btn btn-sm btn-ghost" disabled>Your listing</button>' +
+          '<span class="field-hint">You already own this — use My assets to import it into a project.</span>';
+      } else {
+        var actionLabel = owned ? "Add to project" : (price ? "Buy · " + formatPrice(price) : "Get free");
+        actionHtml =
+          '<button type="button" class="btn btn-sm btn-primary marketplace-acquire-btn" data-listing-id="' +
+            escapeAttr(listing.id) + '">' + escapeHtml(actionLabel) + "</button>" +
+          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "");
+      }
 
       return (
         preview +
         "<h4>" + escapeHtml(listing.title) + "</h4>" +
-        '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") + "</p>" +
+        '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") +
+          (isSeller ? " (you)" : "") + "</p>" +
         "<p>" + escapeHtml(listing.description || "") + "</p>" +
-        '<div class="marketplace-detail-actions">' +
-          '<button type="button" class="btn btn-sm btn-primary marketplace-acquire-btn" data-listing-id="' + escapeAttr(listing.id) + '">' +
-            escapeHtml(actionLabel) +
-          "</button>" +
-          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "") +
-        "</div>" +
-        (!owned && price > 0 && opts.showPackUpsell && window.ScenaWallet
+        '<div class="marketplace-detail-actions">' + actionHtml + "</div>" +
+        (!isSeller && !owned && price > 0 && opts.showPackUpsell && window.ScenaWallet
           ? '<div class="marketplace-upsell"><p class="field-hint">Need Ducats?</p>' + ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) + "</div>"
           : "")
       );

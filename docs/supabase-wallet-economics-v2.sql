@@ -142,6 +142,10 @@ begin
 
   if not found then raise exception 'Listing not found'; end if;
 
+  if v_listing.seller_id = auth.uid() then
+    raise exception 'You cannot buy your own listing — it is already in your library.';
+  end if;
+
   if exists (
     select 1 from public.marketplace_purchases
     where user_id = auth.uid() and listing_id = p_listing_id
