@@ -26,6 +26,55 @@
     }
   }
 
+  function rpcMissingError(msg) {
+    msg = String(msg || "");
+    return /does not exist|could not find the function|schema cache|PGRST202/i.test(msg);
+  }
+
+  function schemaColumnError(err) {
+    var msg = String((err && (err.message || err.details || err.hint)) || err || "");
+    return /could not find.*column|column.*does not exist|schema cache|PGRST204/i.test(msg);
+  }
+
+  var PROFILE_SELECT_FULL =
+    "id, email, display_name, username, pronouns, avatar_url, birth_year, adult_verified_at, is_admin";
+  var PROFILE_SELECT_STANDARD =
+    "id, email, display_name, username, pronouns, avatar_url, is_admin";
+  var PROFILE_SELECT_BASE =
+    "id, email, display_name, username, pronouns, avatar_url";
+
+  var profileColumnsTier = "full";
+
+  function queryProfileRow(sb, userId, columns) {
+    return sb.from("profiles").select(columns).eq("id", userId).maybeSingle();
+  }
+
+  function fetchProfileRow(sb, userId) {
+    return queryProfileRow(sb, userId, PROFILE_SELECT_FULL).then(function (result) {
+      if (!result.error) {
+        profileColumnsTier = "full";
+        return result.data;
+      }
+      if (!schemaColumnError(result.error)) {
+        return Promise.reject(result.error);
+      }
+      return queryProfileRow(sb, userId, PROFILE_SELECT_STANDARD).then(function (retry) {
+        if (!retry.error) {
+          profileColumnsTier = "standard";
+          return retry.data;
+        }
+        if (!schemaColumnError(retry.error)) {
+          return Promise.reject(retry.error);
+        }
+        return queryProfileRow(sb, userId, PROFILE_SELECT_BASE).then(function (base) {
+          if (base.error) return Promise.reject(base.error);
+          profileColumnsTier = "base";
+          return base.data;
+        });
+      });
+    });
+  }
+
   function oauthAvatarFromUser(user) {
     var meta = (user && user.user_metadata) || {};
     return meta.avatar_url || meta.picture || meta.photo || "";
@@ -55,8 +104,16 @@
       username: String(row.username || base.username || "").trim(),
       pronouns: String(row.pronouns || base.pronouns || "").trim(),
       avatarUrl: row.avatar_url || row.avatarUrl || base.avatarUrl || "",
+      birthYear: row.birth_year || row.birthYear || base.birthYear || null,
       adultVerifiedAt: row.adult_verified_at || row.adultVerifiedAt || base.adultVerifiedAt || "",
+      isAdmin: !!(row.is_admin || row.isAdmin),
     };
+  }
+
+  function accountAge(profile) {
+    var year = parseInt(profile && profile.birthYear, 10);
+    if (!year || year < 1900) return null;
+    return new Date().getFullYear() - year;
   }
 
   function initials(profile) {
@@ -113,12 +170,20 @@
     sessionProfile: defaultFromSession,
 
     isAdultVerified: function (profile) {
-      return Boolean(profile && profile.adultVerifiedAt);
+      if (!profile) return false;
+      var age = accountAge(profile);
+      if (age != null && age >= 18) return true;
+      return Boolean(profile.adultVerifiedAt);
     },
+
+    accountAge: accountAge,
 
     seriesNeedsAgeGate: function (series) {
       if (!series) return false;
-      return (series.contentFlags || []).indexOf("sexual_content") >= 0;
+      if (window.ScenaStore && ScenaStore.seriesIsAgeRestricted) {
+        return ScenaStore.seriesIsAgeRestricted(series);
+      }
+      return (series.contentFlags || []).length > 0;
     },
 
     /** Public author block for comments UI */
@@ -145,7 +210,6 @@
 
     get: function (userId, session) {
       if (!userId) return Promise.resolve(null);
-      if (cache[userId]) return Promise.resolve(cache[userId]);
 
       var fallback = defaultFromSession(session) || normalize({ id: userId }, { id: userId, displayName: "Reader" });
       var local = readLocal(userId);
@@ -165,16 +229,55 @@
         return Promise.resolve(cache[userId]);
       }
 
-      return sb.from("profiles")
-        .select("id, email, display_name, username, pronouns, avatar_url")
-        .eq("id", userId)
-        .maybeSingle()
-        .then(function (r) {
+      return fetchProfileRow(sb, userId)
+        .then(function (row) {
+          return finishProfile(row);
+        })
+        .catch(function (err) {
+          if (!schemaColumnError(err)) {
+            cache[userId] = cache[userId] || fallback;
+            return cache[userId];
+          }
+          return sb.rpc("ensure_auth_profile").then(function (ensureRes) {
+            if (!ensureRes.error) {
+              return refetchProfile();
+            }
+            if (!rpcMissingError(ensureRes.error.message)) {
+              return finishProfile(null);
+            }
+            return insertProfileFallback().then(function () {
+              return refetchProfile();
+            });
+          });
+        });
+
+      function refetchProfile() {
+        return fetchProfileRow(sb, userId).then(function (row) {
+          return finishProfile(row);
+        }, function () {
+          return finishProfile(null);
+        });
+      }
+
+      function insertProfileFallback() {
+        var email = (session && session.user && session.user.email) || "";
+        var displayName =
+          (session && session.user && session.user.user_metadata && session.user.user_metadata.display_name) ||
+          (email ? email.split("@")[0] : "Reader");
+        return sb.from("profiles").insert({
+          id: userId,
+          email: email || null,
+          display_name: displayName,
+          intended_role: "reader",
+        });
+      }
+
+      function finishProfile(row) {
           var profile;
-          if (r.error || !r.data) {
+          if (!row) {
             profile = cache[userId] || fallback;
           } else {
-            profile = normalize(r.data, fallback);
+            profile = normalize(row, fallback);
             if (local && local.avatarUrl && !profile.avatarUrl) {
               profile.avatarUrl = local.avatarUrl;
             }
@@ -182,11 +285,7 @@
           cache[userId] = profile;
           writeLocal(userId, profile);
           return profile;
-        })
-        .catch(function () {
-          cache[userId] = cache[userId] || fallback;
-          return cache[userId];
-        });
+      }
     },
 
     update: function (userId, patch, session) {
@@ -204,9 +303,28 @@
           adultVerifiedAt: patch.adultVerifiedAt != null
             ? String(patch.adultVerifiedAt || "")
             : current.adultVerifiedAt || "",
+          birthYear: patch.birthYear != null
+            ? parseInt(patch.birthYear, 10) || null
+            : current.birthYear || null,
+          isAdmin: !!current.isAdmin,
         };
 
+        if (next.birthYear && (next.birthYear < 1900 || next.birthYear > new Date().getFullYear())) {
+          return Promise.reject(new Error("Enter a valid birth year."));
+        }
+        if (next.adultVerifiedAt && accountAge(next) != null && accountAge(next) < 18) {
+          return Promise.reject(new Error("You must be 18 or older to view age-restricted content."));
+        }
+
         if (!next.displayName) next.displayName = "Reader";
+
+        if (patch.displayName != null && window.ScenaContentPolicy && ScenaContentPolicy.assertProfileName) {
+          try {
+            ScenaContentPolicy.assertProfileName(next.displayName);
+          } catch (policyErr) {
+            return Promise.reject(policyErr);
+          }
+        }
 
         if (next.username && !/^[a-zA-Z0-9_]{3,24}$/.test(next.username)) {
           return Promise.reject(new Error("Username must be 3–24 letters, numbers, or underscores."));
@@ -231,10 +349,30 @@
             row.avatar_url = next.avatarUrl || null;
           }
         }
+        if (profileColumnsTier === "full") {
+          if (patch.birthYear != null) row.birth_year = next.birthYear;
+          if (patch.adultVerifiedAt != null) {
+            row.adult_verified_at = next.adultVerifiedAt ? next.adultVerifiedAt : null;
+          }
+        }
 
-        return sb.from("profiles").update(row).eq("id", userId).then(function (r) {
-          if (r.error) throw r.error;
-          return next;
+        function runUpdate(payload) {
+          return sb.from("profiles").update(payload).eq("id", userId).then(function (r) {
+            if (r.error) throw r.error;
+            return next;
+          });
+        }
+
+        return runUpdate(row).catch(function (err) {
+          if (!schemaColumnError(err)) throw err;
+          var minimal = {
+            display_name: next.displayName,
+            username: next.username || null,
+            pronouns: next.pronouns || null,
+          };
+          if (row.avatar_url !== undefined) minimal.avatar_url = row.avatar_url;
+          profileColumnsTier = "base";
+          return runUpdate(minimal);
         });
       });
     },

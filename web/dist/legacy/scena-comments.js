@@ -207,6 +207,11 @@
         if (!parent) return Promise.resolve(null);
       }
 
+      if (window.ScenaContentPolicy) {
+        var policy = ScenaContentPolicy.check(text);
+        if (!policy.ok) return Promise.reject(new Error(policy.message));
+      }
+
       if (!useCloud()) {
         var key = storageKey(seriesId, episodeId);
         var list = getCacheFlat(seriesId, episodeId);
@@ -225,22 +230,22 @@
       }
 
       var sb = getClient();
-      return sb.from("episode_comments").insert({
-        series_id: seriesId,
-        episode_id: episodeId,
-        user_id: author.userId,
-        parent_id: parentId || null,
-        body: text,
-        author: author,
-      }).select("id, series_id, episode_id, user_id, parent_id, body, author, created_at")
-        .single()
-        .then(function (result) {
+      return sb.rpc("post_episode_comment", {
+        p_series_id: seriesId,
+        p_episode_id: episodeId,
+        p_body: text,
+        p_parent_id: parentId || null,
+        p_author: author,
+      }).then(function (result) {
           if (result.error) throw result.error;
           return window.ScenaComments.load(seriesId, episodeId).then(function () {
-            return window.ScenaComments.findById(seriesId, episodeId, result.data.id);
+            return window.ScenaComments.findById(seriesId, episodeId, result.data);
           });
         })
-        .catch(function () { return null; });
+        .catch(function (err) {
+          if (err && err.message) throw err;
+          return null;
+        });
     },
 
     reactionCount: function (comment, emoji) {

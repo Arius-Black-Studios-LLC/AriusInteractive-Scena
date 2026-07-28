@@ -1,5 +1,5 @@
 /**
- * Arleco — public discover catalog (demos + published creator series).
+ * Arleco — public discover catalog (published creator series).
  */
 (function () {
   function escapeHtml(s) {
@@ -12,15 +12,19 @@
 
   var DEMO_META = {
     "signal-lost": {
-      genres: "scifi",
+      genres: "scifi horror",
+      genreKeys: ["scifi", "horror"],
       cover: "d",
-      flags: ["Sci-fi", "Strong language"],
+      flags: ["Sci-fi", "Horror", "Strong language"],
+      matureFlags: ["strong_language"],
       description: "Sci-fi mystery aboard Kerberos-9 — long chapters, dead comms, and a signal from inside the hull.",
     },
     "cafe-at-sunset": {
-      genres: "romance",
+      genres: "romance slice_of_life",
+      genreKeys: ["romance", "slice_of_life"],
       cover: "b",
-      flags: ["Romance"],
+      flags: ["Romance", "Slice of life"],
+      matureFlags: [],
       description: "A cozy romance with two playable chapters and too much matcha.",
     },
   };
@@ -74,6 +78,7 @@
   function shouldListInCatalog(series) {
     if (!series || !series.id) return false;
     if (series.templateSource) return false;
+    if (series.adminHidden) return false;
     return isPublishedSeries(series);
   }
 
@@ -94,19 +99,42 @@
 
   function genreTags(series, demoMeta) {
     if (demoMeta && demoMeta.genres) return demoMeta.genres;
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genres = series.genres || [];
+    if (genres.length) return genres.join(" ");
     var flags = series.contentFlags || [];
     if (!flags.length) return "story";
     return flags.join(" ");
   }
 
+  function genreKeys(series, demoMeta) {
+    if (demoMeta && demoMeta.genreKeys) return demoMeta.genreKeys.slice();
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    return (series.genres || []).slice();
+  }
+
   function flagLabels(series, demoMeta) {
     if (demoMeta && demoMeta.flags) return demoMeta.flags;
-    var keys = series.contentFlags || [];
-    var defs = (window.ScenaStore && ScenaStore.CONTENT_FLAGS) || [];
-    return keys.map(function (key) {
-      var def = defs.find(function (item) { return item.key === key; });
-      return def ? def.label : key;
+    if (window.ScenaStore && ScenaStore.migrateSeriesTaxonomy) ScenaStore.migrateSeriesTaxonomy(series);
+    var genreLabels = (series.genres || []).map(function (key) {
+      return window.ScenaStore && ScenaStore.labelForGenre
+        ? ScenaStore.labelForGenre(key)
+        : key;
     });
+    var matureLabels = (series.contentFlags || []).map(function (key) {
+      return window.ScenaStore && ScenaStore.labelForMatureFlag
+        ? ScenaStore.labelForMatureFlag(key)
+        : key;
+    });
+    return genreLabels.concat(matureLabels);
+  }
+
+  function entryIsAgeRestricted(series, demoMeta) {
+    if (demoMeta && demoMeta.matureFlags) return demoMeta.matureFlags.length > 0;
+    if (window.ScenaStore && ScenaStore.seriesIsAgeRestricted) {
+      return ScenaStore.seriesIsAgeRestricted(series);
+    }
+    return (series.contentFlags || []).length > 0;
   }
 
   function coverKey(series, demoMeta, index) {
@@ -127,6 +155,7 @@
       title: series.title || "Untitled",
       description: desc,
       genres: genreTags(series, demoMeta),
+      genreKeys: genreKeys(series, demoMeta),
       epLabel: liveEpisodeLabel(series),
       liveCount: (window.ScenaStore ? ScenaStore.orderedEpisodes(series) : (series.episodes || []))
         .filter(function (ep) {
@@ -137,10 +166,16 @@
       href: "/series?series=" + encodeURIComponent(series.id),
       cover: coverKey(series, demoMeta, opts.index || 0),
       thumbStyle: thumbStyle,
+      thumbnailDataUrl: series.thumbnailDataUrl || "",
+      bannerDataUrl: series.bannerDataUrl || "",
       flags: flagLabels(series, demoMeta),
+      isAgeRestricted: entryIsAgeRestricted(series, demoMeta),
       updatedAt: series.updatedAt || "",
       isDemo: !!opts.isDemo,
       ownerId: opts.ownerId || null,
+      featured: !!series.featured,
+      featuredOrder: series.featuredOrder != null ? parseInt(series.featuredOrder, 10) : null,
+      featuredEyebrow: String(series.featuredEyebrow || "").trim(),
     };
   }
 
@@ -175,6 +210,107 @@
     existing.push(entry);
   }
 
+  function finalizeDiscoverEntries(entries) {
+    entries.sort(function (a, b) {
+      return String(b.updatedAt).localeCompare(String(a.updatedAt));
+    });
+    return entries.filter(function (e) { return !e.isDemo; });
+  }
+
+  function sortFeaturedEntries(entries) {
+    return (entries || []).slice().sort(function (a, b) {
+      var ao = a.featuredOrder != null && !isNaN(a.featuredOrder) ? a.featuredOrder : 999;
+      var bo = b.featuredOrder != null && !isNaN(b.featuredOrder) ? b.featuredOrder : 999;
+      if (ao !== bo) return ao - bo;
+      return String(b.updatedAt).localeCompare(String(a.updatedAt));
+    });
+  }
+
+  function fetchCreatorNames(ownerIds) {
+    var unique = (ownerIds || []).filter(function (id, index, arr) {
+      return id && arr.indexOf(id) === index;
+    });
+    if (!unique.length) return Promise.resolve({});
+    var sb = window.ScenaAuth && ScenaAuth.getClient ? ScenaAuth.getClient() : null;
+    if (!sb) return Promise.resolve({});
+    return sb.from("profiles")
+      .select("id, display_name")
+      .in("id", unique)
+      .then(function (result) {
+        var map = {};
+        (result.data || []).forEach(function (row) {
+          map[row.id] = String(row.display_name || "Creator").trim() || "Creator";
+        });
+        return map;
+      })
+      .catch(function () {
+        return {};
+      });
+  }
+
+  function chapterCountLabel(entry) {
+    var count = parseInt(entry.liveCount, 10) || 0;
+    if (count <= 0) return "";
+    return count === 1 ? "1 chapter" : count + " chapters";
+  }
+
+  function featuredVisualStyle(entry) {
+    var url = entry.bannerDataUrl || entry.thumbnailDataUrl || "";
+    if (!url) return "";
+    return ' style="background-image:url(' + escapeAttr(url) +
+      ');background-size:cover;background-position:center;background-repeat:no-repeat"';
+  }
+
+  function renderFeaturedMeta(entry) {
+    var parts = [];
+    if (entry.creatorName) parts.push("by " + entry.creatorName);
+    var chapters = chapterCountLabel(entry);
+    if (chapters) parts.push(chapters);
+    if (entry.epLabel) parts.push(entry.epLabel);
+    return parts.join(" · ");
+  }
+
+  function renderFeaturedCard(entry, opts) {
+    opts = opts || {};
+    var visualClass = "featured-visual featured-visual--" + escapeAttr(entry.cover || "a");
+    if (entry.bannerDataUrl || entry.thumbnailDataUrl) visualClass += " featured-visual--image";
+    var flagsHtml = (entry.flags || []).slice(0, opts.side ? 2 : 4).map(function (label) {
+      return '<span class="flag">' + escapeHtml(label) + "</span>";
+    }).join("");
+    var eyebrow = entry.featuredEyebrow || (opts.hero ? "Editor's pick" : "");
+    var meta = renderFeaturedMeta(entry);
+    return (
+      '<a class="featured-card' + (opts.hero ? " featured-card--hero" : " featured-card--side") +
+        '" href="' + escapeAttr(entry.href) + '">' +
+        '<div class="' + visualClass + '"' + featuredVisualStyle(entry) + ">" +
+          (opts.hero && entry.epLabel
+            ? ('<span class="badge">' + escapeHtml(entry.epLabel) + "</span>")
+            : "") +
+        "</div>" +
+        '<div class="featured-body">' +
+          (eyebrow ? ('<div class="featured-eyebrow">' + escapeHtml(eyebrow) + "</div>") : "") +
+          '<h3 class="featured-title">' + escapeHtml(entry.title) + "</h3>" +
+          '<p class="featured-desc">' + escapeHtml(entry.description) + "</p>" +
+          (flagsHtml ? ('<div class="flags">' + flagsHtml + "</div>") : "") +
+          (meta ? ('<p class="featured-meta">' + escapeHtml(meta) + "</p>") : "") +
+        "</div>" +
+      "</a>"
+    );
+  }
+
+  function renderFeaturedGridHtml(entries) {
+    if (!entries || !entries.length) return "";
+    var hero = entries[0];
+    var side = entries.slice(1, 3);
+    var html = renderFeaturedCard(hero, { hero: true });
+    if (side.length) {
+      html += '<div class="featured-side">' + side.map(function (entry) {
+        return renderFeaturedCard(entry, { side: true });
+      }).join("") + "</div>";
+    }
+    return html;
+  }
+
   window.ScenaCatalog = {
     isPublishedSeries: isPublishedSeries,
 
@@ -189,18 +325,28 @@
       return resolveReaderStats(entries, cloudStats);
     },
 
+    listFeatured: function (userId, opts) {
+      opts = opts || {};
+      var limit = parseInt(opts.limit, 10) || 3;
+      return this.listDiscover(userId).then(function (entries) {
+        var picks = sortFeaturedEntries((entries || []).filter(function (entry) {
+          return entry.featured;
+        })).slice(0, limit);
+        var ownerIds = picks.map(function (entry) { return entry.ownerId; });
+        return fetchCreatorNames(ownerIds).then(function (names) {
+          return picks.map(function (entry) {
+            return Object.assign({}, entry, {
+              creatorName: names[entry.ownerId] || "Creator",
+            });
+          });
+        });
+      });
+    },
+
     listDiscover: function (userId) {
       var entries = [];
       var seen = {};
       var index = 0;
-
-      if (window.ScenaDemo && ScenaDemo.templateIds) {
-        ScenaDemo.templateIds().forEach(function (id) {
-          var series = ScenaDemo.getSeries(id);
-          if (!series) return;
-          mergeEntries(entries, entryFromSeries(series, { isDemo: true, index: index++ }), seen);
-        });
-      }
 
       var localPromise = window.ScenaStore && ScenaStore.ready
         ? ScenaStore.ready(userId)
@@ -215,7 +361,7 @@
         }
 
         if (!window.ScenaCloud || !ScenaCloud.isAvailable || !ScenaCloud.listPublishedSeries) {
-          return entries;
+          return finalizeDiscoverEntries(entries);
         }
 
         return ScenaCloud.listPublishedSeries().then(function (rows) {
@@ -225,14 +371,9 @@
             if (window.ScenaStore && ScenaStore.normalizeSeries) ScenaStore.normalizeSeries(series);
             mergeEntries(entries, entryFromSeries(series, { ownerId: row.user_id, index: index++ }), seen);
           });
-          entries.sort(function (a, b) {
-            if (a.isDemo && !b.isDemo) return -1;
-            if (!a.isDemo && b.isDemo) return 1;
-            return String(b.updatedAt).localeCompare(String(a.updatedAt));
-          });
-          return entries;
+          return finalizeDiscoverEntries(entries);
         }).catch(function () {
-          return entries;
+          return finalizeDiscoverEntries(entries);
         });
       });
     },
@@ -264,6 +405,7 @@
             return null;
           }
           var series = row.data;
+          series.creatorUserId = row.user_id;
           if (window.ScenaStore && ScenaStore.normalizeSeries) ScenaStore.normalizeSeries(series);
           return series;
         }).catch(function () {
@@ -277,6 +419,20 @@
       var list = readerBundle && readerBundle.entries ? readerBundle.entries : (entries || []);
       var emptyHtml = '<p class="empty-state" id="emptyState">No series match your search. Try another genre or term.</p>';
       gridEl.innerHTML = list.map(renderCard).join("") + emptyHtml;
+    },
+
+    renderFeaturedGrid: function (mountEl, entries) {
+      if (!mountEl) return;
+      if (!entries || !entries.length) {
+        mountEl.innerHTML = "";
+        var section = mountEl.closest("#featured");
+        if (section) section.hidden = true;
+        return;
+      }
+      var section = mountEl.closest("#featured");
+      if (section) section.hidden = false;
+      mountEl.className = "featured-grid" + (entries.length > 1 ? "" : " featured-grid--solo");
+      mountEl.innerHTML = renderFeaturedGridHtml(entries);
     },
 
     formatReaderCount: formatReaderCount,

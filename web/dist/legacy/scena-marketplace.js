@@ -4,6 +4,7 @@
 (function () {
   var PURCHASES_PREFIX = "arleco_marketplace_purchases_";
   var LISTINGS_LOCAL = "arleco_marketplace_listings";
+  var RATINGS_LOCAL = "arleco_marketplace_ratings";
 
   var CATEGORIES = [
     { id: "", label: "All" },
@@ -11,6 +12,7 @@
     { id: "stage", label: "Stages" },
     { id: "item", label: "Items" },
     { id: "audio", label: "Audio" },
+    { id: "ui", label: "UI" },
     { id: "pack", label: "Packs" },
   ];
 
@@ -62,6 +64,53 @@
     } catch (e) { /* quota */ }
   }
 
+  function readLocalRatings() {
+    try {
+      return JSON.parse(localStorage.getItem(RATINGS_LOCAL) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeLocalRatings(map) {
+    try {
+      localStorage.setItem(RATINGS_LOCAL, JSON.stringify(map));
+    } catch (e) { /* quota */ }
+  }
+
+  function ratingStatsFor(listingId, userId) {
+    var all = readLocalRatings()[listingId] || {};
+    var keys = Object.keys(all);
+    var sum = 0;
+    keys.forEach(function (uid) { sum += Math.max(0, parseInt(all[uid], 10) || 0); });
+    return {
+      rating_avg: keys.length ? Math.round((sum / keys.length) * 100) / 100 : 0,
+      rating_count: keys.length,
+      my_rating: userId && all[userId] != null ? parseInt(all[userId], 10) || null : null,
+    };
+  }
+
+  function formatRating(avg, count) {
+    avg = Number(avg) || 0;
+    count = Math.max(0, parseInt(count, 10) || 0);
+    if (!count) return "Not rated";
+    return "★ " + avg.toFixed(1) + " (" + count + ")";
+  }
+
+  function renderStarsInput(listingId, myRating, opts) {
+    opts = opts || {};
+    var canRate = !!opts.canRate;
+    var stars = "";
+    for (var i = 1; i <= 5; i++) {
+      stars +=
+        '<button type="button" class="mp-star-btn' + (myRating >= i ? " is-on" : "") + '"' +
+          ' data-mp-rate-listing="' + escapeAttr(listingId) + '" data-mp-stars="' + i + '"' +
+          (canRate ? "" : " disabled") +
+          ' aria-label="' + i + ' star' + (i === 1 ? "" : "s") + '">★</button>';
+    }
+    return '<div class="mp-stars' + (canRate ? "" : " mp-stars--readonly") + '">' + stars + "</div>";
+  }
+
   function demoListings() {
     return [
       {
@@ -72,6 +121,8 @@
         price_ducats: 0,
         preview_data_url: "",
         purchase_count: 42,
+        rating_avg: 4.6,
+        rating_count: 18,
         seller_name: "Arleco",
         bundle: {
           characterProfiles: [{
@@ -102,6 +153,8 @@
         price_ducats: 15,
         preview_data_url: "",
         purchase_count: 18,
+        rating_avg: 4.2,
+        rating_count: 9,
         seller_name: "Arleco",
         bundle: {
           backgroundScenes: [{
@@ -127,6 +180,74 @@
     if (!n) return "Free";
     if (window.ScenaWallet && ScenaWallet.formatDucats) return ScenaWallet.formatDucats(n);
     return n + " Ducats";
+  }
+
+  function isJamFreeListing(listing) {
+    if (!listing) return false;
+    if (listing.jam_free === true) return true;
+    var until = listing.jam_free_until;
+    if (!until) return false;
+    var t = new Date(until).getTime();
+    return !isNaN(t) && t > Date.now();
+  }
+
+  function listPriceDucats(listing) {
+    return Math.max(0, parseInt(listing && listing.price_ducats, 10) || 0);
+  }
+
+  function effectivePriceDucats(listing) {
+    if (listing && listing.effective_price_ducats != null && !isNaN(Number(listing.effective_price_ducats))) {
+      return Math.max(0, parseInt(listing.effective_price_ducats, 10) || 0);
+    }
+    if (isJamFreeListing(listing)) return 0;
+    return listPriceDucats(listing);
+  }
+
+  /** Strikethrough list price when a jam promo is active. */
+  function renderPriceHtml(listing) {
+    var list = listPriceDucats(listing);
+    var effective = effectivePriceDucats(listing);
+    if (isJamFreeListing(listing) && list > 0) {
+      return (
+        '<span class="mp-price mp-price--jam-free">' +
+          '<s class="mp-price-was">' + escapeHtml(formatPrice(list)) + "</s> " +
+          '<span class="mp-price-now">Free</span>' +
+          '<span class="mp-price-jam-tag"> during jam</span>' +
+        "</span>"
+      );
+    }
+    return '<span class="mp-price">' + escapeHtml(formatPrice(effective)) + "</span>";
+  }
+
+  function enrichListingsWithJamFree(listings) {
+    listings = (listings || []).slice();
+    if (!window.ScenaJams || !ScenaJams.jamFreeUntilByListingId) {
+      return Promise.resolve(listings.map(normalizeJamFreeFields));
+    }
+    return Promise.resolve(ScenaJams.jamFreeUntilByListingId()).then(function (map) {
+      map = map || {};
+      return listings.map(function (item) {
+        var row = Object.assign({}, item);
+        var fromJam = map[row.id];
+        if (fromJam) {
+          var existing = row.jam_free_until ? new Date(row.jam_free_until).getTime() : 0;
+          var next = new Date(fromJam).getTime();
+          if (!existing || next > existing) row.jam_free_until = fromJam;
+        }
+        return normalizeJamFreeFields(row);
+      });
+    }).catch(function () {
+      return listings.map(normalizeJamFreeFields);
+    });
+  }
+
+  function normalizeJamFreeFields(listing) {
+    if (!listing) return listing;
+    var row = Object.assign({}, listing);
+    var jamFree = isJamFreeListing(row);
+    row.jam_free = jamFree;
+    row.effective_price_ducats = jamFree ? 0 : listPriceDucats(row);
+    return row;
   }
 
   function categoryLabel(id) {
@@ -183,6 +304,11 @@
       series.metrics.push(m);
       count++;
     });
+    if (bundle.readerUi && window.ScenaStore) {
+      series.readerUi = JSON.parse(JSON.stringify(bundle.readerUi));
+      ScenaStore.ensureReaderUi(series);
+      count++;
+    }
 
     return { ok: count > 0, count: count };
   }
@@ -192,30 +318,117 @@
     var bundle = { characterProfiles: [], backgroundScenes: [], assets: [], metrics: [] };
     var preview = spec.previewDataUrl || "";
 
-    if (spec.characterId) {
-      var ch = ScenaStore.getCharacter(series, spec.characterId);
-      if (ch) {
-        bundle.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
-        preview = preview || ((ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "");
-      }
-    }
-    if (spec.stageId) {
-      var bg = ScenaStore.getBackground(series, spec.stageId);
-      if (bg) {
-        bundle.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
-        preview = preview || (bg.layers && bg.layers.bg) || "";
-      }
-    }
-    if (spec.assetId) {
-      var asset = ScenaStore.ensureAssets(series).find(function (a) { return a.id === spec.assetId; });
-      if (asset) {
-        bundle.assets.push(JSON.parse(JSON.stringify(asset)));
-        preview = preview || asset.dataUrl || "";
+    var characterIds = [];
+    if (Array.isArray(spec.characterIds)) characterIds = spec.characterIds.slice();
+    else if (spec.characterId) characterIds = [spec.characterId];
+
+    var stageIds = [];
+    if (Array.isArray(spec.stageIds)) stageIds = spec.stageIds.slice();
+    else if (spec.stageId) stageIds = [spec.stageId];
+
+    var assetIds = [];
+    if (Array.isArray(spec.assetIds)) assetIds = spec.assetIds.slice();
+    else if (spec.assetId) assetIds = [spec.assetId];
+
+    characterIds.forEach(function (id) {
+      var ch = ScenaStore.getCharacter(series, id);
+      if (!ch) return;
+      bundle.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
+      if (!preview) preview = (ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "";
+    });
+    stageIds.forEach(function (id) {
+      var bg = ScenaStore.getBackground(series, id);
+      if (!bg) return;
+      bundle.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
+      if (!preview) preview = (bg.layers && bg.layers.bg) || "";
+    });
+    assetIds.forEach(function (id) {
+      var asset = ScenaStore.ensureAssets(series).find(function (a) { return a.id === id; });
+      if (!asset) return;
+      bundle.assets.push(JSON.parse(JSON.stringify(asset)));
+      if (!preview) preview = asset.dataUrl || "";
+    });
+
+    if (spec.readerUi && window.ScenaStore) {
+      ScenaStore.ensureReaderUi(series);
+      bundle.readerUi = JSON.parse(JSON.stringify(series.readerUi));
+      if (!preview && series.readerUi.customSprites) {
+        preview = series.readerUi.customSprites.dialogueBox || series.readerUi.customSprites.choiceButton || "";
       }
     }
 
-    var empty = !bundle.characterProfiles.length && !bundle.backgroundScenes.length && !bundle.assets.length;
-    return { bundle: bundle, preview: preview, empty: empty };
+    var empty = !bundle.characterProfiles.length && !bundle.backgroundScenes.length &&
+      !bundle.assets.length && !bundle.readerUi;
+    var pieceCount =
+      bundle.characterProfiles.length + bundle.backgroundScenes.length + bundle.assets.length +
+      (bundle.readerUi ? 1 : 0);
+    return { bundle: bundle, preview: preview, empty: empty, pieceCount: pieceCount };
+  }
+
+  function inferListingCategory(bundle, preferred) {
+    if (preferred && preferred !== "pack") return preferred;
+    if (!bundle) return preferred || "pack";
+    if (bundle.readerUi &&
+      !(bundle.characterProfiles || []).length &&
+      !(bundle.backgroundScenes || []).length &&
+      !(bundle.assets || []).length) {
+      return "ui";
+    }
+    var types = 0;
+    if ((bundle.characterProfiles || []).length) types++;
+    if ((bundle.backgroundScenes || []).length) types++;
+    if ((bundle.assets || []).length) types++;
+    if (bundle.readerUi) types++;
+    var pieces =
+      (bundle.characterProfiles || []).length +
+      (bundle.backgroundScenes || []).length +
+      (bundle.assets || []).length +
+      (bundle.readerUi ? 1 : 0);
+    if (types > 1 || pieces > 1) return "pack";
+    if ((bundle.characterProfiles || []).length) return "character";
+    if ((bundle.backgroundScenes || []).length) return "stage";
+    var assets = bundle.assets || [];
+    if (assets.some(function (a) { return a.kind === "keyItem"; })) return "item";
+    if (assets.length) return "audio";
+    if (bundle.readerUi) return "ui";
+    return preferred || "pack";
+  }
+
+  function mergeViewerListings(rows, viewerUserId) {
+    rows = (rows || []).slice();
+    if (!viewerUserId) return rows;
+    var byId = {};
+    rows.forEach(function (r) {
+      if (!r || !r.id) return;
+      byId[r.id] = Object.assign({}, r);
+      if (r.seller_id && r.seller_id === viewerUserId) {
+        byId[r.id].is_seller = true;
+        byId[r.id].seller_id = viewerUserId;
+      }
+    });
+    readLocalListings().forEach(function (l) {
+      if (!l || !l.id) return;
+      if (l.seller_id !== viewerUserId) return;
+      if (l.status === "removed") return;
+      var existing = byId[l.id];
+      if (existing) {
+        byId[l.id] = Object.assign({}, existing, {
+          is_seller: true,
+          seller_id: viewerUserId,
+          seller_name: existing.seller_name || "You",
+        });
+      } else {
+        byId[l.id] = Object.assign({}, l, {
+          is_seller: true,
+          seller_id: viewerUserId,
+          seller_name: "You",
+          status: l.status || "live",
+        });
+      }
+    });
+    return Object.keys(byId).map(function (id) { return byId[id]; }).filter(function (l) {
+      return (l.status || "live") === "live";
+    });
   }
 
   window.ScenaMarketplace = {
@@ -225,10 +438,12 @@
       opts = opts || {};
       var category = opts.category || "";
       var query = opts.query || "";
+      var viewerUserId = opts.viewerUserId || opts.userId || null;
 
       var sb = getClient();
+      var chain;
       if (useCloud() && sb) {
-        return sb.rpc("browse_marketplace_listings", {
+        chain = sb.rpc("browse_marketplace_listings", {
           p_category: category || null,
           p_query: query || null,
           p_limit: opts.limit || 48,
@@ -238,75 +453,232 @@
             return filterLocalListings(category, query);
           }
           var rows = res.data || [];
-          return rows.length ? rows : filterLocalListings(category, query);
+          // Always merge local/own listings so sellers can see themselves in the shop.
+          var cloud = rows.length ? rows : [];
+          var local = filterLocalListings(category, query);
+          var byId = {};
+          cloud.concat(local).forEach(function (r) {
+            if (!r || !r.id) return;
+            if (!byId[r.id]) byId[r.id] = r;
+            else byId[r.id] = Object.assign({}, byId[r.id], r);
+          });
+          var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+          if (category) merged = merged.filter(function (r) { return r.category === category; });
+          if (query) {
+            var q = query.toLowerCase();
+            merged = merged.filter(function (r) {
+              return (r.title || "").toLowerCase().indexOf(q) >= 0 ||
+                (r.description || "").toLowerCase().indexOf(q) >= 0;
+            });
+          }
+          return merged.length ? merged : filterLocalListings(category, query);
         }).catch(function () {
           return filterLocalListings(category, query);
         });
+      } else {
+        chain = Promise.resolve(filterLocalListings(category, query));
       }
-      return Promise.resolve(filterLocalListings(category, query));
+      return chain.then(function (rows) {
+        return mergeViewerListings(rows, viewerUserId);
+      }).then(function (rows) {
+        if (!viewerUserId) return rows;
+        return ScenaMarketplace.listSellerListings(viewerUserId).then(function (mine) {
+          if (!mine || !mine.length) return rows;
+          var byId = {};
+          (rows || []).forEach(function (r) {
+            if (r && r.id) byId[r.id] = r;
+          });
+          mine.forEach(function (l) {
+            if (!l || !l.id || (l.status && l.status !== "live")) return;
+            byId[l.id] = Object.assign({}, byId[l.id] || {}, l, {
+              is_seller: true,
+              seller_id: viewerUserId,
+              seller_name: (byId[l.id] && byId[l.id].seller_name) || l.seller_name || "You",
+              status: "live",
+            });
+          });
+          var merged = Object.keys(byId).map(function (id) { return byId[id]; });
+          if (category) merged = merged.filter(function (r) { return r.category === category; });
+          if (query) {
+            var q = query.toLowerCase();
+            merged = merged.filter(function (r) {
+              return (r.title || "").toLowerCase().indexOf(q) >= 0 ||
+                (r.description || "").toLowerCase().indexOf(q) >= 0;
+            });
+          }
+          return merged;
+        });
+      }).then(enrichListingsWithJamFree);
     },
 
     getListing: function (listingId, userId) {
       var sb = getClient();
+      var chain;
       if (useCloud() && sb && listingId && String(listingId).indexOf("demo_") !== 0) {
-        return sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
+        chain = sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
           if (res.error || !res.data) return findLocalListing(listingId, userId);
           var row = res.data;
           row.owned = row.owned || Boolean(readPurchases(userId)[listingId]);
+          if (userId && row.seller_id === userId) row.is_seller = true;
           return row;
         }).catch(function () {
           return findLocalListing(listingId, userId);
         });
+      } else {
+        chain = Promise.resolve(findLocalListing(listingId, userId));
       }
-      return Promise.resolve(findLocalListing(listingId, userId));
+      return chain.then(function (listing) {
+        if (!listing) return null;
+        if (userId && listing.seller_id === userId) listing.is_seller = true;
+        return enrichListingsWithJamFree([listing]).then(function (rows) {
+          return rows[0] || listing;
+        });
+      });
     },
 
     purchase: function (userId, listingId) {
       if (!userId) return Promise.reject(new Error("Sign in to get marketplace assets."));
-      var local = findLocalListing(listingId, userId);
-      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      return ScenaMarketplace.getListing(listingId, userId).then(function (local) {
+        var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
 
-      if (local && isLocalId) {
-        var price = local.price_ducats || 0;
-        var finish = function () {
-          var purchases = readPurchases(userId);
-          purchases[listingId] = true;
-          writePurchases(userId, purchases);
-          return { bundle: local.bundle, free: !price, balance: window.ScenaWallet ? ScenaWallet.getBalance(userId) : null };
-        };
-        if (price <= 0) return Promise.resolve(finish());
-        if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
-        return ScenaWallet.load(userId).then(function () {
-          if (ScenaWallet.getBalance(userId) < price) {
-            return Promise.reject(new Error("Not enough Ducats. You need " + formatPrice(price) + "."));
+        if (local && (local.is_seller || local.isSeller || local.seller_id === userId)) {
+          return Promise.reject(new Error("You cannot buy your own listing — it is already in your library."));
+        }
+
+        if (local && isLocalId) {
+          var price = effectivePriceDucats(local);
+          var finish = function () {
+            var purchases = readPurchases(userId);
+            purchases[listingId] = true;
+            writePurchases(userId, purchases);
+            return {
+              bundle: local.bundle,
+              free: !price,
+              jam_free: isJamFreeListing(local),
+              balance: window.ScenaWallet ? ScenaWallet.getBalance(userId) : null,
+            };
+          };
+          if (price <= 0) return Promise.resolve(finish());
+          if (!window.ScenaWallet) return Promise.reject(new Error("Wallet unavailable."));
+          return ScenaWallet.spendBalance(userId, price, "marketplace_demo", listingId).then(function () {
+            return finish();
+          });
+        }
+
+        var sb = getClient();
+        if (!sb) {
+          return Promise.reject(new Error("Marketplace requires sign-in."));
+        }
+
+        return sb.rpc("purchase_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Purchase failed.");
+          var row = res.data || {};
+          if (window.ScenaWallet && row.balance != null) {
+            ScenaWallet.syncBalance(userId, row.balance);
           }
-          var key = "arleco_wallet_" + userId;
-          try {
-            var raw = JSON.parse(localStorage.getItem(key) || "{}");
-            raw.balance = Math.max(0, (raw.balance || 0) - price);
-            localStorage.setItem(key, JSON.stringify(raw));
-          } catch (e) { /* ignore */ }
-          return ScenaWallet.load(userId).then(finish);
+          if (window.ScenaWallet) {
+            return ScenaWallet.load(userId).then(function () {
+              return row;
+            });
+          }
+          return row;
+        });
+      });
+    },
+
+    /** Extend jam-free window through judging end (seller only). */
+    setJamFreeUntil: function (userId, listingId, untilIso) {
+      if (!userId || !listingId || !untilIso) {
+        return Promise.reject(new Error("Missing jam free details."));
+      }
+      var sb = getClient();
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      if (useCloud() && sb && !isLocalId) {
+        return sb.rpc("set_listing_jam_free_until", {
+          p_listing_id: listingId,
+          p_until: untilIso,
+        }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not apply jam free pricing.");
+          // Mirror locally for UI enrichment
+          var list = readLocalListings();
+          var idx = list.findIndex(function (l) { return l.id === listingId; });
+          if (idx >= 0) {
+            var prev = list[idx].jam_free_until ? new Date(list[idx].jam_free_until).getTime() : 0;
+            var next = new Date(untilIso).getTime();
+            if (!prev || next > prev) list[idx].jam_free_until = untilIso;
+            writeLocalListings(list);
+          }
+          return res.data || { jam_free_until: untilIso };
         });
       }
-
-      var sb = getClient();
-      if (!sb) {
-        return Promise.reject(new Error("Marketplace requires sign-in."));
+      var list = readLocalListings();
+      var idx = list.findIndex(function (l) { return l.id === listingId; });
+      if (idx < 0) {
+        // Still record on a side map for demo listings
+        try {
+          var side = JSON.parse(localStorage.getItem("arleco_marketplace_jam_free") || "{}");
+          var prevSide = side[listingId] ? new Date(side[listingId]).getTime() : 0;
+          var nextSide = new Date(untilIso).getTime();
+          if (!prevSide || nextSide > prevSide) side[listingId] = untilIso;
+          localStorage.setItem("arleco_marketplace_jam_free", JSON.stringify(side));
+        } catch (e) { /* ignore */ }
+        return Promise.resolve({ jam_free_until: untilIso });
       }
+      if (list[idx].seller_id && list[idx].seller_id !== userId) {
+        return Promise.reject(new Error("Only the seller can mark jam free pricing."));
+      }
+      var prev = list[idx].jam_free_until ? new Date(list[idx].jam_free_until).getTime() : 0;
+      var next = new Date(untilIso).getTime();
+      if (!prev || next > prev) list[idx].jam_free_until = untilIso;
+      writeLocalListings(list);
+      return Promise.resolve({ jam_free_until: list[idx].jam_free_until });
+    },
 
-      return sb.rpc("purchase_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
-        if (res.error) throw new Error(res.error.message || "Purchase failed.");
-        var row = res.data || {};
-        if (window.ScenaWallet) ScenaWallet.load(userId);
-        return row;
+    listSellerListings: function (userId) {
+      if (!userId) return Promise.resolve([]);
+      var local = readLocalListings().filter(function (l) {
+        return l.seller_id === userId && l.status !== "removed";
       });
+      var sb = getClient();
+      if (!useCloud() || !sb) return Promise.resolve(local);
+      return sb.from("marketplace_listings")
+        .select("id,title,description,category,price_ducats,preview_data_url,purchase_count,created_at,seller_id,status,jam_free_until")
+        .eq("seller_id", userId)
+        .eq("status", "live")
+        .order("created_at", { ascending: false })
+        .limit(100)
+        .then(function (res) {
+          if (res.error) {
+            console.warn("listSellerListings:", res.error.message);
+            return local;
+          }
+          var cloud = (res.data || []).map(function (row) {
+            return Object.assign({}, row, {
+              is_seller: true,
+              seller_name: "You",
+            });
+          });
+          var byId = {};
+          cloud.concat(local).forEach(function (l) {
+            if (!l || !l.id) return;
+            byId[l.id] = Object.assign({}, byId[l.id] || {}, l, { is_seller: true, seller_id: userId });
+          });
+          return Object.keys(byId).map(function (id) { return byId[id]; });
+        })
+        .catch(function () { return local; });
     },
 
     publishListing: function (userId, spec) {
       spec = spec || {};
       if (!userId) return Promise.reject(new Error("Sign in to sell on the marketplace."));
       if (!spec.bundle || spec.empty) return Promise.reject(new Error("Nothing to list — pick a character, stage, or asset."));
+
+      if (window.ScenaContentPolicy) {
+        var titleCheck = ScenaContentPolicy.check(spec.title || "");
+        if (!titleCheck.ok) return Promise.reject(new Error(titleCheck.message));
+        var descCheck = ScenaContentPolicy.check(spec.description || "");
+        if (!descCheck.ok) return Promise.reject(new Error(descCheck.message));
+      }
 
       var sb = getClient();
       if (!sb) {
@@ -338,13 +710,220 @@
         p_preview_data_url: spec.previewDataUrl || null,
       }).then(function (res) {
         if (res.error) throw new Error(res.error.message || "Could not publish listing.");
-        return { id: res.data };
+        var id = res.data && (res.data.id || res.data);
+        // Mirror locally so the shop always shows your own listing even if browse omits seller_id.
+        if (id) {
+          var list = readLocalListings().filter(function (l) { return l.id !== id; });
+          list.unshift({
+            id: id,
+            seller_id: userId,
+            title: spec.title,
+            description: spec.description || "",
+            category: spec.category,
+            price_ducats: spec.priceDucats || 0,
+            preview_data_url: spec.previewDataUrl || "",
+            bundle: spec.bundle,
+            status: "live",
+            purchase_count: 0,
+            seller_name: spec.sellerName || "You",
+            is_seller: true,
+          });
+          writeLocalListings(list);
+        }
+        return { id: id };
       });
+    },
+
+    updateListing: function (userId, listingId, spec) {
+      spec = spec || {};
+      if (!userId) return Promise.reject(new Error("Sign in to edit listings."));
+      if (!listingId) return Promise.reject(new Error("Missing listing."));
+      var title = String(spec.title || "").trim();
+      if (title.length < 2) return Promise.reject(new Error("Title is too short."));
+      var category = spec.category || "pack";
+      var allowed = CATEGORIES.some(function (c) { return c.id && c.id === category; });
+      if (!allowed) return Promise.reject(new Error("Invalid category."));
+      var price = Math.max(0, parseInt(spec.priceDucats, 10) || 0);
+      var description = String(spec.description || "").trim();
+
+      if (window.ScenaContentPolicy) {
+        var titleCheck = ScenaContentPolicy.check(title);
+        if (!titleCheck.ok) return Promise.reject(new Error(titleCheck.message));
+        var descCheck = ScenaContentPolicy.check(description);
+        if (!descCheck.ok) return Promise.reject(new Error(descCheck.message));
+      }
+
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      var sb = getClient();
+
+      function mirrorLocal(extra) {
+        var list = readLocalListings();
+        var idx = list.findIndex(function (l) { return l.id === listingId; });
+        if (idx < 0) {
+          if (!isLocalId) {
+            list.unshift(Object.assign({
+              id: listingId,
+              seller_id: userId,
+              status: "live",
+              purchase_count: 0,
+              seller_name: "You",
+              is_seller: true,
+              preview_data_url: "",
+              bundle: {},
+            }, {
+              title: title,
+              description: description,
+              category: category,
+              price_ducats: price,
+            }, extra || {}));
+            writeLocalListings(list);
+          }
+          return;
+        }
+        if (list[idx].seller_id && list[idx].seller_id !== userId) {
+          throw new Error("Only the seller can edit this listing.");
+        }
+        list[idx] = Object.assign({}, list[idx], {
+          title: title,
+          description: description,
+          category: category,
+          price_ducats: price,
+          status: list[idx].status === "removed" ? "live" : (list[idx].status || "live"),
+          seller_id: userId,
+          is_seller: true,
+          updated_at: new Date().toISOString(),
+        }, extra || {});
+        writeLocalListings(list);
+      }
+
+      if (isLocalId || !useCloud() || !sb) {
+        try {
+          mirrorLocal();
+        } catch (err) {
+          return Promise.reject(err);
+        }
+        var local = findLocalListing(listingId, userId);
+        if (!local) return Promise.reject(new Error("Listing not found."));
+        return Promise.resolve(local);
+      }
+
+      return sb.rpc("update_marketplace_listing", {
+        p_listing_id: listingId,
+        p_title: title,
+        p_description: description,
+        p_category: category,
+        p_price_ducats: price,
+      }).then(function (res) {
+        if (res.error) throw new Error(res.error.message || "Could not update listing.");
+        try { mirrorLocal(); } catch (e) { /* ignore mirror errors */ }
+        return Object.assign({ id: listingId }, res.data || {}, {
+          title: title,
+          description: description,
+          category: category,
+          price_ducats: price,
+          is_seller: true,
+          seller_id: userId,
+        });
+      });
+    },
+
+    removeListing: function (userId, listingId) {
+      if (!userId) return Promise.reject(new Error("Sign in to remove listings."));
+      if (!listingId) return Promise.reject(new Error("Missing listing."));
+
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      var sb = getClient();
+
+      function markLocalRemoved() {
+        var list = readLocalListings();
+        var idx = list.findIndex(function (l) { return l.id === listingId; });
+        if (idx >= 0) {
+          if (list[idx].seller_id && list[idx].seller_id !== userId) {
+            throw new Error("Only the seller can remove this listing.");
+          }
+          list[idx] = Object.assign({}, list[idx], {
+            status: "removed",
+            updated_at: new Date().toISOString(),
+          });
+          writeLocalListings(list);
+        } else if (isLocalId) {
+          throw new Error("Listing not found.");
+        }
+      }
+
+      var chain;
+      if (isLocalId || !useCloud() || !sb) {
+        try {
+          markLocalRemoved();
+          chain = Promise.resolve({ id: listingId, status: "removed" });
+        } catch (err) {
+          return Promise.reject(err);
+        }
+      } else {
+        chain = sb.rpc("remove_marketplace_listing", { p_listing_id: listingId }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not remove listing.");
+          try { markLocalRemoved(); } catch (e) { /* ignore */ }
+          return { id: listingId, status: "removed" };
+        });
+      }
+
+      return chain.then(function (result) {
+        if (window.ScenaAssetLibrary && ScenaAssetLibrary.clearListingSale) {
+          ScenaAssetLibrary.clearListingSale(userId, listingId);
+        }
+        return result;
+      });
+    },
+
+    renderEditListingBody: function (listing) {
+      if (!listing) return "<p>Listing not found.</p>";
+      var catOpts = CATEGORIES.filter(function (c) { return c.id; }).map(function (c) {
+        return '<option value="' + escapeAttr(c.id) + '"' +
+          (listing.category === c.id ? " selected" : "") + ">" + escapeHtml(c.label) + "</option>";
+      }).join("");
+      return (
+        '<div class="field"><label>Listing title</label><input type="text" id="mpEditTitle" maxlength="80" value="' +
+          escapeAttr(listing.title || "") + '"></div>' +
+        '<div class="field"><label>Description</label><textarea id="mpEditDesc" rows="3" maxlength="400">' +
+          escapeHtml(listing.description || "") + "</textarea></div>" +
+        '<div class="field"><label>Category</label><select id="mpEditCategory">' + catOpts + "</select></div>" +
+        '<div class="field"><label>Price (Ducats, 0 = free)</label><input type="number" id="mpEditPrice" min="0" max="9999" value="' +
+          escapeAttr(String(listing.price_ducats != null ? listing.price_ducats : 0)) + '"></div>' +
+        '<p class="field-hint">Changes apply to the shop listing. The asset pack contents stay the same.</p>'
+      );
     },
 
     importBundleToSeries: importBundleToSeries,
 
     buildBundleFromSeries: buildBundleFromSeries,
+    inferListingCategory: inferListingCategory,
+
+    /** Merge several library/project bundles into one pack listing payload. */
+    mergeBundles: function (bundles) {
+      var out = { characterProfiles: [], backgroundScenes: [], assets: [], metrics: [] };
+      var preview = "";
+      (bundles || []).forEach(function (bundle) {
+        if (!bundle) return;
+        (bundle.characterProfiles || []).forEach(function (ch) {
+          out.characterProfiles.push(JSON.parse(JSON.stringify(ch)));
+          if (!preview) preview = (ch.sprites && ch.sprites[0] && ch.sprites[0].dataUrl) || "";
+        });
+        (bundle.backgroundScenes || []).forEach(function (bg) {
+          out.backgroundScenes.push(JSON.parse(JSON.stringify(bg)));
+          if (!preview) preview = (bg.layers && bg.layers.bg) || "";
+        });
+        (bundle.assets || []).forEach(function (a) {
+          out.assets.push(JSON.parse(JSON.stringify(a)));
+          if (!preview) preview = a.dataUrl || "";
+        });
+        (bundle.metrics || []).forEach(function (m) {
+          out.metrics.push(JSON.parse(JSON.stringify(m)));
+        });
+      });
+      var empty = !out.characterProfiles.length && !out.backgroundScenes.length && !out.assets.length;
+      var pieceCount = out.characterProfiles.length + out.backgroundScenes.length + out.assets.length;
+      return { bundle: out, preview: preview, empty: empty, pieceCount: pieceCount };
+    },
 
     renderStorePanel: function (listings, opts) {
       opts = opts || {};
@@ -361,14 +940,22 @@
         var thumb = item.preview_data_url
           ? 'style="background-image:url(' + item.preview_data_url + ')"'
           : 'data-category="' + escapeAttr(item.category) + '"';
+        var isYours = item.is_seller || item.isSeller;
         return (
           '<button type="button" class="marketplace-card' + (selectedId === item.id ? " is-active" : "") +
+            (isYours ? " marketplace-card--yours" : "") +
             '" data-listing-id="' + escapeAttr(item.id) + '">' +
             '<span class="marketplace-card-thumb" ' + thumb + "></span>" +
             '<span class="marketplace-card-body">' +
-              '<strong>' + escapeHtml(item.title) + "</strong>" +
+              '<strong>' + escapeHtml(item.title) +
+                (isYours ? ' <span class="mp-yours-badge">Yours</span>' : "") +
+              "</strong>" +
               '<span class="marketplace-card-meta">' + escapeHtml(categoryLabel(item.category)) +
-              " · " + escapeHtml(formatPrice(item.price_ducats)) + "</span>" +
+              " · " + renderPriceHtml(item) +
+              (item.rating_count
+                ? " · " + escapeHtml(formatRating(item.rating_avg, item.rating_count))
+                : "") +
+              "</span>" +
             "</span>" +
           "</button>"
         );
@@ -386,6 +973,13 @@
 
       return (
         '<div class="marketplace-panel">' +
+          (window.ScenaWallet
+            ? '<section class="marketplace-ducat-buy">' +
+                '<h3 class="marketplace-ducat-buy-title">Buy Ducats</h3>' +
+                '<p class="field-hint">Top up your wallet for chapters, marketplace assets, and jam prizes.</p>' +
+                ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) +
+              "</section>"
+            : "") +
           '<div class="marketplace-toolbar">' +
             '<input type="search" class="marketplace-search" placeholder="Search assets…" value="' + escapeAttr(opts.query || "") + '">' +
             (balance != null
@@ -411,21 +1005,55 @@
         : '<div class="marketplace-preview marketplace-preview--empty">' + escapeHtml(categoryLabel(listing.category)) + "</div>";
 
       var owned = listing.owned;
-      var price = listing.price_ducats || 0;
-      var actionLabel = owned ? "Add to project" : (price ? "Buy · " + formatPrice(price) : "Get free");
+      var isSeller = listing.is_seller || listing.isSeller ||
+        (opts.viewerUserId && listing.seller_id && listing.seller_id === opts.viewerUserId);
+      var listPrice = listPriceDucats(listing);
+      var price = effectivePriceDucats(listing);
+      var jamFree = isJamFreeListing(listing) && listPrice > 0;
+      var actionHtml;
+      if (isSeller) {
+        actionHtml =
+          '<div class="marketplace-seller-actions">' +
+            '<button type="button" class="btn btn-sm btn-secondary marketplace-edit-btn" data-listing-id="' +
+              escapeAttr(listing.id) + '">Edit listing</button>' +
+            '<button type="button" class="btn btn-sm btn-danger marketplace-remove-btn" data-listing-id="' +
+              escapeAttr(listing.id) + '">Remove from store</button>' +
+          "</div>" +
+          '<span class="field-hint">This is your listing. Edit title, price, or category — or remove it from the shop. Buyers who already purchased keep their copy.</span>';
+      } else {
+        var actionLabel = owned
+          ? "Add to project"
+          : (price ? "Buy · " + formatPrice(price) : (jamFree ? "Get free (jam promo)" : "Get free"));
+        actionHtml =
+          '<button type="button" class="btn btn-sm btn-primary marketplace-acquire-btn" data-listing-id="' +
+            escapeAttr(listing.id) + '">' + escapeHtml(actionLabel) + "</button>" +
+          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "") +
+          (jamFree && !owned
+            ? '<span class="field-hint mp-jam-free-note">Free while the jam’s voting period is live — then returns to ' +
+                escapeHtml(formatPrice(listPrice)) + ".</span>"
+            : "");
+      }
 
       return (
         preview +
         "<h4>" + escapeHtml(listing.title) + "</h4>" +
-        '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") + "</p>" +
+        '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") +
+          (isSeller ? " (you)" : "") + "</p>" +
+        '<p class="marketplace-price-line">' + renderPriceHtml(listing) + "</p>" +
+        '<p class="marketplace-rating-line">' +
+          escapeHtml(formatRating(listing.rating_avg, listing.rating_count)) +
+          (owned && !isSeller
+            ? ' · <span class="field-hint">Your rating</span>'
+            : "") +
+        "</p>" +
+        (owned && !isSeller
+          ? renderStarsInput(listing.id, listing.my_rating || 0, { canRate: true })
+          : (listing.rating_count
+              ? renderStarsInput(listing.id, Math.round(Number(listing.rating_avg) || 0), { canRate: false })
+              : "")) +
         "<p>" + escapeHtml(listing.description || "") + "</p>" +
-        '<div class="marketplace-detail-actions">' +
-          '<button type="button" class="btn btn-sm btn-primary marketplace-acquire-btn" data-listing-id="' + escapeAttr(listing.id) + '">' +
-            escapeHtml(actionLabel) +
-          "</button>" +
-          (owned ? '<span class="field-hint">Already in your library — import again anytime.</span>' : "") +
-        "</div>" +
-        (!owned && price > 0 && opts.showPackUpsell && window.ScenaWallet
+        '<div class="marketplace-detail-actions">' + actionHtml + "</div>" +
+        (!isSeller && !owned && price > 0 && opts.showPackUpsell && window.ScenaWallet
           ? '<div class="marketplace-upsell"><p class="field-hint">Need Ducats?</p>' + ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) + "</div>"
           : "")
       );
@@ -437,34 +1065,142 @@
       var stages = ScenaStore.ensureBackgrounds(series);
       var assets = ScenaStore.ensureAssets(series).filter(function (a) { return !a.isDefault; });
 
-      function options(list, prefix) {
+      function checkRows(list, prefix, nameAttr) {
+        if (!list.length) return '<p class="field-hint">None in this project yet.</p>';
         return list.map(function (item) {
-          return '<option value="' + escapeAttr(prefix + ":" + item.id) + '">' + escapeHtml(item.name || item.label || "Untitled") + "</option>";
+          var id = prefix + ":" + item.id;
+          return (
+            '<label class="check-row">' +
+              '<input type="checkbox" data-mp-pack-item="' + escapeAttr(id) + '" name="' + escapeAttr(nameAttr) + '">' +
+              escapeHtml(item.name || item.label || "Untitled") +
+            "</label>"
+          );
         }).join("");
       }
 
       return (
-        '<div class="field"><label>Title</label><input type="text" id="mpSellTitle" maxlength="80" placeholder="Aurora sprite set"></div>' +
-        '<div class="field"><label>Description</label><textarea id="mpSellDesc" rows="2" maxlength="400"></textarea></div>' +
+        '<div class="field"><label>Pack title</label><input type="text" id="mpSellTitle" maxlength="80" placeholder="e.g. Café starter kit"></div>' +
+        '<div class="field"><label>Description</label><textarea id="mpSellDesc" rows="2" maxlength="400" placeholder="What buyers get in this pack…"></textarea></div>' +
         '<div class="field"><label>Category</label><select id="mpSellCategory">' +
           CATEGORIES.filter(function (c) { return c.id; }).map(function (c) {
-            return '<option value="' + escapeAttr(c.id) + '">' + escapeHtml(c.label) + "</option>";
+            var selected = c.id === "pack" ? " selected" : "";
+            return '<option value="' + escapeAttr(c.id) + '"' + selected + ">" + escapeHtml(c.label) + "</option>";
           }).join("") +
-        "</select></div>" +
+        "</select>" +
+          '<p class="field-hint">Pick <strong>Packs</strong> when including more than one piece. Single items can use Characters / Stages / etc.</p></div>' +
         '<div class="field"><label>Price (Ducats, 0 = free)</label><input type="number" id="mpSellPrice" min="0" max="9999" value="0"></div>' +
-        '<div class="field"><label>Include from this project</label><select id="mpSellSource">' +
-          '<option value="">— pick one —</option>' +
-          (chars.length ? '<optgroup label="Characters">' + options(chars, "char") + "</optgroup>" : "") +
-          (stages.length ? '<optgroup label="Stages">' + options(stages, "stage") + "</optgroup>" : "") +
-          (assets.length ? '<optgroup label="Audio / items">' + options(assets, "asset") + "</optgroup>" : "") +
-        "</select></div>" +
-        '<p class="field-hint">Listings ship as engine-ready packs — buyers import directly into their graph editor.</p>'
+        '<div class="field"><label>Build your pack — select anything to include</label>' +
+          '<div class="mp-pack-builder">' +
+            '<div class="mp-pack-group"><strong>Characters</strong><div class="check-grid">' +
+              checkRows(chars, "char", "mpChar") +
+            "</div></div>" +
+            '<div class="mp-pack-group"><strong>Stages</strong><div class="check-grid">' +
+              checkRows(stages, "stage", "mpStage") +
+            "</div></div>" +
+            '<div class="mp-pack-group"><strong>Audio &amp; items</strong><div class="check-grid">' +
+              checkRows(assets, "asset", "mpAsset") +
+            "</div></div>" +
+          "</div>" +
+          '<p class="field-hint">Check multiple items to sell them together as one pack buyers import in one click.</p>' +
+        "</div>"
       );
+    },
+
+    readSellModalSelection: function (root) {
+      root = root || document;
+      var characterIds = [];
+      var stageIds = [];
+      var assetIds = [];
+      root.querySelectorAll("[data-mp-pack-item]:checked").forEach(function (el) {
+        var raw = el.getAttribute("data-mp-pack-item") || "";
+        var parts = raw.split(":");
+        if (parts[0] === "char" && parts[1]) characterIds.push(parts[1]);
+        else if (parts[0] === "stage" && parts[1]) stageIds.push(parts[1]);
+        else if (parts[0] === "asset" && parts[1]) assetIds.push(parts[1]);
+      });
+      return { characterIds: characterIds, stageIds: stageIds, assetIds: assetIds };
+    },
+
+    formatRating: formatRating,
+
+    rateListing: function (userId, listingId, stars) {
+      if (!userId) return Promise.reject(new Error("Sign in to rate assets."));
+      stars = Math.max(1, Math.min(5, parseInt(stars, 10) || 0));
+      if (!stars) return Promise.reject(new Error("Pick 1–5 stars."));
+      var listingPromise = ScenaMarketplace.getListing(listingId, userId);
+      return listingPromise.then(function (listing) {
+        if (!listing) throw new Error("Listing not found.");
+        if (listing.is_seller || listing.isSeller || listing.seller_id === userId) {
+          throw new Error("You cannot rate your own listing.");
+        }
+        if (!listing.owned && !(readPurchases(userId)[listingId])) {
+          throw new Error("Get this asset first, then you can rate it.");
+        }
+        var sb = getClient();
+        var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+        if (useCloud() && sb && !isLocalId) {
+          return sb.rpc("rate_marketplace_listing", {
+            p_listing_id: listingId,
+            p_stars: stars,
+          }).then(function (res) {
+            if (res.error) throw new Error(res.error.message || "Could not save rating.");
+            var data = res.data || {};
+            // Mirror locally for jam scoring / offline display
+            var map = readLocalRatings();
+            map[listingId] = map[listingId] || {};
+            map[listingId][userId] = stars;
+            writeLocalRatings(map);
+            return {
+              listing_id: listingId,
+              my_rating: data.my_rating || stars,
+              rating_avg: Number(data.rating_avg) || stars,
+              rating_count: parseInt(data.rating_count, 10) || 1,
+            };
+          });
+        }
+        var map = readLocalRatings();
+        map[listingId] = map[listingId] || {};
+        map[listingId][userId] = stars;
+        writeLocalRatings(map);
+        var stats = ratingStatsFor(listingId, userId);
+        return {
+          listing_id: listingId,
+          my_rating: stars,
+          rating_avg: stats.rating_avg,
+          rating_count: stats.rating_count,
+        };
+      });
+    },
+
+    getListingRating: function (listingId, userId) {
+      var sb = getClient();
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      if (useCloud() && sb && listingId && !isLocalId) {
+        return sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
+          if (res.error || !res.data) {
+            return ratingStatsFor(listingId, userId);
+          }
+          return {
+            rating_avg: Number(res.data.rating_avg) || 0,
+            rating_count: parseInt(res.data.rating_count, 10) || 0,
+            my_rating: res.data.my_rating != null ? parseInt(res.data.my_rating, 10) : null,
+          };
+        }).catch(function () {
+          return ratingStatsFor(listingId, userId);
+        });
+      }
+      return Promise.resolve(ratingStatsFor(listingId, userId));
     },
   };
 
   function filterLocalListings(category, query) {
-    var all = readLocalListings().concat(demoListings());
+    var all = readLocalListings().concat(demoListings()).map(function (item) {
+      var stats = ratingStatsFor(item.id);
+      return Object.assign({}, item, {
+        rating_avg: item.rating_avg != null && !stats.rating_count ? item.rating_avg : (stats.rating_count ? stats.rating_avg : (item.rating_avg || 0)),
+        rating_count: Math.max(item.rating_count || 0, stats.rating_count || 0),
+      });
+    });
     return all.filter(function (item) {
       if (category && item.category !== category) return false;
       if (query) {
@@ -482,6 +1218,22 @@
     if (item) {
       item = Object.assign({}, item);
       item.owned = Boolean(readPurchases(userId)[listingId]);
+      var stats = ratingStatsFor(listingId, userId);
+      if (stats.rating_count) {
+        item.rating_avg = stats.rating_avg;
+        item.rating_count = stats.rating_count;
+        item.my_rating = stats.my_rating;
+      } else {
+        item.rating_avg = item.rating_avg || 0;
+        item.rating_count = item.rating_count || 0;
+        item.my_rating = null;
+      }
+      try {
+        var side = JSON.parse(localStorage.getItem("arleco_marketplace_jam_free") || "{}");
+        if (side[listingId] && !item.jam_free_until) item.jam_free_until = side[listingId];
+      } catch (e) { /* ignore */ }
+      item = normalizeJamFreeFields(item);
+      if (userId && item.seller_id === userId) item.is_seller = true;
     }
     return item;
   }

@@ -9,7 +9,7 @@ import {
   jamTypeLabel,
   type JamHomeSubmission,
 } from "../lib/jams";
-import "./JamPages.css";
+import "../pages/JamPages.css";
 
 export type PlayerJamCard = {
   jamId: string;

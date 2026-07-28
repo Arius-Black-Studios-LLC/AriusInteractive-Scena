@@ -22,11 +22,14 @@
 
   var ECONOMICS = {
 
-    CREATOR_SHARE: 0.7,
+    /** Share of each Ducat spend credited to the creator (80% — platform keeps 20%). */
+    CREATOR_SHARE: 0.8,
 
-    REFERENCE_RETAIL_CENTS_PER_DUCAT: 4,
+    /** Reference buy rate from the $0.99 / 10 loss-leader pack (~$0.09/Ducat). */
+    MARKET_RATE_CENTS_PER_DUCAT: 9,
 
-    CASHOUT_RATIO: 0.7,
+    /** USD paid per earned Ducat at cash-out (only earned Ducats convert). */
+    CASHOUT_CENTS_PER_DUCAT: 5,
 
     MIN_CASHOUT_DUCATS: 500,
 
@@ -164,6 +167,58 @@
 
     cache[scopeKey(scopeId)] = wallet;
 
+    notifyWalletChange(scopeId);
+
+  }
+
+
+
+  function notifyWalletChange(scopeId) {
+
+    if (typeof window === "undefined" || !scopeId) return;
+
+    var wallet = cache[scopeKey(scopeId)];
+
+    if (!wallet) return;
+
+    try {
+
+      window.dispatchEvent(new CustomEvent("scena-wallet-change", {
+
+        detail: {
+
+          userId: scopeId,
+
+          balance: wallet.balance,
+
+          creatorEarned: wallet.creatorEarned,
+
+        },
+
+      }));
+
+    } catch (e) { /* ignore */ }
+
+  }
+
+
+
+  function patchWalletFromRow(scopeId, row) {
+
+    if (!row || row.balance == null) return;
+
+    var wallet = getWallet(scopeId);
+
+    wallet.balance = Math.max(0, parseInt(row.balance, 10) || 0);
+
+    if (row.creator_earned != null) {
+
+      wallet.creatorEarned = Math.max(0, parseInt(row.creator_earned, 10) || 0);
+
+    }
+
+    setCache(scopeId, wallet);
+
   }
 
 
@@ -210,7 +265,7 @@
 
   function payoutCentsPerDucat() {
 
-    return ECONOMICS.REFERENCE_RETAIL_CENTS_PER_DUCAT * ECONOMICS.CASHOUT_RATIO;
+    return ECONOMICS.CASHOUT_CENTS_PER_DUCAT;
 
   }
 
@@ -254,6 +309,47 @@
 
     return Promise.resolve();
 
+  }
+
+  function rpcMissingError(msg) {
+    msg = String(msg || "");
+    return /does not exist|could not find the function|schema cache|PGRST202/i.test(msg);
+  }
+
+  function ensureProfileRow(sb, scopeId) {
+    return sb.rpc("ensure_auth_profile").then(function (res) {
+      if (!res.error) return;
+      if (!rpcMissingError(res.error.message)) {
+        throw new Error(res.error.message || "Could not ensure profile.");
+      }
+      return sb.from("profiles").select("id").eq("id", scopeId).maybeSingle().then(function (row) {
+        if (row.data) return;
+        var email = "";
+        var displayName = "Reader";
+        if (window.ScenaAuth && ScenaAuth.getSession) {
+          return ScenaAuth.getSession().then(function (session) {
+            if (session && session.user) {
+              email = session.user.email || "";
+              displayName =
+                (session.user.user_metadata && session.user.user_metadata.display_name) ||
+                (email ? email.split("@")[0] : "Reader");
+            }
+            return sb.from("profiles").insert({
+              id: scopeId,
+              email: email || null,
+              display_name: displayName,
+              intended_role: "reader",
+            });
+          });
+        }
+        return sb.from("profiles").insert({
+          id: scopeId,
+          email: null,
+          display_name: displayName,
+          intended_role: "reader",
+        });
+      });
+    });
   }
 
 
@@ -304,13 +400,51 @@
 
 
 
+  function purchaseReturnQuery() {
+
+    var searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get("ducat_purchase")) {
+
+      return { params: searchParams, inHash: false };
+
+    }
+
+    var hash = window.location.hash || "";
+
+    var qIdx = hash.indexOf("?");
+
+    if (qIdx >= 0) {
+
+      return {
+
+        params: new URLSearchParams(hash.slice(qIdx + 1)),
+
+        inHash: true,
+
+        hashBeforeQuery: hash.slice(0, qIdx),
+
+      };
+
+    }
+
+    return { params: new URLSearchParams(), inHash: false };
+
+  }
+
+
+
   function handlePurchaseReturn(scopeId) {
 
     try {
 
-      var params = new URLSearchParams(window.location.search);
+      var parsed = purchaseReturnQuery();
+
+      var params = parsed.params;
 
       if (params.get("ducat_purchase") === "success") {
+
+        var sessionId = params.get("session_id") || "";
 
         params.delete("ducat_purchase");
 
@@ -318,15 +452,21 @@
 
         var qs = params.toString();
 
-        var next = window.location.pathname + (qs ? "?" + qs : "") + (window.location.hash || "");
+        if (parsed.inHash) {
 
-        window.history.replaceState({}, "", next);
+          var nextHash = parsed.hashBeforeQuery + (qs ? "?" + qs : "");
 
-        return ScenaWallet.load(scopeId).then(function () {
+          window.history.replaceState({}, "", window.location.pathname + window.location.search + nextHash);
 
-          return { purchased: true };
+        } else {
 
-        });
+          var next = window.location.pathname + (qs ? "?" + qs : "") + (window.location.hash || "");
+
+          window.history.replaceState({}, "", next);
+
+        }
+
+        return Promise.resolve({ purchased: true, sessionId: sessionId });
 
       }
 
@@ -336,7 +476,15 @@
 
         var qs2 = params.toString();
 
-        window.history.replaceState({}, "", window.location.pathname + (qs2 ? "?" + qs2 : "") + (window.location.hash || ""));
+        if (parsed.inHash) {
+
+          window.history.replaceState({}, "", window.location.pathname + window.location.search + parsed.hashBeforeQuery + (qs2 ? "?" + qs2 : ""));
+
+        } else {
+
+          window.history.replaceState({}, "", window.location.pathname + (qs2 ? "?" + qs2 : "") + (window.location.hash || ""));
+
+        }
 
       }
 
@@ -376,7 +524,7 @@
 
     referenceRetailCentsPerDucat: function () {
 
-      return ECONOMICS.REFERENCE_RETAIL_CENTS_PER_DUCAT;
+      return ECONOMICS.MARKET_RATE_CENTS_PER_DUCAT;
 
     },
 
@@ -385,6 +533,20 @@
     getBalance: function (scopeId) {
 
       return getWallet(scopeId).balance;
+
+    },
+
+
+
+    syncBalance: function (scopeId, balance, creatorEarned) {
+
+      var wallet = getWallet(scopeId);
+
+      if (balance != null) wallet.balance = Math.max(0, parseInt(balance, 10) || 0);
+
+      if (creatorEarned != null) wallet.creatorEarned = Math.max(0, parseInt(creatorEarned, 10) || 0);
+
+      setCache(scopeId, wallet);
 
     },
 
@@ -428,17 +590,59 @@
 
         var sb = supabaseClient();
 
-        return sb.rpc("wallet_snapshot").then(function (res) {
+        var confirmPromise = Promise.resolve(null);
 
-          if (res.error) throw new Error(res.error.message || "Could not load wallet.");
+        if (purchaseMeta && purchaseMeta.sessionId && sb && sb.functions && sb.functions.invoke) {
 
-          var wallet = applySnapshot(scopeId, res.data || {});
+          confirmPromise = sb.functions.invoke("confirm-ducat-checkout", {
 
-          if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+            body: { sessionId: purchaseMeta.sessionId },
 
-          return wallet;
+          }).then(function (res) {
+
+            if (res.error) {
+
+              console.warn("confirm-ducat-checkout:", res.error.message || res.error);
+
+            }
+
+            return res.data;
+
+          }).catch(function (err) {
+
+            console.warn("confirm-ducat-checkout:", err && err.message ? err.message : err);
+
+            return null;
+
+          });
+
+        }
+
+        return confirmPromise.then(function () {
+
+          return ensureProfileRow(sb, scopeId).then(function () {
+
+            return sb.rpc("wallet_snapshot").then(function (res) {
+
+              if (res.error) throw new Error(res.error.message || "Could not load wallet.");
+
+              var wallet = applySnapshot(scopeId, res.data || {});
+
+              if (purchaseMeta && purchaseMeta.purchased) wallet.purchased = true;
+
+              return wallet;
+
+            });
+
+          });
 
         });
+
+      }).catch(function (err) {
+
+        console.warn("ScenaWallet.load:", err && err.message ? err.message : err);
+
+        return getWallet(scopeId);
 
       });
 
@@ -458,7 +662,9 @@
 
         var sb = supabaseClient();
 
-        return sb.functions.invoke("create-ducat-checkout", {
+        return ensureProfileRow(sb, scopeId).then(function () {
+
+          return sb.functions.invoke("create-ducat-checkout", {
 
           body: {
 
@@ -488,9 +694,29 @@
 
             var msg = res.error.message || "Checkout failed.";
 
+            if (res.error.context && res.error.context.body) {
+
+              try {
+
+                var errBody = typeof res.error.context.body === "string"
+
+                  ? JSON.parse(res.error.context.body)
+
+                  : res.error.context.body;
+
+                if (errBody && errBody.error) msg = String(errBody.error);
+
+              } catch (parseErr) { /* keep msg */ }
+
+            }
+
             if (/not found|404|Failed to send/i.test(msg)) {
 
               msg = "Ducat checkout is not deployed yet. Finish Stripe setup in docs/STRIPE_SETUP.md (Edge Function create-ducat-checkout).";
+
+            } else if (/non-2xx/i.test(msg)) {
+
+              msg = "Checkout server error. In Supabase → Edge Functions → create-ducat-checkout → Logs. Usually: STRIPE_SECRET_KEY secret missing/wrong (use sk_live_… for live), or function needs redeploy after adding secrets.";
 
             }
 
@@ -503,6 +729,8 @@
           window.location.assign(data.url);
 
           return { redirecting: true };
+
+        });
 
         });
 
@@ -550,6 +778,8 @@
 
           if (res.error) throw new Error(res.error.message || "Unlock failed.");
 
+          patchWalletFromRow(scopeId, res.data || {});
+
           return ScenaWallet.load(scopeId).then(function (w) {
 
             return { ok: true, balance: w.balance };
@@ -574,7 +804,9 @@
 
         var sb = supabaseClient();
 
-        return sb.rpc("wallet_spend_balance", {
+        return ensureProfileRow(sb, scopeId).then(function () {
+
+          return sb.rpc("wallet_spend_balance", {
 
           p_amount: amount,
 
@@ -586,15 +818,19 @@
 
           if (res.error) throw new Error(res.error.message || "Could not spend Ducats.");
 
+          patchWalletFromRow(scopeId, res.data || {});
+
           return ScenaWallet.load(scopeId).then(function () {
 
             var row = res.data || {};
 
-            return { balance: row.balance, spent: amount };
+            return { balance: row.balance != null ? row.balance : getWallet(scopeId).balance, spent: amount };
 
           });
 
         });
+
+      });
 
       });
 
@@ -619,6 +855,30 @@
           return res.data || {};
         });
       });
+    },
+
+    /** Empty jam (no eligible entries): refund each contributor their own stake. */
+    jamRefundEmptyPrizePool: function (userId, jamId) {
+      if (!jamId || !userId) {
+        return Promise.reject(new Error("Missing jam refund details."));
+      }
+      return cloudRequired(userId).then(function () {
+        var sb = supabaseClient();
+        return sb.rpc("jam_refund_empty_prize_pool", {
+          p_jam_id: String(jamId),
+        }).then(function (res) {
+          if (res.error) throw new Error(res.error.message || "Could not refund jam prize pool.");
+          var row = res.data || {};
+          return ScenaWallet.load(userId).then(function () {
+            return row;
+          });
+        });
+      });
+    },
+
+    /** @deprecated use jamRefundEmptyPrizePool — kept for older jam client code */
+    jamRefundPrizeToHost: function (hostUserId, jamId) {
+      return ScenaWallet.jamRefundEmptyPrizePool(hostUserId, jamId);
     },
 
     checkBalance: function (scopeId, needed) {
@@ -748,29 +1008,153 @@
 
     renderEconomicsHint: function () {
 
-      var payoutPer = payoutCentsPerDucat();
-
-      var payoutLabel = "$" + (payoutPer / 100).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+      var marketPer = ECONOMICS.MARKET_RATE_CENTS_PER_DUCAT / 100;
+      var payoutPer = payoutCentsPerDucat() / 100;
+      var marketLabel = "$" + marketPer.toFixed(2);
+      var payoutLabel = "$" + payoutPer.toFixed(2);
+      var platformPct = Math.round((1 - ECONOMICS.CREATOR_SHARE) * 100);
+      var creatorPct = Math.round(ECONOMICS.CREATOR_SHARE * 100);
 
       return (
 
         '<p class="field-hint wallet-economics-hint">' +
 
-        "Ducats are purchased securely via Stripe. When readers spend on your work, you earn " +
-
-        Math.round(ECONOMICS.CREATOR_SHARE * 100) +
-
-        "% as earned Ducats. Cash out at " + payoutLabel + " each (min " +
+        "When readers spend Ducats on your chapters or marketplace listings, you earn " +
+        creatorPct + "% as <strong>earned Ducats</strong> (" + platformPct + "% stays with " +
+        ECONOMICS.PLATFORM_NAME + " as platform share). Earned Ducats cash out at " +
+        payoutLabel + " each (reference buy rate ~" + marketLabel + " via packs). Minimum cash-out: " +
 
         formatDucats(ECONOMICS.MIN_CASHOUT_DUCATS) + " = " +
 
-        formatUsdFromCents(cashoutUsdCents(ECONOMICS.MIN_CASHOUT_DUCATS)) + "). " +
+        formatUsdFromCents(cashoutUsdCents(ECONOMICS.MIN_CASHOUT_DUCATS)) + ". " +
 
-        "Purchased balance cannot be sold back for USD." +
+        "Purchased wallet balance cannot be exchanged for USD." +
 
         "</p>"
 
       );
+
+    },
+
+    renderWalletPanel: function (scopeId) {
+
+      var balance = ScenaWallet.getBalance(scopeId);
+
+      var earned = ScenaWallet.getCreatorEarned(scopeId);
+
+      var payoutPer = payoutCentsPerDucat();
+
+      var payoutLabel = "$" + (payoutPer / 100).toFixed(2);
+
+      var earnedUsd = formatUsdFromCents(cashoutUsdCents(earned));
+
+      var canCashout = earned >= ECONOMICS.MIN_CASHOUT_DUCATS;
+
+      return (
+
+        '<section class="form-section wallet-panel" id="accountWalletPanel">' +
+
+          "<h2>Ducats</h2>" +
+
+          '<div class="wallet-balances">' +
+
+            '<div class="wallet-balance-card">' +
+
+              "<span class=\"wallet-balance-label\">Spending balance</span>" +
+
+              '<strong class="wallet-balance-value">' + balance.toLocaleString() + "</strong>" +
+
+              "<span class=\"field-hint\">For chapters, marketplace, and jam entries</span>" +
+
+            "</div>" +
+
+            '<div class="wallet-balance-card wallet-balance-card--earned">' +
+
+              "<span class=\"wallet-balance-label\">Earned Ducats</span>" +
+
+              '<strong class="wallet-balance-value">' + earned.toLocaleString() + "</strong>" +
+
+              '<span class="field-hint">Cash-out eligible · ~' + earnedUsd + " at " + payoutLabel + "/Ducat</span>" +
+
+            "</div>" +
+
+          "</div>" +
+
+          ScenaWallet.renderEconomicsHint() +
+
+          '<div class="wallet-actions">' +
+
+            '<div class="field"><label>Cash out earned Ducats</label>' +
+
+              '<input type="number" id="walletCashoutAmount" min="' + ECONOMICS.MIN_CASHOUT_DUCATS +
+
+              '" step="1" value="' + (canCashout ? String(ECONOMICS.MIN_CASHOUT_DUCATS) : "") +
+
+              '" placeholder="Min ' + ECONOMICS.MIN_CASHOUT_DUCATS + '"' +
+
+              (canCashout ? "" : " disabled") + ">" +
+
+              '<p class="field-hint">Only earned Ducats convert to USD — not your spending balance.</p></div>' +
+
+            '<button type="button" class="btn btn-secondary" id="walletCashoutBtn"' +
+
+              (canCashout ? "" : " disabled") + ">Request cash-out</button>" +
+
+          "</div>" +
+
+          "<h3 class=\"wallet-buy-heading\">Buy more Ducats</h3>" +
+
+          ScenaWallet.renderPackGrid({ buttonClass: "btn btn-sm btn-secondary ducat-pack-btn" }) +
+
+        "</section>"
+
+      );
+
+    },
+
+    bindWalletPanel: function (root, scopeId, onChange) {
+
+      if (!root || !scopeId) return;
+
+      ScenaWallet.bindPackButtons(root, scopeId, function () {
+
+        if (onChange) onChange();
+
+      }, function (err) {
+
+        if (onChange) onChange(err && err.message);
+
+      });
+
+      var cashoutBtn = root.querySelector("#walletCashoutBtn");
+
+      var cashoutInput = root.querySelector("#walletCashoutAmount");
+
+      if (cashoutBtn) {
+
+        cashoutBtn.addEventListener("click", function () {
+
+          var amount = cashoutInput ? parseInt(cashoutInput.value, 10) : ECONOMICS.MIN_CASHOUT_DUCATS;
+
+          cashoutBtn.disabled = true;
+
+          ScenaWallet.requestCashout(scopeId, amount).then(function () {
+
+            if (onChange) onChange("Cash-out request submitted.");
+
+          }).catch(function (err) {
+
+            if (onChange) onChange((err && err.message) || "Cash-out failed.");
+
+          }).finally(function () {
+
+            cashoutBtn.disabled = false;
+
+          });
+
+        });
+
+      }
 
     },
 
