@@ -746,8 +746,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (min-width: 901px) {
-  .workspace-editor:not(.workspace-editor--learn) .workspace-panels,
-  .workspace-editor:not(.workspace-editor--learn) .workspace-panels--binder {
+  .workspace-editor .workspace-panels,
+  .workspace-editor .workspace-panels--binder {
     grid-template-columns: minmax(0, 1fr);
     position: relative;
   }
@@ -1627,12 +1627,59 @@ body.is-resizing-center {
   touch-action: none;
   outline: 2px solid transparent;
   outline-offset: 2px;
+  box-sizing: border-box;
 }
 .ui-mock-layer:active { cursor: grabbing; }
 .ui-mock-layer.is-selected {
   outline-color: var(--scena-accent, #2a9d8f);
   z-index: 4;
 }
+
+.ui-mock-resize-handle {
+  display: none;
+  position: absolute;
+  z-index: 8;
+  box-sizing: border-box;
+  background: var(--scena-accent, #7c1128);
+  border: 1px solid #fff;
+  border-radius: 1px;
+  pointer-events: auto;
+  touch-action: none;
+}
+.ui-mock-layer.is-selected > .ui-mock-resize-handle,
+.ui-mock-menu-panel.is-selected > .ui-mock-resize-handle {
+  display: block;
+}
+.ui-mock-resize-handle[data-resize="n"],
+.ui-mock-resize-handle[data-resize="s"] {
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.ui-mock-resize-handle[data-resize="n"] { top: -4px; }
+.ui-mock-resize-handle[data-resize="s"] { bottom: -4px; }
+.ui-mock-resize-handle[data-resize="e"],
+.ui-mock-resize-handle[data-resize="w"] {
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.ui-mock-resize-handle[data-resize="e"] { right: -4px; }
+.ui-mock-resize-handle[data-resize="w"] { left: -4px; }
+.ui-mock-resize-handle[data-resize="nw"],
+.ui-mock-resize-handle[data-resize="ne"],
+.ui-mock-resize-handle[data-resize="sw"],
+.ui-mock-resize-handle[data-resize="se"] {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ui-mock-resize-handle[data-resize="nw"] { top: -5px; left: -5px; cursor: nwse-resize; }
+.ui-mock-resize-handle[data-resize="ne"] { top: -5px; right: -5px; cursor: nesw-resize; }
+.ui-mock-resize-handle[data-resize="sw"] { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.ui-mock-resize-handle[data-resize="se"] { bottom: -5px; right: -5px; cursor: nwse-resize; }
 
 .ui-mock-menu {
   left: 92%;
@@ -1673,6 +1720,7 @@ body.is-resizing-center {
   justify-content: flex-start;
 }
 .ui-mock-menu-panel {
+  position: relative;
   width: var(--ui-menu-panel-w, 42%);
   max-width: 100%;
   max-height: 100%;
@@ -1685,6 +1733,7 @@ body.is-resizing-center {
   cursor: default;
   outline: 2px solid transparent;
   outline-offset: -2px;
+  box-sizing: border-box;
 }
 .ui-mock-menu-backdrop[data-side="left"] .ui-mock-menu-panel {
   border-left: none;
@@ -1713,6 +1762,10 @@ body.is-resizing-center {
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.55);
   border-left: 3px solid var(--ui-accent);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .ui-mock-speaker {
   color: var(--ui-speaker);
@@ -1726,6 +1779,8 @@ body.is-resizing-center {
   border-top: 2px solid var(--ui-accent);
   border-radius: 0 0 var(--ui-corner-radius) var(--ui-corner-radius);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  min-height: 0;
 }
 .ui-mock-frame[data-custom-dialogue="1"] .ui-mock-dialogue {
   background: var(--ui-dialogue-sprite) center/100% 100% no-repeat, var(--ui-dialogue-bg);
@@ -1740,6 +1795,8 @@ body.is-resizing-center {
   display: flex;
   flex-direction: column;
   gap: 0.4em;
+  overflow: auto;
+  min-height: 0;
 }
 .ui-mock-choice {
   background: var(--ui-choice-bg);
@@ -1797,8 +1854,10 @@ body.is-resizing-center {
   left: var(--ui-layout-dialogue-x, 4%);
   top: var(--ui-layout-dialogue-y, 68%);
   width: var(--ui-layout-dialogue-w, 92%);
+  height: var(--ui-layout-dialogue-h, auto);
   z-index: 5;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .preview-frame--laid-out .preview-dialogue--choices {
@@ -1806,8 +1865,14 @@ body.is-resizing-center {
   left: var(--ui-layout-choices-x, 52%);
   top: var(--ui-layout-choices-y, 28%);
   width: var(--ui-layout-choices-w, 42%);
+  height: var(--ui-layout-choices-h, auto);
   z-index: 6;
   box-sizing: border-box;
+  overflow: auto;
+}
+
+.preview-frame--laid-out .preview-speaker {
+  max-width: var(--ui-layout-nameplate-w, none);
 }
 
 @media (max-width: 960px) {

@@ -741,11 +741,17 @@
     if (uiChoiceScale) ui.sizes.choiceScale = parseFloat(uiChoiceScale.value) || 1;
     if (uiCornerRadius) ui.sizes.cornerRadius = parseInt(uiCornerRadius.value, 10) || 6;
     if (!ui.layout) ui.layout = defaultUiLayout();
-    if (!ui.layout.dialogue) ui.layout.dialogue = { x: 4, y: 68, w: 92 };
-    if (!ui.layout.choices) ui.layout.choices = { x: 52, y: 28, w: 42 };
-    if (!ui.layout.nameplate) ui.layout.nameplate = { x: 6, y: 62 };
+    if (!ui.layout.dialogue) ui.layout.dialogue = { x: 4, y: 68, w: 92, h: 24 };
+    if (!ui.layout.choices) ui.layout.choices = { x: 52, y: 28, w: 42, h: 40 };
+    if (!ui.layout.nameplate) ui.layout.nameplate = { x: 6, y: 62, w: 28 };
     if (uiDialogueWidth) ui.layout.dialogue.w = Math.max(40, Math.min(98, parseInt(uiDialogueWidth.value, 10) || 92));
     if (uiChoicesWidth) ui.layout.choices.w = Math.max(24, Math.min(70, parseInt(uiChoicesWidth.value, 10) || 42));
+    var uiDialogueHeight = form.querySelector('[name="uiDialogueHeight"]');
+    var uiChoicesHeight = form.querySelector('[name="uiChoicesHeight"]');
+    var uiNameplateWidth = form.querySelector('[name="uiNameplateWidth"]');
+    if (uiDialogueHeight) ui.layout.dialogue.h = Math.max(10, Math.min(50, parseInt(uiDialogueHeight.value, 10) || 24));
+    if (uiChoicesHeight) ui.layout.choices.h = Math.max(12, Math.min(70, parseInt(uiChoicesHeight.value, 10) || 40));
+    if (uiNameplateWidth) ui.layout.nameplate.w = Math.max(12, Math.min(60, parseInt(uiNameplateWidth.value, 10) || 28));
     if (!ui.sounds) ui.sounds = { clickAssetId: null };
     if (!ui.menu) ui.menu = {
       enabled: true,
@@ -966,16 +972,37 @@
     }).join("");
   }
 
+  var UI_LAYOUT_LIMITS = {
+    dialogue: { w: [40, 98], h: [10, 50] },
+    choices: { w: [24, 70], h: [12, 70] },
+    nameplate: { w: [12, 60] },
+    menuPanel: { w: [28, 70] },
+  };
+
+  function uiMockResizeHandlesHtml(edges) {
+    return (edges || []).map(function (edge) {
+      return '<span class="ui-mock-resize-handle" data-resize="' + edge + '" aria-hidden="true"></span>';
+    }).join("");
+  }
+
+  function clampUiLayoutValue(value, min, max) {
+    return Math.max(min, Math.min(max, Math.round(value * 10) / 10));
+  }
+
   function renderUiMockupMarkup(ui, selected) {
     selected = selected || gameUiSelectedEl || "dialogue";
     var layout = ui.layout || defaultUiLayout();
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
-    var name = layout.nameplate || { x: 6, y: 62 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42 };
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
+    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
     var menuPos = layout.menu || { x: 92, y: 4 };
     var menuOn = !(ui.menu && ui.menu.enabled === false);
     var menuOpen = gameUiMenuOpen || selected === "menuPanel";
     var panelSide = (ui.menu && ui.menu.panelSide === "left") ? "left" : "right";
+    var panelEdge = panelSide === "left" ? "e" : "w";
+    var dlgH = dlg.h != null ? dlg.h : 24;
+    var chH = ch.h != null ? ch.h : 40;
+    var nameW = name.w != null ? name.w : 28;
     return (
       '<div class="ui-mock-stage" id="uiMockStage" data-aspect="16:9">' +
         '<div class="ui-mock-frame preview-frame player-frame preview-ui--' + escapeAttr(ui.preset || "scena-classic") +
@@ -989,22 +1016,28 @@
             '" data-ui-select="menu" data-ui-drag="menu" title="Reader menu button" style="left:' +
             menuPos.x + "%;top:" + menuPos.y + '%">☰</button>' +
           '<div class="ui-mock-layer ui-mock-nameplate' + (selected === "nameplate" ? " is-selected" : "") +
-            '" data-ui-select="nameplate" data-ui-drag="nameplate" style="left:' + name.x + "%;top:" + name.y + '%">' +
+            '" data-ui-select="nameplate" data-ui-drag="nameplate" style="left:' + name.x + "%;top:" + name.y +
+            "%;width:" + nameW + '%">' +
             '<span class="ui-mock-speaker">Character</span>' +
+            uiMockResizeHandlesHtml(["e", "w"]) +
           "</div>" +
           '<div class="ui-mock-layer ui-mock-dialogue' + (selected === "dialogue" ? " is-selected" : "") +
-            '" data-ui-select="dialogue" data-ui-drag="dialogue" style="left:' + dlg.x + "%;top:" + dlg.y + "%;width:" + dlg.w + '%">' +
+            '" data-ui-select="dialogue" data-ui-drag="dialogue" style="left:' + dlg.x + "%;top:" + dlg.y +
+            "%;width:" + dlg.w + "%;height:" + dlgH + '%">' +
             '<p class="ui-mock-dialogue-text">Dialogue text appears here.</p>' +
+            uiMockResizeHandlesHtml(["n", "s", "e", "w", "ne", "nw", "se", "sw"]) +
           "</div>" +
           '<div class="ui-mock-layer ui-mock-choices' + (selected === "choices" ? " is-selected" : "") +
-            '" data-ui-select="choices" data-ui-drag="choices" style="left:' + ch.x + "%;top:" + ch.y + "%;width:" + ch.w + '%">' +
+            '" data-ui-select="choices" data-ui-drag="choices" style="left:' + ch.x + "%;top:" + ch.y +
+            "%;width:" + ch.w + "%;height:" + chH + '%">' +
             '<button type="button" class="ui-mock-choice" tabindex="-1">Choice A</button>' +
             '<button type="button" class="ui-mock-choice" tabindex="-1">Choice B</button>' +
+            uiMockResizeHandlesHtml(["n", "s", "e", "w", "ne", "nw", "se", "sw"]) +
           "</div>" +
           '<div class="ui-mock-menu-backdrop" id="uiMockMenuBackdrop" data-side="' + panelSide +
             '" data-ui-select="menuPanel" title="Click panel to edit menu">' +
             '<div class="ui-mock-menu-panel player-menu-panel' + (selected === "menuPanel" ? " is-selected" : "") +
-              '" data-ui-select="menuPanel" id="uiMockMenuPanel">' +
+              '" data-ui-select="menuPanel" data-ui-resize="menuPanel" id="uiMockMenuPanel">' +
               '<header class="player-menu-header">' +
                 '<h2 class="player-menu-title">Menu</h2>' +
                 '<button type="button" class="player-menu-close ui-mock-menu-close" id="uiMockMenuClose" aria-label="Close menu preview">×</button>' +
@@ -1015,6 +1048,7 @@
               '<div class="player-menu-body">' +
                 '<p class="player-menu-empty">Sample transcript and inventory appear here during play. Edit tabs and panel look in the inspector.</p>' +
               "</div>" +
+              uiMockResizeHandlesHtml([panelEdge]) +
             "</div>" +
           "</div>" +
         "</div>" +
@@ -1024,9 +1058,9 @@
 
   function defaultUiLayout() {
     return {
-      dialogue: { x: 4, y: 68, w: 92 },
-      nameplate: { x: 6, y: 62 },
-      choices: { x: 52, y: 28, w: 42 },
+      dialogue: { x: 4, y: 68, w: 92, h: 24 },
+      nameplate: { x: 6, y: 62, w: 28 },
+      choices: { x: 52, y: 28, w: 42, h: 40 },
       menu: { x: 92, y: 4 },
     };
   }
@@ -1075,6 +1109,7 @@
           '<div class="field"><label>Text color</label><input type="color" name="uiDialogueText" value="' + escapeAttr(toColorInput(resolved.colors.dialogueText) || "#ffffff") + '"></div>' +
           '<div class="field"><label>Scale</label><input type="range" name="uiDialogueScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.dialogueScale || 1) + '"><span class="field-hint" id="uiDialogueScaleVal">' + (ui.sizes.dialogueScale || 1) + "×</span></div>" +
           '<div class="field"><label>Width (%)</label><input type="range" name="uiDialogueWidth" min="40" max="98" step="1" value="' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + '"><span class="field-hint" id="uiDialogueWidthVal">' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.w) || 92) + "%</span></div>" +
+          '<div class="field"><label>Height (%)</label><input type="range" name="uiDialogueHeight" min="10" max="50" step="1" value="' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.h) || 24) + '"><span class="field-hint" id="uiDialogueHeightVal">' + ((ui.layout && ui.layout.dialogue && ui.layout.dialogue.h) || 24) + "%</span></div>" +
           '<div class="field"><label>Custom sprite</label>' +
             '<div class="ui-sprite-preview" id="uiDialogueSpritePreview" style="' + (ui.customSprites.dialogueBox ? "background-image:url(" + ui.customSprites.dialogueBox + ")" : "") + '"></div>' +
             artImportActionsHtml({ inputId: "uiDialogueSpriteInput", kind: "ui", pixelBtnId: "uiDialogueSpritePixel" }) +
@@ -1083,8 +1118,9 @@
         "</div>" +
         '<div class="game-ui-inspector-panel" data-ui-panel="nameplate"' + (selected === "nameplate" ? "" : " hidden") + ">" +
           "<h2>Nameplate</h2>" +
-          '<p class="field-hint">Drag on the canvas to place the speaker name. Color follows the accent/speaker setting.</p>' +
+          '<p class="field-hint">Drag on the canvas to place the speaker name. Grab the edges to resize width.</p>' +
           '<div class="field"><label>Speaker color</label><input type="color" name="uiSpeaker" value="' + escapeAttr(resolved.colors.speaker || "#2a9d8f") + '"></div>' +
+          '<div class="field"><label>Width (%)</label><input type="range" name="uiNameplateWidth" min="12" max="60" step="1" value="' + ((ui.layout && ui.layout.nameplate && ui.layout.nameplate.w) || 28) + '"><span class="field-hint" id="uiNameplateWidthVal">' + ((ui.layout && ui.layout.nameplate && ui.layout.nameplate.w) || 28) + "%</span></div>" +
         "</div>" +
         '<div class="game-ui-inspector-panel" data-ui-panel="choices"' + (selected === "choices" ? "" : " hidden") + ">" +
           "<h2>Choices</h2>" +
@@ -1096,6 +1132,7 @@
           '<div class="field"><label>Text color</label><input type="color" name="uiChoiceText" value="' + escapeAttr(resolved.colors.choiceText || "#ffffff") + '"></div>' +
           '<div class="field"><label>Scale</label><input type="range" name="uiChoiceScale" min="0.7" max="1.4" step="0.05" value="' + (ui.sizes.choiceScale || 1) + '"><span class="field-hint" id="uiChoiceScaleVal">' + (ui.sizes.choiceScale || 1) + "×</span></div>" +
           '<div class="field"><label>Width (%)</label><input type="range" name="uiChoicesWidth" min="24" max="70" step="1" value="' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + '"><span class="field-hint" id="uiChoicesWidthVal">' + ((ui.layout && ui.layout.choices && ui.layout.choices.w) || 42) + "%</span></div>" +
+          '<div class="field"><label>Height (%)</label><input type="range" name="uiChoicesHeight" min="12" max="70" step="1" value="' + ((ui.layout && ui.layout.choices && ui.layout.choices.h) || 40) + '"><span class="field-hint" id="uiChoicesHeightVal">' + ((ui.layout && ui.layout.choices && ui.layout.choices.h) || 40) + "%</span></div>" +
           '<div class="field"><label>Custom button sprite</label>' +
             '<div class="ui-sprite-preview" id="uiChoiceSpritePreview" style="' + (ui.customSprites.choiceButton ? "background-image:url(" + ui.customSprites.choiceButton + ")" : "") + '"></div>' +
             artImportActionsHtml({ inputId: "uiChoiceSpriteInput", kind: "ui", pixelBtnId: "uiChoiceSpritePixel" }) +
@@ -1401,8 +1438,14 @@
           $("#uiCornerRadiusVal").textContent = el.value + "px";
         } else if (el.name === "uiDialogueWidth") {
           $("#uiDialogueWidthVal").textContent = el.value + "%";
+        } else if (el.name === "uiDialogueHeight") {
+          $("#uiDialogueHeightVal").textContent = el.value + "%";
         } else if (el.name === "uiChoicesWidth") {
           $("#uiChoicesWidthVal").textContent = el.value + "%";
+        } else if (el.name === "uiChoicesHeight") {
+          $("#uiChoicesHeightVal").textContent = el.value + "%";
+        } else if (el.name === "uiNameplateWidth") {
+          $("#uiNameplateWidthVal").textContent = el.value + "%";
         } else if (el.name === "uiMenuPanelWidth") {
           $("#uiMenuPanelWidthVal").textContent = el.value + "%";
         }
@@ -1675,17 +1718,7 @@
     if (resetLayout) {
       resetLayout.addEventListener("click", function () {
         series.readerUi.layout = defaultUiLayout();
-        var form = $("#settingsForm");
-        if (form) {
-          var dw = form.querySelector('[name="uiDialogueWidth"]');
-          var cw = form.querySelector('[name="uiChoicesWidth"]');
-          if (dw) dw.value = "92";
-          if (cw) cw.value = "42";
-          var dwv = $("#uiDialogueWidthVal");
-          var cwv = $("#uiChoicesWidthVal");
-          if (dwv) dwv.textContent = "92%";
-          if (cwv) cwv.textContent = "42%";
-        }
+        syncUiLayoutInspector(series);
         persistSeries(series);
         refreshUiMockup(series);
         toast("Layout reset.");
@@ -1758,16 +1791,19 @@
     if (dlg) {
       dlg.style.left = layout.dialogue.x + "%";
       dlg.style.top = layout.dialogue.y + "%";
-      dlg.style.width = layout.dialogue.w + "%";
+      dlg.style.width = (layout.dialogue.w != null ? layout.dialogue.w : 92) + "%";
+      dlg.style.height = (layout.dialogue.h != null ? layout.dialogue.h : 24) + "%";
     }
     if (name) {
       name.style.left = layout.nameplate.x + "%";
       name.style.top = layout.nameplate.y + "%";
+      name.style.width = (layout.nameplate.w != null ? layout.nameplate.w : 28) + "%";
     }
     if (ch) {
       ch.style.left = layout.choices.x + "%";
       ch.style.top = layout.choices.y + "%";
-      ch.style.width = layout.choices.w + "%";
+      ch.style.width = (layout.choices.w != null ? layout.choices.w : 42) + "%";
+      ch.style.height = (layout.choices.h != null ? layout.choices.h : 40) + "%";
     }
     if (menu) {
       var m = layout.menu || { x: 92, y: 4 };
@@ -1777,17 +1813,47 @@
       menu.classList.toggle("is-selected", gameUiSelectedEl === "menu");
     }
     var backdrop = frame.querySelector("#uiMockMenuBackdrop");
+    var panelSide = (ui.menu && ui.menu.panelSide === "left") ? "left" : "right";
     if (backdrop) {
-      backdrop.setAttribute("data-side", (ui.menu && ui.menu.panelSide === "left") ? "left" : "right");
+      backdrop.setAttribute("data-side", panelSide);
     }
     var panel = frame.querySelector("#uiMockMenuPanel");
-    if (panel) panel.classList.toggle("is-selected", gameUiSelectedEl === "menuPanel");
+    if (panel) {
+      panel.classList.toggle("is-selected", gameUiSelectedEl === "menuPanel");
+      var panelHandle = panel.querySelector(".ui-mock-resize-handle");
+      var panelEdge = panelSide === "left" ? "e" : "w";
+      if (panelHandle) panelHandle.setAttribute("data-resize", panelEdge);
+      else panel.insertAdjacentHTML("beforeend", uiMockResizeHandlesHtml([panelEdge]));
+    }
     var tabsEl = frame.querySelector("#uiMockMenuTabs");
     if (tabsEl) tabsEl.innerHTML = renderUiMockMenuTabs(ui);
     var stage = $("#uiMockStage");
     if (stage) stage.setAttribute("data-aspect", "16:9");
-    var widthHint = $("#uiMenuPanelWidthVal");
-    if (widthHint) widthHint.textContent = panelW + "%";
+    syncUiLayoutInspector(series, panelW);
+  }
+
+  function syncUiLayoutInspector(series, panelW) {
+    ScenaStore.ensureReaderUi(series);
+    var layout = (series.readerUi && series.readerUi.layout) || defaultUiLayout();
+    var dlg = layout.dialogue || {};
+    var ch = layout.choices || {};
+    var name = layout.nameplate || {};
+    if (panelW == null) {
+      panelW = Math.max(28, Math.min(70, parseInt(series.readerUi.menu && series.readerUi.menu.panelWidth, 10) || 42));
+    }
+    function setRange(nameAttr, valId, value) {
+      var input = document.querySelector('[name="' + nameAttr + '"]');
+      var hint = $("#" + valId);
+      var v = Math.round(value);
+      if (input) input.value = String(v);
+      if (hint) hint.textContent = v + "%";
+    }
+    setRange("uiDialogueWidth", "uiDialogueWidthVal", dlg.w != null ? dlg.w : 92);
+    setRange("uiDialogueHeight", "uiDialogueHeightVal", dlg.h != null ? dlg.h : 24);
+    setRange("uiChoicesWidth", "uiChoicesWidthVal", ch.w != null ? ch.w : 42);
+    setRange("uiChoicesHeight", "uiChoicesHeightVal", ch.h != null ? ch.h : 40);
+    setRange("uiNameplateWidth", "uiNameplateWidthVal", name.w != null ? name.w : 28);
+    setRange("uiMenuPanelWidth", "uiMenuPanelWidthVal", panelW);
   }
 
   function refreshUiMockup(series) {
@@ -1801,41 +1867,121 @@
     var drag = null;
     var moved = false;
 
+    function ensureLayoutNode(key) {
+      ScenaStore.ensureReaderUi(series);
+      if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
+      var defaults = defaultUiLayout();
+      if (key === "dialogue") {
+        series.readerUi.layout.dialogue = Object.assign({}, defaults.dialogue, series.readerUi.layout.dialogue || {});
+        return series.readerUi.layout.dialogue;
+      }
+      if (key === "nameplate") {
+        series.readerUi.layout.nameplate = Object.assign({}, defaults.nameplate, series.readerUi.layout.nameplate || {});
+        return series.readerUi.layout.nameplate;
+      }
+      if (key === "choices") {
+        series.readerUi.layout.choices = Object.assign({}, defaults.choices, series.readerUi.layout.choices || {});
+        return series.readerUi.layout.choices;
+      }
+      if (key === "menu") {
+        series.readerUi.layout.menu = Object.assign({}, defaults.menu, series.readerUi.layout.menu || {});
+        return series.readerUi.layout.menu;
+      }
+      return null;
+    }
+
     function onMove(e) {
       if (!drag) return;
       var rect = frame.getBoundingClientRect();
       if (!rect.width || !rect.height) return;
-      var x = ((e.clientX - rect.left) / rect.width) * 100 - drag.ox;
-      var y = ((e.clientY - rect.top) / rect.height) * 100 - drag.oy;
+      var curX = ((e.clientX - rect.left) / rect.width) * 100;
+      var curY = ((e.clientY - rect.top) / rect.height) * 100;
+
+      if (drag.mode === "resize") {
+        if (Math.abs(curX - drag.startCursorX) > 0.4 || Math.abs(curY - drag.startCursorY) > 0.4) moved = true;
+        applyUiResize(drag, curX, curY);
+        applyUiMockFrameStyles(frame, series);
+        return;
+      }
+
+      var x = curX - drag.ox;
+      var y = curY - drag.oy;
       x = Math.max(0, Math.min(90, x));
       y = Math.max(0, Math.min(90, y));
       if (Math.abs(x - (drag.startX || x)) > 0.4 || Math.abs(y - (drag.startY || y)) > 0.4) moved = true;
-      ScenaStore.ensureReaderUi(series);
-      if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
-      var key = drag.key;
-      if (key === "dialogue") {
-        series.readerUi.layout.dialogue.x = Math.round(x * 10) / 10;
-        series.readerUi.layout.dialogue.y = Math.round(y * 10) / 10;
-      } else if (key === "nameplate") {
-        series.readerUi.layout.nameplate.x = Math.round(x * 10) / 10;
-        series.readerUi.layout.nameplate.y = Math.round(y * 10) / 10;
-      } else if (key === "choices") {
-        series.readerUi.layout.choices.x = Math.round(x * 10) / 10;
-        series.readerUi.layout.choices.y = Math.round(y * 10) / 10;
-      } else if (key === "menu") {
-        if (!series.readerUi.layout.menu) series.readerUi.layout.menu = { x: 92, y: 4 };
-        series.readerUi.layout.menu.x = Math.round(x * 10) / 10;
-        series.readerUi.layout.menu.y = Math.round(y * 10) / 10;
+      var node = ensureLayoutNode(drag.key);
+      if (node) {
+        node.x = Math.round(x * 10) / 10;
+        node.y = Math.round(y * 10) / 10;
       }
       applyUiMockFrameStyles(frame, series);
+    }
+
+    function applyUiResize(state, curX, curY) {
+      var edge = state.edge || "";
+      var key = state.key;
+      if (key === "menuPanel") {
+        ScenaStore.ensureReaderUi(series);
+        if (!series.readerUi.menu) series.readerUi.menu = {};
+        var side = (series.readerUi.menu.panelSide === "left") ? "left" : "right";
+        var limits = UI_LAYOUT_LIMITS.menuPanel.w;
+        var nextW;
+        if (side === "right") nextW = 100 - curX;
+        else nextW = curX;
+        series.readerUi.menu.panelWidth = Math.round(clampUiLayoutValue(nextW, limits[0], limits[1]));
+        return;
+      }
+
+      var node = ensureLayoutNode(key);
+      if (!node) return;
+      var limits = UI_LAYOUT_LIMITS[key] || {};
+      var start = state.start;
+      var right = start.x + (start.w || 0);
+      var bottom = start.y + (start.h || 0);
+      var nextX = start.x;
+      var nextY = start.y;
+      var nextW = start.w;
+      var nextH = start.h;
+
+      if (edge.indexOf("e") >= 0 && limits.w) {
+        nextW = clampUiLayoutValue(curX - start.x, limits.w[0], limits.w[1]);
+      }
+      if (edge.indexOf("w") >= 0 && limits.w) {
+        var maxLeft = right - limits.w[0];
+        var minLeft = right - limits.w[1];
+        nextX = clampUiLayoutValue(curX, Math.max(0, minLeft), Math.max(0, maxLeft));
+        nextW = clampUiLayoutValue(right - nextX, limits.w[0], limits.w[1]);
+      }
+      if (edge.indexOf("s") >= 0 && limits.h) {
+        nextH = clampUiLayoutValue(curY - start.y, limits.h[0], limits.h[1]);
+      }
+      if (edge.indexOf("n") >= 0 && limits.h) {
+        var maxTop = bottom - limits.h[0];
+        var minTop = bottom - limits.h[1];
+        nextY = clampUiLayoutValue(curY, Math.max(0, minTop), Math.max(0, maxTop));
+        nextH = clampUiLayoutValue(bottom - nextY, limits.h[0], limits.h[1]);
+      }
+
+      node.x = Math.round(nextX * 10) / 10;
+      node.y = Math.round(nextY * 10) / 10;
+      if (limits.w && nextW != null) {
+        if (node.x + nextW > 100) nextW = Math.max(limits.w[0], 100 - node.x);
+        node.w = Math.round(nextW * 10) / 10;
+      }
+      if (limits.h && nextH != null) {
+        if (node.y + nextH > 100) nextH = Math.max(limits.h[0], 100 - node.y);
+        node.h = Math.round(nextH * 10) / 10;
+      }
     }
 
     function onUp() {
       if (!drag) return;
       var key = drag.key;
+      var mode = drag.mode;
       drag = null;
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      document.body.style.removeProperty("cursor");
       if (!moved) {
         if (key === "menu") {
           gameUiMenuOpen = true;
@@ -1847,34 +1993,74 @@
         persistSeries(series);
       }
       moved = false;
+      if (mode === "resize") syncUiLayoutInspector(series);
     }
 
-    frame.querySelectorAll("[data-ui-drag]").forEach(function (el) {
-      el.addEventListener("mousedown", function (e) {
-        if (e.button !== 0) return;
+    frame.addEventListener("mousedown", function (e) {
+      if (e.button !== 0) return;
+      var handle = e.target.closest ? e.target.closest(".ui-mock-resize-handle") : null;
+      if (handle && frame.contains(handle)) {
         e.preventDefault();
         e.stopPropagation();
+        var host = handle.closest("[data-ui-drag], [data-ui-resize]");
+        if (!host) return;
+        var resizeKey = host.getAttribute("data-ui-resize") || host.getAttribute("data-ui-drag");
+        var edge = handle.getAttribute("data-resize") || "se";
         var rect = frame.getBoundingClientRect();
-        var key = el.getAttribute("data-ui-drag");
-        var layout = (series.readerUi && series.readerUi.layout) || defaultUiLayout();
-        var node = layout[key] || { x: 0, y: 0 };
         var curX = ((e.clientX - rect.left) / rect.width) * 100;
         var curY = ((e.clientY - rect.top) / rect.height) * 100;
+        var startNode;
+        if (resizeKey === "menuPanel") {
+          ScenaStore.ensureReaderUi(series);
+          startNode = {
+            w: Math.max(28, Math.min(70, parseInt(series.readerUi.menu && series.readerUi.menu.panelWidth, 10) || 42)),
+          };
+          setGameUiSelection("menuPanel");
+        } else {
+          startNode = Object.assign({}, ensureLayoutNode(resizeKey));
+          setGameUiSelection(resizeKey);
+        }
         moved = false;
         drag = {
+          mode: "resize",
+          key: resizeKey,
+          edge: edge,
+          start: startNode,
+          startCursorX: curX,
+          startCursorY: curY,
+        };
+        var cursor = window.getComputedStyle(handle).cursor;
+        if (cursor && cursor !== "auto") document.body.style.cursor = cursor;
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        return;
+      }
+
+      var dragEl = e.target.closest ? e.target.closest("[data-ui-drag]") : null;
+      if (dragEl && frame.contains(dragEl)) {
+        if (e.target.closest && e.target.closest(".ui-mock-resize-handle")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var rect2 = frame.getBoundingClientRect();
+        var key = dragEl.getAttribute("data-ui-drag");
+        var node = ensureLayoutNode(key) || { x: 0, y: 0 };
+        var mx = ((e.clientX - rect2.left) / rect2.width) * 100;
+        var my = ((e.clientY - rect2.top) / rect2.height) * 100;
+        moved = false;
+        drag = {
+          mode: "move",
           key: key,
-          ox: curX - (node.x || 0),
-          oy: curY - (node.y || 0),
+          ox: mx - (node.x || 0),
+          oy: my - (node.y || 0),
           startX: node.x || 0,
           startY: node.y || 0,
         };
         setGameUiSelection(key);
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
-      });
-    });
+        return;
+      }
 
-    frame.addEventListener("mousedown", function (e) {
       if (e.target === frame || e.target.classList.contains("ui-mock-bg")) {
         setGameUiSelection("scene");
       }

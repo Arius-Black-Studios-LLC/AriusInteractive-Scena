@@ -830,9 +830,9 @@
       customSprites: { dialogueBox: null, choiceButton: null },
       sounds: { clickAssetId: null },
       layout: {
-        dialogue: { x: 4, y: 68, w: 92 },
-        nameplate: { x: 6, y: 62 },
-        choices: { x: 52, y: 28, w: 42 },
+        dialogue: { x: 4, y: 68, w: 92, h: 24 },
+        nameplate: { x: 6, y: 62, w: 28 },
+        choices: { x: 52, y: 28, w: 42, h: 40 },
         menu: { x: 92, y: 4 },
       },
       menu: {

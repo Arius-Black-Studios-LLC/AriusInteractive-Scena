@@ -24,9 +24,11 @@ export function LearnLessonRunner({ lesson }: Props) {
   const [hint, setHint] = useState("Follow the steps — progress checks automatically.");
   const [message, setMessage] = useState<string | null>(null);
   const [showActions, setShowActions] = useState(completed);
+  const [guideOpen, setGuideOpen] = useState(true);
 
   useEffect(() => {
     setCompleted(badgeAdapter.isLessonComplete(lesson.id, userId));
+    setGuideOpen(true);
   }, [lesson.id, userId]);
 
   useEffect(() => {
@@ -74,9 +76,19 @@ export function LearnLessonRunner({ lesson }: Props) {
         </Link>
         <span className="learn-lesson-category">{lesson.category}</span>
       </nav>
-      <div className="learn-lesson-layout">
-        <aside className="learn-instructions">
-          <h1>{lesson.title}</h1>
+      <div className={`learn-lesson-layout${guideOpen ? "" : " is-guide-hidden"}`}>
+        <aside className="learn-instructions" aria-hidden={!guideOpen}>
+          <div className="learn-guide-chrome">
+            <h1>{lesson.title}</h1>
+            <button
+              type="button"
+              className="learn-guide-hide"
+              onClick={() => setGuideOpen(false)}
+              aria-expanded={guideOpen}
+            >
+              Hide guide
+            </button>
+          </div>
           <div
             className="learn-instructions-body"
             dangerouslySetInnerHTML={{ __html: lesson.instructions }}
@@ -105,6 +117,15 @@ export function LearnLessonRunner({ lesson }: Props) {
             </div>
           ) : null}
         </aside>
+        <button
+          type="button"
+          className="learn-guide-show"
+          onClick={() => setGuideOpen(true)}
+          aria-expanded={guideOpen}
+          hidden={guideOpen}
+        >
+          Show guide
+        </button>
         <div className="learn-sandbox-wrap" ref={sandboxRef} id="learnSandbox">
           {!learnReady ? <div className="learn-sandbox-loading">Loading graph…</div> : null}
         </div>

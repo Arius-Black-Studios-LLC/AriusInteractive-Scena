@@ -556,17 +556,20 @@
       delete el.dataset.customChoice;
     }
     var layout = ui.layout || {};
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42 };
-    var name = layout.nameplate || { x: 6, y: 62 };
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
+    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
     el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
     el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
     el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+    el.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
     el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
     el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
     el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+    el.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
     el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
     el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    el.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
     var menuPos = layout.menu || { x: 92, y: 4 };
     el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
     el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");

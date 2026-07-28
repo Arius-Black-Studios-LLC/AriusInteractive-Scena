@@ -116,9 +116,12 @@
           '<a href="#/" class="learn-back">← All acts</a>' +
           '<span class="learn-lesson-category">' + escapeHtml(lesson.category) + '</span>' +
         '</nav>' +
-        '<div class="learn-lesson-layout">' +
-          '<aside class="learn-instructions">' +
-            '<h1>' + escapeHtml(lesson.title) + '</h1>' +
+        '<div class="learn-lesson-layout" id="learnLessonLayout">' +
+          '<aside class="learn-instructions" id="learnInstructions">' +
+            '<div class="learn-guide-chrome">' +
+              '<h1>' + escapeHtml(lesson.title) + '</h1>' +
+              '<button type="button" class="learn-guide-hide" id="learnGuideHide" aria-expanded="true">Hide guide</button>' +
+            '</div>' +
             '<div class="learn-instructions-body">' + lesson.instructions + '</div>' +
             '<div class="learn-task-status" id="learnTaskStatus">' +
               (done
@@ -130,9 +133,33 @@
               '<a href="#/" class="btn btn-ghost">Back to catalog</a>' +
             '</div>' +
           '</aside>' +
+          '<button type="button" class="learn-guide-show" id="learnGuideShow" aria-expanded="true" hidden>Show guide</button>' +
           '<div class="learn-sandbox-wrap" id="learnSandbox"></div>' +
         '</div>' +
       '</div>';
+
+    function setGuideOpen(open) {
+      var layout = $("#learnLessonLayout");
+      var hideBtn = $("#learnGuideHide");
+      var showBtn = $("#learnGuideShow");
+      var panel = $("#learnInstructions");
+      if (layout) layout.classList.toggle("is-guide-hidden", !open);
+      if (hideBtn) hideBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (showBtn) {
+        showBtn.hidden = !!open;
+        showBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+      if (panel) panel.setAttribute("aria-hidden", open ? "false" : "true");
+    }
+
+    var hideGuideBtn = $("#learnGuideHide");
+    if (hideGuideBtn) {
+      hideGuideBtn.addEventListener("click", function () { setGuideOpen(false); });
+    }
+    var showGuideBtn = $("#learnGuideShow");
+    if (showGuideBtn) {
+      showGuideBtn.addEventListener("click", function () { setGuideOpen(true); });
+    }
 
     sandbox = new ScenaLearnSandbox($("#learnSandbox"), lesson, {
       onChange: function (result) {
