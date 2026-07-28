@@ -1758,11 +1758,27 @@ body.is-resizing-center {
   inset: 0;
   height: 100%;
 }
-.preview-frame--layout-edit {
-  cursor: default;
+.is-layout-editable {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  cursor: grab;
+  touch-action: none;
 }
-.preview-frame--layout-edit .ui-mock-layer {
-  z-index: 5;
+.is-layout-editable.is-selected {
+  outline-color: var(--scena-accent, #2a9d8f);
+  z-index: 8 !important;
+}
+.is-layout-editable:active { cursor: grabbing; }
+.is-layout-ghost {
+  opacity: 0.85;
+}
+.preview-frame--layout-edit .preview-layout-host,
+.preview-frame--layout-edit .preview-content,
+.preview-frame--layout-edit .player-story-inner {
+  position: relative;
+}
+.preview-frame--layout-edit .is-layout-editable > .ui-mock-resize-handle {
+  display: block;
 }
 .game-ui-graph-host {
   display: flex;

@@ -881,7 +881,14 @@
     tab = tab || "basics";
     if (tab === "monetization") return renderMonetizationPage(series);
     if (tab === "promotion") return renderPromotionPage(series);
-    if (tab === "ui") return renderGameUiPage(series);
+    if (tab === "ui") {
+      /* Safety net — parseRoute should already send Game UI to the graph. */
+      var sid = series && series.id ? encodeURIComponent(series.id) : "";
+      setTimeout(function () {
+        location.hash = "#/series/" + sid + "/graph/layout";
+      }, 0);
+      return '<div class="loading-screen">Opening Game UI in the story editor…</div>';
+    }
     return renderSettingsForm(series);
   }
 
@@ -896,7 +903,6 @@
       return;
     }
     if (tab === "ui") {
-      bindGameUiPage();
       return;
     }
     bindSettingsForm();
@@ -1614,7 +1620,8 @@
     bindUiInspectorControls(series);
   }
 
-  function setGameUiSelection(id) {
+  function setGameUiSelection(id, opts) {
+    opts = opts || {};
     gameUiSelectedEl = id || null;
     if (id === "menuPanel" || id === "transcript" || id === "inventory" ||
         id === "inventoryItem" || id === "audio") {
@@ -1632,16 +1639,23 @@
         var sel = el.getAttribute("data-ui-select");
         var match = sel === id || (id === "inventoryItem" && sel === "inventoryItem");
         if (el.classList.contains("ui-mock-layer") || el.classList.contains("ui-mock-menu-panel") ||
-            el.classList.contains("ui-mock-inventory-item") || el.classList.contains("ui-mock-menu-pane")) {
+            el.classList.contains("ui-mock-inventory-item") || el.classList.contains("ui-mock-menu-pane") ||
+            el.classList.contains("is-layout-editable")) {
           el.classList.toggle("is-selected", match);
         }
       });
       frame.classList.toggle("is-menu-open", !!gameUiMenuOpen);
+      frame.classList.toggle("player-frame--menu-open", !!gameUiMenuOpen && !!gameUiGraphHost);
     }
     var series = getGameUiSeries();
     if (series) {
-      if (gameUiGraphHost) applyUiMockFrameStyles(getGameUiFrame(), series);
-      else refreshUiMockup(series);
+      if (gameUiGraphHost) {
+        if (opts.refreshPreview && typeof gameUiGraphHost.refreshPreview === "function") {
+          gameUiGraphHost.refreshPreview();
+        }
+      } else {
+        refreshUiMockup(series);
+      }
       refreshUiInspector(series);
     }
     var toggleBtn = $("#uiToggleMenuBtn");
@@ -1784,8 +1798,9 @@
           if (!listing.ok && form.querySelector('[name="title"]')) return;
           persistSeries(series);
           updateSidebarSeriesTitle(series);
-          if (gameUiGraphHost) rebuildGameUiGraphSurface(series);
-          else if ($("#uiMockFrame")) refreshUiMockup(series);
+          if (gameUiGraphHost && typeof gameUiGraphHost.refreshPreview === "function") {
+            gameUiGraphHost.refreshPreview();
+          } else if ($("#uiMockFrame")) refreshUiMockup(series);
         } catch (err) {
           console.error(err);
           toast("Could not save settings — try again.");
@@ -1866,8 +1881,9 @@
             if (uiChoiceShape) uiChoiceShape.value = preset.shapes.choice;
           }
           scheduleAutoSave();
-          if (gameUiGraphHost) rebuildGameUiGraphSurface(series);
-          else if ($("#uiMockFrame")) refreshUiMockup(series);
+          if (gameUiGraphHost && typeof gameUiGraphHost.refreshPreview === "function") {
+            gameUiGraphHost.refreshPreview();
+          } else if ($("#uiMockFrame")) refreshUiMockup(series);
         });
       });
     }
@@ -2627,6 +2643,265 @@
     );
   }
 
+  function syncLayoutCssVars(frame, series) {
+    if (!frame || !series) return;
+    ScenaStore.ensureReaderUi(series);
+    var layout = series.readerUi.layout || defaultUiLayout();
+    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
+    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
+    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
+    var menuPos = layout.menu || { x: 92, y: 4 };
+    var mp = layout.menuPanel || defaultUiLayout().menuPanel;
+    frame.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
+    frame.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
+    frame.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+    frame.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
+    frame.style.setProperty("--ui-layout-choices-x", ch.x + "%");
+    frame.style.setProperty("--ui-layout-choices-y", ch.y + "%");
+    frame.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+    frame.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
+    frame.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
+    frame.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+    frame.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
+    frame.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
+    frame.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
+    frame.style.setProperty("--ui-layout-menu-right", "auto");
+    frame.style.setProperty("--ui-layout-menupanel-x", (mp.x != null ? mp.x : 58) + "%");
+    frame.style.setProperty("--ui-layout-menupanel-y", (mp.y != null ? mp.y : 0) + "%");
+    frame.style.setProperty("--ui-layout-menupanel-w", (mp.w != null ? mp.w : 42) + "%");
+    frame.style.setProperty("--ui-layout-menupanel-h", (mp.h != null ? mp.h : 100) + "%");
+    frame.classList.add("preview-frame--laid-out", "player-frame--menu-laid-out", "preview-frame--layout-edit");
+  }
+
+  function getLiveLayoutHost(frame) {
+    if (!frame) return null;
+    return frame.querySelector("#previewContent") ||
+      frame.querySelector(".player-story-inner") ||
+      frame;
+  }
+
+  function decorateLivePreview(frame, series) {
+    if (!frame || !series) return;
+    ScenaStore.ensureReaderUi(series);
+    syncLayoutCssVars(frame, series);
+    var host = getLiveLayoutHost(frame);
+    if (!host) return;
+    host.classList.add("preview-layout-host");
+
+    function ensureDragEl(key, selector, html) {
+      var el = host.querySelector(selector) || frame.querySelector(selector);
+      if (!el && html) {
+        host.insertAdjacentHTML("beforeend", html);
+        el = host.querySelector(selector) || frame.querySelector('[data-ui-drag="' + key + '"]');
+      }
+      if (!el) return null;
+      el.setAttribute("data-ui-drag", key);
+      el.setAttribute("data-ui-select", key);
+      el.classList.add("is-layout-editable");
+      el.classList.toggle("is-selected", gameUiSelectedEl === key ||
+        (key === "inventory" && gameUiSelectedEl === "inventoryItem"));
+      if (!el.querySelector(".ui-mock-resize-handle")) {
+        var handles = key === "nameplate" || key === "menu"
+          ? (key === "nameplate" ? ["e", "w"] : [])
+          : ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+        if (handles.length) el.insertAdjacentHTML("beforeend", uiMockResizeHandlesHtml(handles));
+      }
+      return el;
+    }
+
+    ensureDragEl(
+      "dialogue",
+      ".preview-dialogue:not(.preview-dialogue--choices)",
+      '<div class="preview-dialogue is-layout-ghost" data-ui-drag="dialogue" data-ui-select="dialogue"><p>Dialogue text</p></div>'
+    );
+    ensureDragEl(
+      "nameplate",
+      ".preview-nameplate",
+      '<strong class="preview-nameplate preview-speaker is-layout-ghost" data-ui-drag="nameplate" data-ui-select="nameplate">Nameplate</strong>'
+    );
+    ensureDragEl(
+      "choices",
+      ".preview-dialogue--choices",
+      '<div class="preview-dialogue preview-dialogue--choices is-layout-ghost" data-ui-drag="choices" data-ui-select="choices">' +
+        '<button type="button" class="preview-choice-btn" tabindex="-1">Choice A</button>' +
+        '<button type="button" class="preview-choice-btn" tabindex="-1">Choice B</button>' +
+      "</div>"
+    );
+    ensureDragEl("menu", ".player-menu-btn", null);
+    var menuBtn = frame.querySelector(".player-menu-btn");
+    if (menuBtn) {
+      menuBtn.setAttribute("data-ui-drag", "menu");
+      menuBtn.setAttribute("data-ui-select", "menu");
+      menuBtn.classList.add("is-layout-editable");
+      menuBtn.classList.toggle("is-selected", gameUiSelectedEl === "menu");
+    }
+
+    if (gameUiMenuOpen) {
+      frame.classList.add("player-frame--menu-open");
+      var backdrop = frame.querySelector(".player-menu-backdrop");
+      if (backdrop) backdrop.hidden = false;
+      ensureDragEl("menuPanel", ".player-menu-panel", null);
+      var panel = frame.querySelector(".player-menu-panel");
+      if (panel) {
+        panel.setAttribute("data-ui-drag", "menuPanel");
+        panel.setAttribute("data-ui-resize", "menuPanel");
+        panel.setAttribute("data-ui-select", "menuPanel");
+        panel.classList.add("is-layout-editable");
+        if (!panel.querySelector(".ui-mock-resize-handle")) {
+          panel.insertAdjacentHTML("beforeend", uiMockResizeHandlesHtml(["n", "s", "e", "w", "ne", "nw", "se", "sw"]));
+        }
+      }
+    }
+
+    bindLiveLayoutDrag(series, frame);
+  }
+
+  function bindLiveLayoutDrag(series, frame) {
+    if (!frame || frame.dataset.liveDragBound === "1") return;
+    frame.dataset.liveDragBound = "1";
+    var drag = null;
+    var moved = false;
+
+    function ensureLayoutNode(key) {
+      ScenaStore.ensureReaderUi(series);
+      if (!series.readerUi.layout) series.readerUi.layout = defaultUiLayout();
+      var defaults = defaultUiLayout();
+      series.readerUi.layout[key] = Object.assign({}, defaults[key], series.readerUi.layout[key] || {});
+      return series.readerUi.layout[key];
+    }
+
+    function dragRect() {
+      var host = getLiveLayoutHost(frame);
+      return (host || frame).getBoundingClientRect();
+    }
+
+    function onMove(e) {
+      if (!drag) return;
+      var rect = dragRect();
+      if (!rect.width || !rect.height) return;
+      var curX = ((e.clientX - rect.left) / rect.width) * 100;
+      var curY = ((e.clientY - rect.top) / rect.height) * 100;
+      if (drag.mode === "resize") {
+        if (Math.abs(curX - drag.startCursorX) > 0.4 || Math.abs(curY - drag.startCursorY) > 0.4) moved = true;
+        var edge = drag.edge || "";
+        var node = ensureLayoutNode(drag.key);
+        var limits = UI_LAYOUT_LIMITS[drag.key] || {};
+        var start = drag.start;
+        var right = start.x + (start.w || 0);
+        var bottom = start.y + (start.h || 0);
+        var nextX = start.x;
+        var nextY = start.y;
+        var nextW = start.w;
+        var nextH = start.h;
+        if (edge.indexOf("e") >= 0 && limits.w) nextW = clampUiLayoutValue(curX - start.x, limits.w[0], limits.w[1]);
+        if (edge.indexOf("w") >= 0 && limits.w) {
+          var maxLeft = right - limits.w[0];
+          var minLeft = right - limits.w[1];
+          nextX = clampUiLayoutValue(curX, Math.max(0, minLeft), Math.max(0, maxLeft));
+          nextW = clampUiLayoutValue(right - nextX, limits.w[0], limits.w[1]);
+        }
+        if (edge.indexOf("s") >= 0 && limits.h) nextH = clampUiLayoutValue(curY - start.y, limits.h[0], limits.h[1]);
+        if (edge.indexOf("n") >= 0 && limits.h) {
+          var maxTop = bottom - limits.h[0];
+          var minTop = bottom - limits.h[1];
+          nextY = clampUiLayoutValue(curY, Math.max(0, minTop), Math.max(0, maxTop));
+          nextH = clampUiLayoutValue(bottom - nextY, limits.h[0], limits.h[1]);
+        }
+        node.x = Math.round(nextX * 10) / 10;
+        node.y = Math.round(nextY * 10) / 10;
+        if (limits.w && nextW != null) {
+          if (node.x + nextW > 100) nextW = Math.max(limits.w[0], 100 - node.x);
+          node.w = Math.round(nextW * 10) / 10;
+        }
+        if (limits.h && nextH != null) {
+          if (node.y + nextH > 100) nextH = Math.max(limits.h[0], 100 - node.y);
+          node.h = Math.round(nextH * 10) / 10;
+        }
+        syncLayoutCssVars(frame, series);
+        return;
+      }
+      var x = Math.max(0, Math.min(90, curX - drag.ox));
+      var y = Math.max(0, Math.min(90, curY - drag.oy));
+      if (Math.abs(x - (drag.startX || x)) > 0.4 || Math.abs(y - (drag.startY || y)) > 0.4) moved = true;
+      var moveNode = ensureLayoutNode(drag.key);
+      moveNode.x = Math.round(x * 10) / 10;
+      moveNode.y = Math.round(y * 10) / 10;
+      syncLayoutCssVars(frame, series);
+    }
+
+    function onUp() {
+      if (!drag) return;
+      var key = drag.key;
+      drag = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.removeProperty("cursor");
+      if (!moved) {
+        if (key === "menu") {
+          gameUiMenuOpen = true;
+          setGameUiSelection("menuPanel", { refreshPreview: true });
+        } else {
+          setGameUiSelection(key);
+        }
+      } else {
+        persistGameUiSeries(series);
+      }
+      moved = false;
+    }
+
+    frame.addEventListener("mousedown", function (e) {
+      if (e.button !== 0 || !gameUiGraphHost) return;
+      var handle = e.target.closest ? e.target.closest(".ui-mock-resize-handle") : null;
+      if (handle && frame.contains(handle)) {
+        e.preventDefault();
+        e.stopPropagation();
+        var hostEl = handle.closest("[data-ui-drag]");
+        if (!hostEl) return;
+        var resizeKey = hostEl.getAttribute("data-ui-drag");
+        var edge = handle.getAttribute("data-resize") || "se";
+        var rect = dragRect();
+        var curX = ((e.clientX - rect.left) / rect.width) * 100;
+        var curY = ((e.clientY - rect.top) / rect.height) * 100;
+        setGameUiSelection(resizeKey);
+        moved = false;
+        drag = {
+          mode: "resize",
+          key: resizeKey,
+          edge: edge,
+          start: Object.assign({}, ensureLayoutNode(resizeKey)),
+          startCursorX: curX,
+          startCursorY: curY,
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        return;
+      }
+      var dragEl = e.target.closest ? e.target.closest("[data-ui-drag]") : null;
+      if (dragEl && frame.contains(dragEl)) {
+        if (e.target.closest && e.target.closest(".ui-mock-resize-handle")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var key = dragEl.getAttribute("data-ui-drag");
+        var rect2 = dragRect();
+        var node = ensureLayoutNode(key) || { x: 0, y: 0 };
+        var mx = ((e.clientX - rect2.left) / rect2.width) * 100;
+        var my = ((e.clientY - rect2.top) / rect2.height) * 100;
+        moved = false;
+        drag = {
+          mode: "move",
+          key: key,
+          ox: mx - (node.x || 0),
+          oy: my - (node.y || 0),
+          startX: node.x || 0,
+          startY: node.y || 0,
+        };
+        setGameUiSelection(key);
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      }
+    });
+  }
+
   function mountGameUiInGraph(host) {
     if (!host || !host.frame || !host.series) return;
     gameUiGraphHost = host;
@@ -2639,11 +2914,12 @@
       host.panelEl.innerHTML = renderGameUiGraphPanel(host.series);
     }
 
-    rebuildGameUiGraphSurface(host.series);
     bindSettingsForm();
     loadUiPresetStore(host.series);
     bindUiInspectorControls(host.series);
     bindGameUiGraphPanelActions(host.series);
+    if (typeof host.refreshPreview === "function") host.refreshPreview();
+    else decorateLivePreview(host.frame, host.series);
     setGameUiSelection(gameUiSelectedEl);
   }
 
@@ -2653,10 +2929,16 @@
     gameUiGraphHost = null;
     window.__scenaLayoutEdit = false;
     if (host.frame) {
-      host.frame.innerHTML = "";
-      host.frame.dataset.dragBound = "";
-      host.frame.dataset.selectBound = "";
-      host.frame.classList.remove("preview-frame--layout-edit", "ui-mock-frame", "is-menu-open");
+      host.frame.dataset.liveDragBound = "";
+      host.frame.classList.remove("preview-frame--layout-edit", "player-frame--menu-open");
+      host.frame.querySelectorAll(".is-layout-ghost").forEach(function (el) { el.remove(); });
+      host.frame.querySelectorAll(".ui-mock-resize-handle").forEach(function (el) { el.remove(); });
+      host.frame.querySelectorAll(".is-layout-editable").forEach(function (el) {
+        el.classList.remove("is-layout-editable", "is-selected");
+        el.removeAttribute("data-ui-drag");
+        el.removeAttribute("data-ui-select");
+        el.removeAttribute("data-ui-resize");
+      });
     }
     if (host.panelEl) host.panelEl.innerHTML = "";
   }
@@ -2667,7 +2949,11 @@
       hierarchy.dataset.bound = "1";
       hierarchy.addEventListener("click", function (e) {
         var btn = e.target.closest("[data-ui-select]");
-        if (btn) setGameUiSelection(btn.getAttribute("data-ui-select"));
+        if (!btn) return;
+        var id = btn.getAttribute("data-ui-select");
+        var needsMenu = id === "menuPanel" || id === "transcript" || id === "inventory" ||
+          id === "inventoryItem" || id === "audio" || id === "menu";
+        setGameUiSelection(id, { refreshPreview: !!gameUiGraphHost && needsMenu });
       });
     }
     var toggleMenu = $("#uiToggleMenuBtn");
@@ -2675,17 +2961,17 @@
       toggleMenu.dataset.bound = "1";
       toggleMenu.addEventListener("click", function () {
         gameUiMenuOpen = !gameUiMenuOpen;
-        if (gameUiMenuOpen) setGameUiSelection("menuPanel");
+        if (gameUiMenuOpen) setGameUiSelection("menuPanel", { refreshPreview: true });
         else {
-          var frame = getGameUiFrame();
-          if (frame) frame.classList.remove("is-menu-open");
           toggleMenu.textContent = "Open menu";
           toggleMenu.classList.add("btn-ghost");
           toggleMenu.classList.remove("btn-primary");
           if (gameUiSelectedEl === "menuPanel" || gameUiSelectedEl === "transcript" ||
             gameUiSelectedEl === "inventory" || gameUiSelectedEl === "inventoryItem" ||
-            gameUiSelectedEl === "audio") setGameUiSelection("menu");
-          else rebuildGameUiGraphSurface(series);
+            gameUiSelectedEl === "audio") setGameUiSelection("menu", { refreshPreview: true });
+          else if (gameUiGraphHost && typeof gameUiGraphHost.refreshPreview === "function") {
+            gameUiGraphHost.refreshPreview();
+          }
         }
       });
     }
@@ -2696,7 +2982,9 @@
         series.readerUi.layout = defaultUiLayout();
         syncUiLayoutInspector(series);
         persistGameUiSeries(series);
-        rebuildGameUiGraphSurface(series);
+        if (gameUiGraphHost && typeof gameUiGraphHost.refreshPreview === "function") {
+          gameUiGraphHost.refreshPreview();
+        }
         toast("Layout reset to defaults.");
       });
     }
@@ -2715,7 +3003,7 @@
       openFromInspector.dataset.bound = "1";
       openFromInspector.addEventListener("click", function () {
         gameUiMenuOpen = true;
-        setGameUiSelection("menuPanel");
+        setGameUiSelection("menuPanel", { refreshPreview: true });
       });
     }
   }
@@ -2723,8 +3011,11 @@
   window.ScenaGameUi = {
     mountInGraph: mountGameUiInGraph,
     unmountFromGraph: unmountGameUiFromGraph,
+    decorateLivePreview: decorateLivePreview,
     refreshSurface: function () {
-      if (gameUiGraphHost && gameUiGraphHost.series) rebuildGameUiGraphSurface(gameUiGraphHost.series);
+      if (!gameUiGraphHost) return;
+      if (typeof gameUiGraphHost.refreshPreview === "function") gameUiGraphHost.refreshPreview();
+      else decorateLivePreview(gameUiGraphHost.frame, gameUiGraphHost.series);
     },
     isMounted: function () { return !!gameUiGraphHost; },
   };

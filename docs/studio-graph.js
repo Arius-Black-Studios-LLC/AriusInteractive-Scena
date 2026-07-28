@@ -3117,7 +3117,9 @@
       frame: this.previewEl,
       viewport: this.previewViewport,
       panelEl: this.gameUiGraphHostEl || this.container.querySelector("#gameUiGraphHost"),
-      getStageHtml: function () { return self.buildLayoutEditStageHtml(); },
+      refreshPreview: function () {
+        self.renderPreview();
+      },
       onLayoutChanged: function () {
         self.markDirty();
         if (typeof self.onChange === "function") self.onChange(self.series);
@@ -3125,46 +3127,29 @@
     });
   };
 
-  ScenaGraphEditor.prototype.buildLayoutEditStageHtml = function () {
-    var node = this.selectedId ? this.getNode(this.selectedId) : null;
-    if (!node && this.playNodeId) node = this.getNode(this.playNodeId);
-    if (!node || node.type !== "beat" || ScenaStore.isRouterNode(node) || ScenaStore.shouldAutoAdvance(node)) {
-      return '<div class="preview-stage preview-stage--layout-edit"><div class="preview-layer preview-layer-bg"></div></div>';
-    }
-    ScenaStore.migrateNode(node);
-    var resolved = this.effectivePresentation(node);
-    var bg = resolved.backgroundSceneId ? ScenaStore.getBackground(this.series, resolved.backgroundSceneId) : null;
-    var layers = (bg && bg.layers) || {};
-    var spriteUrl = "";
-    if (resolved.characterProfileId && resolved.spriteId) {
-      var sprites = ScenaStore.spritesForProfile(this.series, resolved.characterProfileId);
-      var sp = sprites.find(function (s) { return s.id === resolved.spriteId; });
-      if (sp) spriteUrl = sp.dataUrl || "";
-    }
-    var slot = resolved.slot || "center";
-    return (
-      '<div class="preview-stage preview-stage--layout-edit">' +
-        '<div class="preview-layer preview-layer-bg" style="' + (layers.bg ? "background-image:url(" + layers.bg + ")" : "") + '"></div>' +
-        '<div class="preview-layer preview-layer-mg" style="' + (layers.mg ? "background-image:url(" + layers.mg + ")" : "") + '"></div>' +
-        '<div class="preview-character preview-character--' + slot + '"' +
-          (spriteUrl ? ' style="background-image:url(' + spriteUrl + ')"' : "") + "></div>" +
-        '<div class="preview-layer preview-layer-fg" style="' + (layers.fg ? "background-image:url(" + layers.fg + ")" : "") + '"></div>' +
-      "</div>"
-    );
-  };
-
   ScenaGraphEditor.prototype.bindPreviewPlayfieldFit = function () {
-    if (this.layoutEditMode) return;
     if (!this.previewEl || !this.previewViewport || !window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
     ScenaStore.bindPlayfieldFit(this.previewEl, this.previewViewport, { pad: 0 });
   };
 
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
-    if (this.layoutEditMode) return;
     if (!this.previewEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
     var self = this;
+    var keepFitted = this.previewEl.classList.contains("preview-frame--fitted");
+    var keepW = this.previewEl.style.width;
+    var keepH = this.previewEl.style.height;
+    var keepFont = this.previewEl.style.fontSize;
+    var keepPlayfieldFont = this.previewEl.style.getPropertyValue("--playfield-font");
     ScenaStore.applyReaderUiToFrame(this.previewEl, this.series, {
       onApplied: function () {
+        if (keepFitted) {
+          self.previewEl.classList.add("preview-frame--fitted");
+          self.previewEl.style.width = keepW;
+          self.previewEl.style.height = keepH;
+          self.previewEl.style.fontSize = keepFont;
+          if (keepPlayfieldFont) self.previewEl.style.setProperty("--playfield-font", keepPlayfieldFont);
+        }
+        if (self.layoutEditMode) self.previewEl.classList.add("preview-frame--layout-edit");
         self.syncReaderMenu();
         self.bindPreviewPlayfieldFit();
       },
@@ -3173,17 +3158,12 @@
 
   ScenaGraphEditor.prototype.renderPreview = function () {
     if (!this.previewEl) return;
-    if (this.layoutEditMode) {
-      if (window.ScenaGameUi && ScenaGameUi.isMounted()) ScenaGameUi.refreshSurface();
-      else this.mountGameUiLayoutEditor();
-      return;
-    }
     this.applyPreviewUi();
     var self = this;
     var contentEl = this.ensurePreviewContentEl();
     if (!contentEl) return;
 
-    if (this.playEnded) {
+    if (this.playEnded && !this.layoutEditMode) {
       this.renderPlayEnd();
       this.syncReaderMenu();
       return;
@@ -3200,9 +3180,14 @@
       contentEl.innerHTML =
         '<div class="preview-empty">' +
           '<span class="preview-empty-label">Game preview</span>' +
-          '<p>' + (this.playMode ? "Playing…" : "Select a story beat to preview, or press ▶ Play to run from it.") + '</p>' +
+          '<p>' + (this.layoutEditMode
+            ? "Select a story beat to position UI over the real stage."
+            : (this.playMode ? "Playing…" : "Select a story beat to preview, or press ▶ Play to run from it.")) + '</p>' +
         '</div>';
       this.syncReaderMenu();
+      if (this.layoutEditMode && window.ScenaGameUi && ScenaGameUi.decorateLivePreview) {
+        ScenaGameUi.decorateLivePreview(this.previewEl, this.series);
+      }
       return;
     }
 
@@ -3336,6 +3321,10 @@
     }
     if (isPlaying) this.bindPlayPreviewEvents(node);
     this.syncReaderMenu();
+    if (this.layoutEditMode && window.ScenaGameUi && ScenaGameUi.decorateLivePreview) {
+      if (this.readerMenu && this.readerMenu.attachToPlayfield) this.readerMenu.attachToPlayfield();
+      ScenaGameUi.decorateLivePreview(this.previewEl, this.series);
+    }
   };
 
   ScenaGraphEditor.prototype.setParallaxEnabled = function (enabled) {
