@@ -4709,6 +4709,134 @@ body.is-resizing-center {
   font-weight: 600;
 }
 
+.jam-split-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--scena-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.jam-split-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 88px 64px;
+  gap: 10px;
+  align-items: center;
+}
+
+.jam-split-place {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.jam-split-bar-wrap {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.jam-split-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--scena-accent, #7c1128);
+  transition: width 0.15s ease;
+}
+
+.jam-split-pct {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+}
+
+.jam-split-input {
+  width: 3.5rem;
+  padding: 4px 6px;
+}
+
+.jam-split-ducats {
+  font-size: 0.75rem;
+  color: var(--scena-muted, #666);
+  text-align: right;
+}
+
+.jam-split-sum {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.jam-split-sum.is-invalid {
+  color: #a33;
+}
+
+.jam-split-sum.is-valid {
+  color: #2a6;
+}
+
+.jam-place-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--scena-accent, #7c1128);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.jam-pick-places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.jam-rating-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.jam-entry-stars,
+.mp-stars {
+  display: inline-flex;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.mp-star-btn {
+  border: 0;
+  background: transparent;
+  color: #c4b5a0;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 1px;
+  cursor: pointer;
+}
+
+.mp-star-btn.is-on {
+  color: #c45c26;
+}
+
+.mp-star-btn:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.mp-stars--readonly .mp-star-btn {
+  pointer-events: none;
+}
+
+.marketplace-rating-line {
+  margin: 0 0 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .jam-age-gate {
   max-width: 520px;
 }

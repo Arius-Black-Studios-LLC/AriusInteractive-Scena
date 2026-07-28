@@ -1891,6 +1891,19 @@
         });
       });
     });
+    root.querySelectorAll("[data-mp-rate-listing]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var listingId = btn.getAttribute("data-mp-rate-listing");
+        var stars = btn.getAttribute("data-mp-stars");
+        if (!listingId || btn.disabled) return;
+        ScenaMarketplace.rateListing(userId, listingId, stars).then(function () {
+          toast("Thanks for rating!");
+          paintLibraryRoot();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not save rating.");
+        });
+      });
+    });
     if (window.ScenaWallet) {
       ScenaWallet.bindPackButtons(root, userId, function (result) {
         if (result && result.redirecting) return;
@@ -2169,8 +2182,51 @@
     if (prizeToggle && prizeFields) {
       prizeToggle.addEventListener("change", function () {
         prizeFields.hidden = !prizeToggle.checked;
+        if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root);
       });
     }
+    function syncJamTypeSections() {
+      var typeEl = $("#jamTypeSelect", root) || form.elements.jamType;
+      var type = (typeEl && typeEl.value) === "asset" ? "asset" : "game";
+      var gameSec = $("#jamGameEntryReqs", root);
+      var assetSec = $("#jamAssetEntryReqs", root);
+      function setSection(sec, active) {
+        if (!sec) return;
+        sec.hidden = !active;
+        sec.querySelectorAll("input, select, textarea").forEach(function (el) {
+          el.disabled = !active;
+        });
+      }
+      setSection(gameSec, type === "game");
+      setSection(assetSec, type === "asset");
+      if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root);
+    }
+    var typeSelect = $("#jamTypeSelect", root);
+    if (typeSelect) {
+      typeSelect.addEventListener("change", syncJamTypeSections);
+      syncJamTypeSections();
+    } else if (window.ScenaJams && ScenaJams.syncWinnerFormUi) {
+      ScenaJams.syncWinnerFormUi(root);
+    }
+
+    function onWinnerUiChange(opts) {
+      if (window.ScenaJams && ScenaJams.syncWinnerFormUi) ScenaJams.syncWinnerFormUi(root, opts);
+    }
+    ["jamWinnerMode", "jamWinnerCount"].forEach(function (id) {
+      var el = $("#" + id, root);
+      if (el) el.addEventListener("change", function () { onWinnerUiChange(); });
+    });
+    var hostContrib = form.elements.hostContribution;
+    if (hostContrib) {
+      hostContrib.addEventListener("input", function () { onWinnerUiChange({ rebuildModes: false }); });
+      hostContrib.addEventListener("change", function () { onWinnerUiChange({ rebuildModes: false }); });
+    }
+    root.addEventListener("input", function (ev) {
+      if (ev.target && ev.target.getAttribute && ev.target.getAttribute("data-prize-split") != null) {
+        onWinnerUiChange({ rebuildModes: false });
+      }
+    });
+
     form.querySelectorAll("[data-jam-mature]").forEach(function (el) {
       el.addEventListener("change", function () {
         var note = $("#jamAutoAgeNote", root);
@@ -2429,11 +2485,25 @@
     root.querySelectorAll(".jam-pick-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var subId = btn.getAttribute("data-pick-sub");
-        ScenaJams.pickWinner(userId, jam.id, subId).then(function () {
-          toast("Winner chosen — prize sent if funded.");
+        var place = btn.getAttribute("data-pick-place");
+        ScenaJams.pickWinner(userId, jam.id, subId, place).then(function () {
+          toast(place ? ("Set as " + place + " — prize pays when all places are filled.") : "Winner updated.");
           render();
         }).catch(function (err) {
           toast((err && err.message) || "Could not pick winner.");
+        });
+      });
+    });
+
+    root.querySelectorAll(".jam-rate-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var subId = btn.getAttribute("data-rate-sub");
+        var stars = btn.getAttribute("data-stars");
+        ScenaJams.rateJamEntry(userId, jam.id, subId, stars).then(function () {
+          toast("Rating saved.");
+          render();
+        }).catch(function (err) {
+          toast((err && err.message) || "Could not rate entry.");
         });
       });
     });

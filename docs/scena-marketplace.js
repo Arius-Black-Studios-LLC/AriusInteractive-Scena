@@ -4,6 +4,7 @@
 (function () {
   var PURCHASES_PREFIX = "arleco_marketplace_purchases_";
   var LISTINGS_LOCAL = "arleco_marketplace_listings";
+  var RATINGS_LOCAL = "arleco_marketplace_ratings";
 
   var CATEGORIES = [
     { id: "", label: "All" },
@@ -62,6 +63,53 @@
     } catch (e) { /* quota */ }
   }
 
+  function readLocalRatings() {
+    try {
+      return JSON.parse(localStorage.getItem(RATINGS_LOCAL) || "{}");
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function writeLocalRatings(map) {
+    try {
+      localStorage.setItem(RATINGS_LOCAL, JSON.stringify(map));
+    } catch (e) { /* quota */ }
+  }
+
+  function ratingStatsFor(listingId, userId) {
+    var all = readLocalRatings()[listingId] || {};
+    var keys = Object.keys(all);
+    var sum = 0;
+    keys.forEach(function (uid) { sum += Math.max(0, parseInt(all[uid], 10) || 0); });
+    return {
+      rating_avg: keys.length ? Math.round((sum / keys.length) * 100) / 100 : 0,
+      rating_count: keys.length,
+      my_rating: userId && all[userId] != null ? parseInt(all[userId], 10) || null : null,
+    };
+  }
+
+  function formatRating(avg, count) {
+    avg = Number(avg) || 0;
+    count = Math.max(0, parseInt(count, 10) || 0);
+    if (!count) return "Not rated";
+    return "★ " + avg.toFixed(1) + " (" + count + ")";
+  }
+
+  function renderStarsInput(listingId, myRating, opts) {
+    opts = opts || {};
+    var canRate = !!opts.canRate;
+    var stars = "";
+    for (var i = 1; i <= 5; i++) {
+      stars +=
+        '<button type="button" class="mp-star-btn' + (myRating >= i ? " is-on" : "") + '"' +
+          ' data-mp-rate-listing="' + escapeAttr(listingId) + '" data-mp-stars="' + i + '"' +
+          (canRate ? "" : " disabled") +
+          ' aria-label="' + i + ' star' + (i === 1 ? "" : "s") + '">★</button>';
+    }
+    return '<div class="mp-stars' + (canRate ? "" : " mp-stars--readonly") + '">' + stars + "</div>";
+  }
+
   function demoListings() {
     return [
       {
@@ -72,6 +120,8 @@
         price_ducats: 0,
         preview_data_url: "",
         purchase_count: 42,
+        rating_avg: 4.6,
+        rating_count: 18,
         seller_name: "Arleco",
         bundle: {
           characterProfiles: [{
@@ -102,6 +152,8 @@
         price_ducats: 15,
         preview_data_url: "",
         purchase_count: 18,
+        rating_avg: 4.2,
+        rating_count: 9,
         seller_name: "Arleco",
         bundle: {
           backgroundScenes: [{
@@ -444,7 +496,11 @@
             '<span class="marketplace-card-body">' +
               '<strong>' + escapeHtml(item.title) + "</strong>" +
               '<span class="marketplace-card-meta">' + escapeHtml(categoryLabel(item.category)) +
-              " · " + escapeHtml(formatPrice(item.price_ducats)) + "</span>" +
+              " · " + escapeHtml(formatPrice(item.price_ducats)) +
+              (item.rating_count
+                ? " · " + escapeHtml(formatRating(item.rating_avg, item.rating_count))
+                : "") +
+              "</span>" +
             "</span>" +
           "</button>"
         );
@@ -515,6 +571,17 @@
         "<h4>" + escapeHtml(listing.title) + "</h4>" +
         '<p class="marketplace-seller">By ' + escapeHtml(listing.seller_name || "Creator") +
           (isSeller ? " (you)" : "") + "</p>" +
+        '<p class="marketplace-rating-line">' +
+          escapeHtml(formatRating(listing.rating_avg, listing.rating_count)) +
+          (owned && !isSeller
+            ? ' · <span class="field-hint">Your rating</span>'
+            : "") +
+        "</p>" +
+        (owned && !isSeller
+          ? renderStarsInput(listing.id, listing.my_rating || 0, { canRate: true })
+          : (listing.rating_count
+              ? renderStarsInput(listing.id, Math.round(Number(listing.rating_avg) || 0), { canRate: false })
+              : "")) +
         "<p>" + escapeHtml(listing.description || "") + "</p>" +
         '<div class="marketplace-detail-actions">' + actionHtml + "</div>" +
         (!isSeller && !owned && price > 0 && opts.showPackUpsell && window.ScenaWallet
@@ -584,10 +651,87 @@
       });
       return { characterIds: characterIds, stageIds: stageIds, assetIds: assetIds };
     },
+
+    formatRating: formatRating,
+
+    rateListing: function (userId, listingId, stars) {
+      if (!userId) return Promise.reject(new Error("Sign in to rate assets."));
+      stars = Math.max(1, Math.min(5, parseInt(stars, 10) || 0));
+      if (!stars) return Promise.reject(new Error("Pick 1–5 stars."));
+      var listingPromise = ScenaMarketplace.getListing(listingId, userId);
+      return listingPromise.then(function (listing) {
+        if (!listing) throw new Error("Listing not found.");
+        if (listing.is_seller || listing.isSeller || listing.seller_id === userId) {
+          throw new Error("You cannot rate your own listing.");
+        }
+        if (!listing.owned && !(readPurchases(userId)[listingId])) {
+          throw new Error("Get this asset first, then you can rate it.");
+        }
+        var sb = getClient();
+        var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+        if (useCloud() && sb && !isLocalId) {
+          return sb.rpc("rate_marketplace_listing", {
+            p_listing_id: listingId,
+            p_stars: stars,
+          }).then(function (res) {
+            if (res.error) throw new Error(res.error.message || "Could not save rating.");
+            var data = res.data || {};
+            // Mirror locally for jam scoring / offline display
+            var map = readLocalRatings();
+            map[listingId] = map[listingId] || {};
+            map[listingId][userId] = stars;
+            writeLocalRatings(map);
+            return {
+              listing_id: listingId,
+              my_rating: data.my_rating || stars,
+              rating_avg: Number(data.rating_avg) || stars,
+              rating_count: parseInt(data.rating_count, 10) || 1,
+            };
+          });
+        }
+        var map = readLocalRatings();
+        map[listingId] = map[listingId] || {};
+        map[listingId][userId] = stars;
+        writeLocalRatings(map);
+        var stats = ratingStatsFor(listingId, userId);
+        return {
+          listing_id: listingId,
+          my_rating: stars,
+          rating_avg: stats.rating_avg,
+          rating_count: stats.rating_count,
+        };
+      });
+    },
+
+    getListingRating: function (listingId, userId) {
+      var sb = getClient();
+      var isLocalId = String(listingId).indexOf("demo_") === 0 || String(listingId).indexOf("local_") === 0;
+      if (useCloud() && sb && listingId && !isLocalId) {
+        return sb.rpc("marketplace_listing_detail", { p_listing_id: listingId }).then(function (res) {
+          if (res.error || !res.data) {
+            return ratingStatsFor(listingId, userId);
+          }
+          return {
+            rating_avg: Number(res.data.rating_avg) || 0,
+            rating_count: parseInt(res.data.rating_count, 10) || 0,
+            my_rating: res.data.my_rating != null ? parseInt(res.data.my_rating, 10) : null,
+          };
+        }).catch(function () {
+          return ratingStatsFor(listingId, userId);
+        });
+      }
+      return Promise.resolve(ratingStatsFor(listingId, userId));
+    },
   };
 
   function filterLocalListings(category, query) {
-    var all = readLocalListings().concat(demoListings());
+    var all = readLocalListings().concat(demoListings()).map(function (item) {
+      var stats = ratingStatsFor(item.id);
+      return Object.assign({}, item, {
+        rating_avg: item.rating_avg != null && !stats.rating_count ? item.rating_avg : (stats.rating_count ? stats.rating_avg : (item.rating_avg || 0)),
+        rating_count: Math.max(item.rating_count || 0, stats.rating_count || 0),
+      });
+    });
     return all.filter(function (item) {
       if (category && item.category !== category) return false;
       if (query) {
@@ -605,6 +749,16 @@
     if (item) {
       item = Object.assign({}, item);
       item.owned = Boolean(readPurchases(userId)[listingId]);
+      var stats = ratingStatsFor(listingId, userId);
+      if (stats.rating_count) {
+        item.rating_avg = stats.rating_avg;
+        item.rating_count = stats.rating_count;
+        item.my_rating = stats.my_rating;
+      } else {
+        item.rating_avg = item.rating_avg || 0;
+        item.rating_count = item.rating_count || 0;
+        item.my_rating = null;
+      }
     }
     return item;
   }
