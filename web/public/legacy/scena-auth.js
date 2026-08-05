@@ -3,6 +3,8 @@
  */
 (function () {
   var client = null;
+  // Captured before Supabase strips the tokens out of the URL.
+  var landedFromRecoveryLink = /(^|[#&])type=recovery(&|$)/.test(window.location.hash || "");
 
   function getConfig() {
     return window.ARLECO_CONFIG || window.SCENA_CONFIG || {};
@@ -26,6 +28,10 @@
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
+          // Email links (recovery, confirmation, magic link) must work when opened
+          // on a different device than the one that requested them. PKCE keeps the
+          // verifier in the requesting browser's storage, so it cannot.
+          flowType: "implicit",
         },
       });
     }
@@ -74,11 +80,10 @@
 
   function cleanAuthUrl() {
     if (!window.history.replaceState) return;
-    var isRecovery = new URLSearchParams(window.location.search).get("reset") === "1";
     window.history.replaceState(
       {},
       document.title,
-      isRecovery ? "/account?reset=1" : window.location.pathname
+      isRecoveryLanding() ? "/account?reset=1" : window.location.pathname
     );
   }
 
@@ -93,7 +98,13 @@
     return pageName() === target;
   }
 
+  function isRecoveryLanding() {
+    return new URLSearchParams(window.location.search).get("reset") === "1";
+  }
+
   function maybeRedirectAfterSignIn() {
+    // Stay put while the user is choosing a new password.
+    if (isRecoveryLanding()) return;
     var path = consumePostLogin();
     if (!path) return;
     if (isAlreadyOnPage(path)) return;
@@ -156,6 +167,12 @@
   function finishInit(session) {
     if (window.ScenaAuth.onSessionChange) {
       window.ScenaAuth.onSessionChange(session);
+    }
+    if (session && landedFromRecoveryLink && !isRecoveryLanding()) {
+      // Supabase falls back to the project Site URL when the redirect path is not
+      // allow-listed, so send recovery landings to the password form ourselves.
+      window.location.replace("/account?reset=1");
+      return session;
     }
     if (session) {
       cleanAuthUrl();

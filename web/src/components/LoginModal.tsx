@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import "./LoginModal.css";
 
@@ -27,7 +27,21 @@ export function LoginModal({ open, onClose, postLogin, initialMode = "login" }: 
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    setMode(initialMode);
+    setMessage("");
+    setError("");
+    setBusy(false);
+  }, [open, initialMode]);
+
   if (!open) return null;
+
+  function switchMode(next: "login" | "signup" | "reset") {
+    setMode(next);
+    setMessage("");
+    setError("");
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,7 +55,10 @@ export function LoginModal({ open, onClose, postLogin, initialMode = "login" }: 
       }
       if (mode === "reset") {
         await resetPassword(email.trim());
-        setMessage("Check your email for a password reset link.");
+        setMode("login");
+        setMessage(
+          "Reset link sent. Open it, choose a new password, then log in here with the new one.",
+        );
         return;
       }
 
@@ -89,72 +106,69 @@ export function LoginModal({ open, onClose, postLogin, initialMode = "login" }: 
         {!loading && !configured ? (
           <p className="field-error">{CONFIG_HINT}</p>
         ) : null}
-        {message ? (
-          <p className="modal-success">{message}</p>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            {mode === "signup" ? (
-              <label className="field">
-                <span>Username</span>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="storyteller"
-                  minLength={3}
-                  maxLength={32}
-                  required
-                  autoFocus
-                />
-              </label>
-            ) : null}
+        {message ? <p className="modal-success">{message}</p> : null}
+        <form onSubmit={handleSubmit}>
+          {mode === "signup" ? (
             <label className="field">
-              <span>Email</span>
+              <span>Username</span>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="storyteller"
+                minLength={3}
+                maxLength={32}
                 required
-                autoFocus={mode !== "signup"}
+                autoFocus
               />
             </label>
-            {mode !== "reset" ? (
-              <label className="field">
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  minLength={8}
-                  required
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                />
-              </label>
-            ) : null}
-            {error ? <p className="field-error">{error}</p> : null}
-            <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy
-                ? "Working…"
-                : mode === "signup"
-                  ? "Create account"
-                  : mode === "reset"
-                    ? "Send reset link"
-                    : "Log in"}
-            </button>
-            <div className="login-mode-links">
-              {mode === "login" ? (
-                <>
-                  <button type="button" onClick={() => setMode("signup")}>Create account</button>
-                  <button type="button" onClick={() => setMode("reset")}>Forgot password?</button>
-                </>
-              ) : (
-                <button type="button" onClick={() => setMode("login")}>Back to log in</button>
-              )}
-            </div>
-          </form>
-        )}
+          ) : null}
+          <label className="field">
+            <span>Email</span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              autoFocus={mode !== "signup"}
+            />
+          </label>
+          {mode !== "reset" ? (
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                minLength={8}
+                required
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              />
+            </label>
+          ) : null}
+          {error ? <p className="field-error">{error}</p> : null}
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy
+              ? "Working…"
+              : mode === "signup"
+                ? "Create account"
+                : mode === "reset"
+                  ? "Send reset link"
+                  : "Log in"}
+          </button>
+          <div className="login-mode-links">
+            {mode === "login" ? (
+              <>
+                <button type="button" onClick={() => switchMode("signup")}>Create account</button>
+                <button type="button" onClick={() => switchMode("reset")}>Forgot password?</button>
+              </>
+            ) : (
+              <button type="button" onClick={() => switchMode("login")}>Back to log in</button>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );

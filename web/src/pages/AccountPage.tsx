@@ -29,6 +29,7 @@ export function AccountPage() {
   const [newPassword, setNewPassword] = useState("");
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordDone, setPasswordDone] = useState(false);
   const [modNotices, setModNotices] = useState<
     Array<{ noticeId: string; title: string; reason: string; createdAt?: string; readAt?: string | null }>
   >([]);
@@ -60,6 +61,8 @@ export function AccountPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!userId || !session) {
+      // A recovery link handles its own messaging; bouncing to login would hide it.
+      if (isPasswordReset) return;
       try {
         sessionStorage.setItem("scena_post_login", "/account");
       } catch {
@@ -103,7 +106,7 @@ export function AccountPage() {
         });
       })
       .catch(() => setBootError("Could not load profile."));
-  }, [authLoading, userId, session, ready, navigate]);
+  }, [authLoading, userId, session, ready, navigate, isPasswordReset]);
 
   async function handlePasswordUpdate(event: FormEvent) {
     event.preventDefault();
@@ -111,14 +114,67 @@ export function AccountPage() {
     setPasswordBusy(true);
     try {
       await updatePassword(newPassword);
-      setPasswordMessage("Password updated. You can use it the next time you log in.");
+      setPasswordDone(true);
+      setPasswordMessage("Password updated. Use it the next time you log in.");
       setNewPassword("");
-      window.history.replaceState({}, document.title, "/account");
     } catch (err) {
       setPasswordMessage(err instanceof Error ? err.message : "Could not update password.");
     } finally {
       setPasswordBusy(false);
     }
+  }
+
+  if (isPasswordReset) {
+    if (authLoading) {
+      return <div className="account-loading">Checking your reset link…</div>;
+    }
+
+    return (
+      <div className="account-loading">
+        <section className="account-reset">
+          <h2>Choose a new password</h2>
+          {session ? (
+            passwordDone ? (
+              <>
+                <p className="field-hint">{passwordMessage}</p>
+                <Link className="btn btn-primary" to="/studio">
+                  Open Creator studio
+                </Link>
+              </>
+            ) : (
+              <form onSubmit={handlePasswordUpdate}>
+                <label className="field">
+                  <span>New password</span>
+                  <input
+                    type="password"
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    autoComplete="new-password"
+                    required
+                    autoFocus
+                  />
+                </label>
+                {passwordMessage ? <p className="field-hint">{passwordMessage}</p> : null}
+                <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
+                  {passwordBusy ? "Updating…" : "Update password"}
+                </button>
+              </form>
+            )
+          ) : (
+            <>
+              <p className="field-hint">
+                This reset link has expired or was already used. Request a new one and open it
+                within the hour.
+              </p>
+              <Link className="btn btn-primary" to="/?login=account">
+                Back to log in
+              </Link>
+            </>
+          )}
+        </section>
+      </div>
+    );
   }
 
   if (error || bootError) {
@@ -171,28 +227,6 @@ export function AccountPage() {
         </div>
       </header>
       <div className="account-body">
-        {isPasswordReset ? (
-          <section className="account-mod-notices container">
-            <h2>Choose a new password</h2>
-            <form onSubmit={handlePasswordUpdate}>
-              <label className="field">
-                <span>New password</span>
-                <input
-                  type="password"
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
-                  autoComplete="new-password"
-                  required
-                />
-              </label>
-              {passwordMessage ? <p className="field-hint">{passwordMessage}</p> : null}
-              <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
-                {passwordBusy ? "Updating…" : "Update password"}
-              </button>
-            </form>
-          </section>
-        ) : null}
         {modNotices.length ? (
           <section className="account-mod-notices container">
             <h2>Moderation notices</h2>
