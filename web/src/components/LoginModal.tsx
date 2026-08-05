@@ -8,12 +8,22 @@ type Props = {
   open: boolean;
   onClose: () => void;
   postLogin?: string;
+  initialMode?: "login" | "signup";
 };
 
-export function LoginModal({ open, onClose, postLogin }: Props) {
-  const { signIn, configured, loading } = useAuth();
+export function LoginModal({ open, onClose, postLogin, initialMode = "login" }: Props) {
+  const {
+    signInWithPassword,
+    signUpWithPassword,
+    resetPassword,
+    configured,
+    loading,
+  } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup" | "reset">(initialMode);
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -22,24 +32,40 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    setMessage("");
     setBusy(true);
     try {
       if (!loading && !configured) {
         setError(CONFIG_HINT);
         return;
       }
-      let dest = postLogin;
-      if (!dest) {
-        try {
-          dest = sessionStorage.getItem("scena_post_login") || undefined;
-        } catch {
-          /* private mode */
-        }
+      if (mode === "reset") {
+        await resetPassword(email.trim());
+        setMessage("Check your email for a password reset link.");
+        return;
       }
-      await signIn(email.trim(), "reader", dest);
-      setSent(true);
+
+      if (mode === "signup") {
+        const signedIn = await signUpWithPassword({
+          email: email.trim(),
+          password,
+          username: username.trim(),
+          role: postLogin === "/studio" ? "creator" : "reader",
+        });
+        if (!signedIn) {
+          setMessage(
+            "Account created. Check your email to confirm it, then return here to log in.",
+          );
+          return;
+        }
+      } else {
+        await signInWithPassword(email.trim(), password);
+      }
+
+      onClose();
+      window.location.assign(postLogin || "/account");
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not send magic link.";
+      const msg = err instanceof Error ? err.message : "Could not authenticate.";
       setError(msg.includes("not configured") ? CONFIG_HINT : msg);
     } finally {
       setBusy(false);
@@ -57,15 +83,31 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
         <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
           ×
         </button>
-        <h2 id="loginTitle">Log in to Arleco</h2>
+        <h2 id="loginTitle">
+          {mode === "signup" ? "Create your Arleco account" : mode === "reset" ? "Reset password" : "Log in to Arleco"}
+        </h2>
         {!loading && !configured ? (
           <p className="field-error">{CONFIG_HINT}</p>
         ) : null}
-        {sent ? (          <p className="modal-success">
-            Check your email — we sent a magic link to <strong>{email}</strong>.
-          </p>
+        {message ? (
+          <p className="modal-success">{message}</p>
         ) : (
           <form onSubmit={handleSubmit}>
+            {mode === "signup" ? (
+              <label className="field">
+                <span>Username</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="storyteller"
+                  minLength={3}
+                  maxLength={32}
+                  required
+                  autoFocus
+                />
+              </label>
+            ) : null}
             <label className="field">
               <span>Email</span>
               <input
@@ -74,13 +116,43 @@ export function LoginModal({ open, onClose, postLogin }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                autoFocus
+                autoFocus={mode !== "signup"}
               />
             </label>
+            {mode !== "reset" ? (
+              <label className="field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  minLength={8}
+                  required
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                />
+              </label>
+            ) : null}
             {error ? <p className="field-error">{error}</p> : null}
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {busy ? "Sending…" : "Send magic link"}
+              {busy
+                ? "Working…"
+                : mode === "signup"
+                  ? "Create account"
+                  : mode === "reset"
+                    ? "Send reset link"
+                    : "Log in"}
             </button>
+            <div className="login-mode-links">
+              {mode === "login" ? (
+                <>
+                  <button type="button" onClick={() => setMode("signup")}>Create account</button>
+                  <button type="button" onClick={() => setMode("reset")}>Forgot password?</button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setMode("login")}>Back to log in</button>
+              )}
+            </div>
           </form>
         )}
       </div>

@@ -107,6 +107,8 @@
     this.previewRatio = 0.42;
     this.isResizingCenter = false;
     this.isDirty = false;
+    this.layoutEditMode = !!options.layoutEdit;
+    this.previewRatioBeforeLayoutEdit = null;
     this.boundaryPlacementMode = false;
     this.dragBoundary = null;
     this.selectedBoundaryId = null;
@@ -141,6 +143,9 @@
     this.applyCenterSplit();
     this.applyPreviewUi();
     this.paintAll();
+    if (this.layoutEditMode) {
+      this.setLayoutEditMode(true, { skipHash: true });
+    }
     if (this.learnMode) this.notifyLearnChange();
   }
 
@@ -271,6 +276,8 @@
     this.workspaceEditor.classList.toggle("is-binder-blocks", tab === "blocks");
     this.workspaceEditor.classList.toggle("is-binder-details", tab === "details");
     this.workspaceEditor.classList.toggle("is-binder-assets", tab === "assets");
+    this.workspaceEditor.classList.toggle("is-binder-layout", tab === "layout");
+    this.workspaceEditor.classList.toggle("is-layout-edit", !!this.layoutEditMode);
     if (this.workspaceBinder) {
       this.workspaceBinder.classList.toggle("is-open", open);
       this.workspaceBinder.querySelectorAll("[data-binder-tab]").forEach(function (btn) {
@@ -294,7 +301,7 @@
       this.setMobileDrawer(mobileMap[tab] || null);
       return;
     }
-    if (tab !== "blocks" && tab !== "details" && tab !== "assets") return;
+    if (tab !== "blocks" && tab !== "details" && tab !== "assets" && tab !== "layout") return;
     this.binderTab = tab;
     this.syncBinderChrome();
     if (opts.persist !== false) {
@@ -730,6 +737,7 @@
         '<div class="graph-toolbar graph-toolbar--studio">' +
           '<div class="graph-toolbar-desktop">' +
             '<button type="button" class="btn btn-sm graph-play-btn" id="graphPlayBtn" title="Play from selected beat">▶ Play</button>' +
+            '<button type="button" class="btn btn-sm" id="graphLayoutEditBtn" title="Edit dialogue, nameplate, choices, and menu on the game view" aria-pressed="false">Edit game layout</button>' +
             '<button type="button" class="btn btn-sm" id="addBoundaryBtn" title="Split the graph into publishable chapters">+ Chapter boundary</button>' +
             '<button type="button" class="btn btn-sm" id="validateGraphBtn" title="Check for orphans, dead ends, and region issues">Validate</button>' +
             '<span class="save-status" id="graphSaveStatus">Saved</span>' +
@@ -771,6 +779,7 @@
               '<button type="button" class="workspace-binder-tab" data-binder-tab="blocks" role="tab" aria-selected="false">Blocks</button>' +
               '<button type="button" class="workspace-binder-tab" data-binder-tab="details" role="tab" aria-selected="false">Details</button>' +
               '<button type="button" class="workspace-binder-tab" data-binder-tab="assets" role="tab" aria-selected="false">Assets</button>' +
+              '<button type="button" class="workspace-binder-tab" data-binder-tab="layout" role="tab" aria-selected="false" id="binderLayoutTab" hidden>Game UI</button>' +
               '<button type="button" class="workspace-binder-close" id="binderClose" title="Close binder" hidden>×</button>' +
             '</div>' +
             '<div class="workspace-binder-body">' +
@@ -800,6 +809,9 @@
                   '</div>' +
                 '</div>' +
               '</div>' +
+              '<div class="workspace-binder-pane" data-binder-pane="layout" id="binderPaneLayout" hidden>' +
+                '<div class="game-ui-graph-host" id="gameUiGraphHost"></div>' +
+              '</div>' +
             '</div>' +
           '</aside>' +
         '</div>' +
@@ -828,6 +840,7 @@
     this.edgesTemp = this.container.querySelector("#graphEdgesTemp");
     this.inspector = this.container.querySelector("#graphInspector");
     this.previewEl = this.container.querySelector("#gamePreview");
+    this.previewViewport = this.container.querySelector(".preview-viewport");
     this.panelCenter = this.container.querySelector("#panelCenter");
     this.resourcesList = this.container.querySelector("#resourcesList");
     this.resourcesDetail = this.container.querySelector("#resourcesDetail");
@@ -841,8 +854,11 @@
     this.episodeContextBtn = null;
     this.validateBtn = this.container.querySelector("#validateGraphBtn");
     this.playBtn = this.container.querySelector("#graphPlayBtn");
+    this.layoutEditBtn = this.container.querySelector("#graphLayoutEditBtn");
     this.parallaxBtn = this.container.querySelector("#graphParallaxBtn");
     this.workspaceEditor = this.container.querySelector(".workspace-editor");
+    this.gameUiGraphHostEl = this.container.querySelector("#gameUiGraphHost");
+    this.binderLayoutTab = this.container.querySelector("#binderLayoutTab");
     this.mobileBlocksBtn = this.container.querySelector("#mobileBlocksBtn");
     this.mobilePlayBtn = this.container.querySelector("#mobilePlayBtn");
     this.mobilePreviewClose = this.container.querySelector("#mobilePreviewClose");
@@ -859,12 +875,20 @@
       });
     }
 
+    if (this.layoutEditBtn) {
+      this.layoutEditBtn.addEventListener("click", function () {
+        self.setLayoutEditMode(!self.layoutEditMode);
+      });
+    }
+
     if (this.parallaxBtn) {
       this.parallaxBtn.addEventListener("click", function () {
         self.setParallaxEnabled(!self.parallaxEnabled);
       });
       this.updateParallaxToggle();
     }
+
+    this.bindPreviewPlayfieldFit();
 
     this.bindEpisodeEditorModal();
 
@@ -1064,6 +1088,12 @@
       return;
     }
     this.panelCenter.style.setProperty("--preview-ratio", String(this.previewRatio));
+    var self = this;
+    requestAnimationFrame(function () {
+      if (self.previewEl && self.previewViewport && window.ScenaStore && ScenaStore.fitPlayfield) {
+        ScenaStore.fitPlayfield(self.previewEl, self.previewViewport, { pad: 0 });
+      }
+    });
   };
 
   ScenaGraphEditor.prototype.markTouchPointer = function () {
@@ -1202,7 +1232,11 @@
   ScenaGraphEditor.prototype.syncInspectorPanel = function () {
     if (!this.workspaceEditor || this.isMobileLayout()) return;
     var hasSelection = !!(this.selectedId || this.selectedEdgeId || this.selectedBoundaryId);
-    this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection);
+    var shouldAutoOpenDetails = !this.playMode;
+    this.workspaceEditor.classList.toggle("has-inspector-selection", hasSelection && shouldAutoOpenDetails);
+    if (!shouldAutoOpenDetails) {
+      return;
+    }
     if (hasSelection) {
       // Open Details when binder is closed; don't yank away from Blocks/Assets mid-edit.
       if (!this.binderTab || this.binderTab === "details") {
@@ -3018,58 +3052,108 @@
     this.syncInspectorPanel();
   };
 
+  ScenaGraphEditor.prototype.setLayoutEditMode = function (on, opts) {
+    opts = opts || {};
+    on = !!on;
+    if (this.layoutEditMode === on && window.ScenaGameUi && ScenaGameUi.isMounted() === on) {
+      this.syncLayoutEditChrome();
+      return;
+    }
+    this.layoutEditMode = on;
+    window.__scenaLayoutEdit = on;
+
+    if (on) {
+      if (this.playMode) this.togglePlay();
+      if (this.previewRatioBeforeLayoutEdit == null) this.previewRatioBeforeLayoutEdit = this.previewRatio;
+      this.previewRatio = Math.max(this.previewRatio, 0.55);
+      this.applyCenterSplit();
+      if (this.binderLayoutTab) this.binderLayoutTab.hidden = false;
+      this.openBinderTab("layout", { persist: false });
+      this.mountGameUiLayoutEditor();
+      if (!opts.skipHash) {
+        try {
+          history.replaceState(null, "", "#/series/" + encodeURIComponent(this.series.id) + "/graph/layout");
+        } catch (e) { /* ignore */ }
+      }
+    } else {
+      if (window.ScenaGameUi && ScenaGameUi.unmountFromGraph) ScenaGameUi.unmountFromGraph();
+      if (this.binderLayoutTab) this.binderLayoutTab.hidden = true;
+      if (this.binderTab === "layout") this.openBinderTab("details", { persist: false });
+      if (this.previewRatioBeforeLayoutEdit != null) {
+        this.previewRatio = this.previewRatioBeforeLayoutEdit;
+        this.previewRatioBeforeLayoutEdit = null;
+        this.applyCenterSplit();
+      }
+      if (!opts.skipHash) {
+        try {
+          history.replaceState(null, "", "#/series/" + encodeURIComponent(this.series.id) + "/graph");
+        } catch (e2) { /* ignore */ }
+      }
+      this.renderPreview();
+    }
+    this.syncLayoutEditChrome();
+  };
+
+  ScenaGraphEditor.prototype.syncLayoutEditChrome = function () {
+    if (this.layoutEditBtn) {
+      this.layoutEditBtn.classList.toggle("btn-primary", !!this.layoutEditMode);
+      this.layoutEditBtn.classList.toggle("is-active", !!this.layoutEditMode);
+      this.layoutEditBtn.setAttribute("aria-pressed", this.layoutEditMode ? "true" : "false");
+      this.layoutEditBtn.textContent = this.layoutEditMode ? "Done editing layout" : "Edit game layout";
+    }
+    if (this.playBtn) this.playBtn.disabled = !!this.layoutEditMode;
+    if (this.binderLayoutTab) this.binderLayoutTab.hidden = !this.layoutEditMode;
+    if (this.workspaceEditor) {
+      this.workspaceEditor.classList.toggle("is-layout-edit", !!this.layoutEditMode);
+    }
+    this.syncBinderChrome();
+  };
+
+  ScenaGraphEditor.prototype.mountGameUiLayoutEditor = function () {
+    var self = this;
+    if (!window.ScenaGameUi || !ScenaGameUi.mountInGraph || !this.previewEl) return;
+    ScenaGameUi.mountInGraph({
+      series: this.series,
+      frame: this.previewEl,
+      viewport: this.previewViewport,
+      panelEl: this.gameUiGraphHostEl || this.container.querySelector("#gameUiGraphHost"),
+      refreshPreview: function () {
+        self.renderPreview();
+      },
+      onLayoutChanged: function () {
+        self.markDirty();
+        if (typeof self.onChange === "function") self.onChange(self.series);
+      },
+    });
+  };
+
+  ScenaGraphEditor.prototype.bindPreviewPlayfieldFit = function () {
+    if (!this.previewEl || !this.previewViewport || !window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
+    ScenaStore.bindPlayfieldFit(this.previewEl, this.previewViewport, { pad: 0 });
+  };
+
   ScenaGraphEditor.prototype.applyPreviewUi = function () {
-    if (!this.previewEl) return;
-    var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String(ui.aspectRatio || "16:9").split(":");
-    var aw = parseInt(parts[0], 10) || 16;
-    var ah = parseInt(parts[1], 10) || 9;
-    var el = this.previewEl;
-    el.style.setProperty("--preview-aspect-w", String(aw));
-    el.style.setProperty("--preview-aspect-h", String(ah));
-    el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
-    el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
-    el.style.setProperty("--ui-accent", ui.colors.accent);
-    el.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
-    el.style.setProperty("--ui-choice-text", ui.colors.choiceText);
-    el.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
-    el.style.setProperty("--ui-speaker", ui.colors.speaker);
-    el.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
-    el.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
-    el.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
-    el.className = "preview-frame player-frame preview-ui--" + ui.preset +
-      " preview-shape-dialogue--" + ui.shapes.dialogue +
-      " preview-shape-choice--" + ui.shapes.choice;
-    if (ui.customSprites.dialogueBox) {
-      el.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
-      el.dataset.customDialogue = "1";
-    } else {
-      el.style.removeProperty("--ui-dialogue-sprite");
-      delete el.dataset.customDialogue;
-    }
-    if (ui.customSprites.choiceButton) {
-      el.style.setProperty("--ui-choice-sprite", "url(" + ui.customSprites.choiceButton + ")");
-      el.dataset.customChoice = "1";
-    } else {
-      el.style.removeProperty("--ui-choice-sprite");
-      delete el.dataset.customChoice;
-    }
-    var layout = ui.layout || {};
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
-    var name = layout.nameplate || { x: 6, y: 62, w: 28 };
-    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
-    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
-    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
-    el.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
-    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
-    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
-    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
-    el.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
-    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
-    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
-    el.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
-    el.classList.add("preview-frame--laid-out");
+    if (!this.previewEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
+    var self = this;
+    var keepFitted = this.previewEl.classList.contains("preview-frame--fitted");
+    var keepW = this.previewEl.style.width;
+    var keepH = this.previewEl.style.height;
+    var keepFont = this.previewEl.style.fontSize;
+    var keepPlayfieldFont = this.previewEl.style.getPropertyValue("--playfield-font");
+    ScenaStore.applyReaderUiToFrame(this.previewEl, this.series, {
+      onApplied: function () {
+        if (keepFitted) {
+          self.previewEl.classList.add("preview-frame--fitted");
+          self.previewEl.style.width = keepW;
+          self.previewEl.style.height = keepH;
+          self.previewEl.style.fontSize = keepFont;
+          if (keepPlayfieldFont) self.previewEl.style.setProperty("--playfield-font", keepPlayfieldFont);
+        }
+        if (self.layoutEditMode) self.previewEl.classList.add("preview-frame--layout-edit");
+        self.syncReaderMenu();
+        self.bindPreviewPlayfieldFit();
+      },
+    });
   };
 
   ScenaGraphEditor.prototype.renderPreview = function () {
@@ -3079,7 +3163,7 @@
     var contentEl = this.ensurePreviewContentEl();
     if (!contentEl) return;
 
-    if (this.playEnded) {
+    if (this.playEnded && !this.layoutEditMode) {
       this.renderPlayEnd();
       this.syncReaderMenu();
       return;
@@ -3096,9 +3180,14 @@
       contentEl.innerHTML =
         '<div class="preview-empty">' +
           '<span class="preview-empty-label">Game preview</span>' +
-          '<p>' + (this.playMode ? "Playing…" : "Select a story beat to preview, or press ▶ Play to run from it.") + '</p>' +
+          '<p>' + (this.layoutEditMode
+            ? "Select a story beat to position UI over the real stage."
+            : (this.playMode ? "Playing…" : "Select a story beat to preview, or press ▶ Play to run from it.")) + '</p>' +
         '</div>';
       this.syncReaderMenu();
+      if (this.layoutEditMode && window.ScenaGameUi && ScenaGameUi.decorateLivePreview) {
+        ScenaGameUi.decorateLivePreview(this.previewEl, this.series);
+      }
       return;
     }
 
@@ -3184,14 +3273,17 @@
       this.appendPreviewDialogueLog(speaker, dialogueText);
     }
 
+    var nameplateHtml = speaker !== "Narration"
+      ? '<strong class="preview-nameplate preview-speaker">' + escapeHtml(speaker) + '</strong>'
+      : "";
     var dialogueHtml = "";
     if (ScenaStore.hasChoices(node)) {
       var previewChoices = isPlaying
         ? ScenaStore.filterVisibleChoices(node, this.playMetrics || {}, this.playChoicesMade || [], this.playKeyItems || {})
         : (data.choices || []);
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           (dialogueText ? '<p>' + escapeHtml(dialogueText) + '</p>' : "") +
         '</div>' +
         '<div class="preview-dialogue preview-dialogue--choices">' +
@@ -3216,8 +3308,8 @@
       var endHint = (data.isEnd && isPlaying) ? '<p class="preview-continue-hint">Click to finish</p>' : "";
       var continueHint = (!data.isEnd && isPlaying) ? '<p class="preview-continue-hint">Click or press Space to continue</p>' : "";
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue' + (isPlaying ? " is-clickable" : "") + '">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           '<p>' + escapeHtml(dialogueText || "…") + '</p>' +
           continueHint + endHint +
         '</div>';
@@ -3229,6 +3321,10 @@
     }
     if (isPlaying) this.bindPlayPreviewEvents(node);
     this.syncReaderMenu();
+    if (this.layoutEditMode && window.ScenaGameUi && ScenaGameUi.decorateLivePreview) {
+      if (this.readerMenu && this.readerMenu.attachToPlayfield) this.readerMenu.attachToPlayfield();
+      ScenaGameUi.decorateLivePreview(this.previewEl, this.series);
+    }
   };
 
   ScenaGraphEditor.prototype.setParallaxEnabled = function (enabled) {

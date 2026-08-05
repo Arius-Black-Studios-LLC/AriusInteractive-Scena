@@ -23,7 +23,8 @@
   width: 100%;
 }
 
-.player-frame.preview-frame {
+/* Immersive reader shell only — do NOT stretch studio #gamePreview (needs 16:9 letterbox). */
+#playerRoot .player-frame.preview-frame {
   flex: 1;
   width: 100% !important;
   height: 100% !important;
@@ -31,7 +32,7 @@
   max-height: none !important;
   min-height: 0;
   aspect-ratio: unset !important;
-  container-type: inline-size;
+  container-type: size;
   box-shadow: none;
   border-radius: 0;
   overflow: hidden;
@@ -69,6 +70,50 @@
   flex-direction: column;
   min-height: 0;
   width: 100%;
+}
+
+/* Letterbox reading playfield to 16:9 (1920×1080 design space) on all viewports. */
+#playerRoot .player-story--reading {
+  height: auto;
+  min-height: 100%;
+  min-height: 100cqh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    max(8px, env(safe-area-inset-top, 0px))
+    max(8px, env(safe-area-inset-right, 0px))
+    max(8px, env(safe-area-inset-bottom, 0px))
+    max(8px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+  background: #050505;
+}
+
+#playerRoot .player-story--reading .player-story-inner {
+  flex: none;
+  position: relative;
+  box-sizing: border-box;
+  container-type: inline-size;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  /* Fallback before JS fit; fitted class overrides with exact px. */
+  width: min(
+    100%,
+    calc((100dvh - 72px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)),
+    calc((100cqh - 16px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9))
+  );
+  height: auto;
+  max-height: none;
+  aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
+  font-size: calc(18px * min(100cqw, 100%) / 1920 * var(--ui-dialogue-scale, 1));
+}
+
+#playerRoot .player-story--reading .player-story-inner.preview-frame--fitted {
+  aspect-ratio: unset;
+  max-width: none;
+  max-height: none;
+  font-size: var(--playfield-font, 18px);
 }
 
 .player-story--discuss-hint::after {
@@ -829,41 +874,50 @@
   font-size: 0.72rem;
 }
 
-/* In-game menu */
+/* In-game menu — sizes track the 16:9 playfield root font */
 .player-menu-btn {
   position: absolute;
-  top: var(--ui-layout-menu-y, 10px);
-  left: var(--ui-layout-menu-x, auto);
-  right: var(--ui-layout-menu-right, 10px);
+  top: var(--ui-layout-menu-y, 4%);
+  left: var(--ui-layout-menu-x, 92%);
+  right: var(--ui-layout-menu-right, auto);
   z-index: 20;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-width: 40px;
-  height: 40px;
-  padding: 0 12px;
+  gap: 0.35em;
+  min-width: 2.2em;
+  height: 2.2em;
+  padding: 0 0.65em;
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 10px;
+  border-radius: 0.55em;
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: 1em;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
   backdrop-filter: blur(6px);
+  box-sizing: border-box;
+  opacity: var(--ui-menu-opacity, 1);
+  border-width: var(--ui-menu-border-width, 1px);
+  border-color: var(--ui-menu-border-color, rgba(255, 255, 255, 0.25));
+  box-shadow: 0 0 var(--ui-menu-glow-size, 0px) var(--ui-menu-glow-color, transparent);
+  background-image: var(--ui-menu-button-sprite, none);
+  background-size: 100% 100%;
+  transform: none;
 }
 
 .player-menu-btn-icon {
-  font-size: 1.1rem;
+  font-size: 1.1em;
   line-height: 1;
 }
 
 .player-menu-btn-label {
   letter-spacing: 0.02em;
+  font-size: 0.85em;
 }
 
 .player-menu-btn--icon-only {
-  width: 40px;
+  width: 2.2em;
   padding: 0;
   justify-content: center;
 }
@@ -900,7 +954,7 @@
 }
 
 .player-menu-panel {
-  width: min(100%, var(--ui-menu-panel-w, 340px));
+  width: min(100%, var(--ui-menu-panel-w, 42%));
   max-height: 100%;
   display: flex;
   flex-direction: column;
@@ -908,12 +962,40 @@
   border-left: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--ui-menu-panel-text, #f5f0e6);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+  opacity: var(--ui-menupanel-opacity, 1);
+  border-width: var(--ui-menupanel-border-width, 1px);
+  border-color: var(--ui-menupanel-border-color, rgba(255,255,255,0.12));
+  box-shadow: 0 0 var(--ui-menupanel-glow-size, 0px) var(--ui-menupanel-glow-color, transparent);
+  background-image: var(--ui-menu-panel-sprite, none);
+  background-size: 100% 100%;
+  font-size: 1em;
+  box-sizing: border-box;
 }
 
 .player-menu-backdrop[data-side="left"] .player-menu-panel {
   border-left: none;
   border-right: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+}
+
+.player-frame--menu-laid-out .player-menu-backdrop {
+  display: block;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.player-frame--menu-laid-out .player-menu-backdrop[hidden] {
+  display: none !important;
+}
+.player-frame--menu-laid-out .player-menu-panel {
+  position: absolute;
+  left: var(--ui-layout-menupanel-x, 58%);
+  top: var(--ui-layout-menupanel-y, 0%);
+  width: var(--ui-layout-menupanel-w, 42%);
+  height: var(--ui-layout-menupanel-h, 100%);
+  max-height: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 }
 
 .player-menu-header {
@@ -968,6 +1050,7 @@
   flex: 1;
   overflow: auto;
   padding: 12px 16px 20px;
+  font-size: var(--ui-menupanel-font-size, 100%);
 }
 
 .player-menu-empty {
@@ -975,6 +1058,29 @@
   opacity: 0.72;
   font-size: 0.9rem;
   line-height: 1.5;
+}
+
+.preview-dialogue:not(.preview-dialogue--choices) {
+  border: var(--ui-dialogue-border-width, 0px) solid var(--ui-dialogue-border-color, transparent);
+  box-shadow: 0 0 var(--ui-dialogue-glow-size, 0px) var(--ui-dialogue-glow-color, transparent);
+}
+.player-dialogue-text {
+  position: relative;
+  z-index: 1;
+  font-size: var(--ui-dialogue-font-size, 100%);
+}
+.preview-speaker {
+  position: relative;
+  z-index: 1;
+  font-size: var(--ui-nameplate-font-size, 100%);
+  border: var(--ui-nameplate-border-width, 0px) solid var(--ui-nameplate-border-color, transparent);
+  box-shadow: 0 0 var(--ui-nameplate-glow-size, 0px) var(--ui-nameplate-glow-color, transparent);
+}
+.preview-choice-btn {
+  border-width: var(--ui-choices-border-width, 1px);
+  border-color: var(--ui-choices-border-color, var(--ui-choice-border));
+  box-shadow: 0 0 var(--ui-choices-glow-size, 0px) var(--ui-choices-glow-color, transparent);
+  font-size: var(--ui-choices-font-size, 100%);
 }
 
 .player-log-list {
@@ -1038,9 +1144,18 @@
   gap: 6px;
   padding: 10px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background-color: var(--ui-inventoryitem-bg, rgba(255, 255, 255, 0.06));
   border: 1px solid rgba(201, 162, 39, 0.25);
   text-align: center;
+  opacity: var(--ui-inventoryitem-opacity, var(--ui-inventory-opacity, 1));
+  border-width: var(--ui-inventoryitem-border-width, var(--ui-inventory-border-width, 1px));
+  border-color: var(--ui-inventoryitem-border-color, var(--ui-inventory-border-color, rgba(201, 162, 39, 0.25)));
+  box-shadow: 0 0 var(--ui-inventoryitem-glow-size, var(--ui-inventory-glow-size, 0px)) var(--ui-inventoryitem-glow-color, var(--ui-inventory-glow-color, transparent));
+  background-image: var(--ui-inventory-item-sprite, none);
+  background-size: 100% 100%;
+  font-size: var(--ui-inventoryitem-font-size, var(--ui-inventory-font-size, 100%));
+  font-family: var(--ui-inventoryitem-font-family, inherit);
+  color: var(--ui-inventoryitem-font-color, var(--ui-inventory-text, inherit));
 }
 
 .player-inventory-icon {
@@ -1082,9 +1197,20 @@
 }
 
 .player-inventory-list li {
-  padding: 10px 0;
+  padding: 10px 8px;
+  margin-bottom: 4px;
+  border-radius: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.92rem;
+  background-color: var(--ui-inventoryitem-bg, transparent);
+  opacity: var(--ui-inventoryitem-opacity, 1);
+  border-width: var(--ui-inventoryitem-border-width, 1px);
+  border-style: solid;
+  border-color: var(--ui-inventoryitem-border-color, rgba(255,255,255,0.08));
+  box-shadow: 0 0 var(--ui-inventoryitem-glow-size, 0px) var(--ui-inventoryitem-glow-color, transparent);
+  font-size: var(--ui-inventoryitem-font-size, var(--ui-inventory-font-size, 100%));
+  font-family: var(--ui-inventoryitem-font-family, inherit);
+  color: var(--ui-inventoryitem-font-color, inherit);
 }
 
 .player-inventory-qty {
@@ -1103,6 +1229,14 @@
   gap: 10px;
   align-items: center;
   font-size: 0.88rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background-color: var(--ui-audio-bg, transparent);
+  border: var(--ui-audio-border-width, 0px) solid var(--ui-audio-border-color, transparent);
+  box-shadow: 0 0 var(--ui-audio-glow-size, 0px) var(--ui-audio-glow-color, transparent);
+  color: var(--ui-audio-font-color, inherit);
+  font-family: var(--ui-audio-font-family, inherit);
+  font-size: var(--ui-audio-font-size, 0.88rem);
 }
 
 .player-setting-row--check {
@@ -1113,6 +1247,8 @@
 
 .player-setting-row input[type="range"] {
   width: 120px;
+  accent-color: var(--ui-audio-fill, var(--ui-accent, #2a9d8f));
+  background: var(--ui-audio-bg, rgba(255,255,255,0.12));
 }
 
 .player-setting-val {
@@ -1122,38 +1258,25 @@
 }
 
 @media (max-width: 768px) {
-  .player-story--reading {
-    height: auto;
+  #playerRoot .player-story--reading {
     min-height: 100dvh;
     min-height: 100svh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     padding:
       max(12px, env(safe-area-inset-top, 0px))
       max(12px, env(safe-area-inset-right, 0px))
       max(12px, env(safe-area-inset-bottom, 0px))
       max(12px, env(safe-area-inset-left, 0px));
-    box-sizing: border-box;
-    background: #050505;
   }
 
-  .player-story--reading .player-story-inner {
-    flex: none;
+  #playerRoot .player-story--reading .player-story-inner {
     width: min(
       100%,
-      calc((100svh - 24px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9))
+      calc((100svh - 24px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)),
+      calc(100vw)
     );
-    max-height: min(
-      calc(100svh - 24px),
-      calc(100vw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16))
-    );
-    aspect-ratio: var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9);
-    container-type: inline-size;
-    font-size: calc((9px + 0.72cqw) * var(--ui-dialogue-scale, 1));
-    overflow: hidden;
+    height: auto;
+    max-height: none;
     border-radius: 4px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   }
 
   .player-story--reading .preview-dialogue:not(.preview-dialogue--choices) {
@@ -1178,6 +1301,104 @@
         calc(50vw * var(--preview-aspect-h, 9) / var(--preview-aspect-w, 16))
       ) + 12px
     );
+  }
+}
+
+/* Mobile reading expects landscape; keep 16:9 letterbox once rotated. */
+.player-rotate-gate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px;
+  text-align: center;
+  background: #050505;
+  color: #fafaf8;
+  font-family: var(--font-ui, "DM Sans", sans-serif);
+}
+
+.player-rotate-gate[hidden] {
+  display: none !important;
+}
+
+.player-rotate-gate-inner {
+  max-width: 280px;
+}
+
+.player-rotate-gate-icon {
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  position: relative;
+  animation: player-rotate-hint 1.6s ease-in-out infinite;
+}
+
+.player-rotate-gate-icon::after {
+  content: "";
+  position: absolute;
+  inset: 10px 18px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+}
+
+.player-rotate-gate h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display, "Fraunces", serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.player-rotate-gate p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(250, 250, 248, 0.72);
+}
+
+@keyframes player-rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(90deg); }
+  60% { transform: rotate(90deg); }
+}
+
+@media (orientation: portrait) and (max-width: 920px) {
+  .player-body.player-needs-landscape .player-rotate-gate {
+    display: flex;
+  }
+
+  .player-body.player-needs-landscape .player-shell {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 920px) {
+  .player-topbar {
+    padding: 6px 10px;
+    min-height: 0;
+  }
+
+  #playerRoot .player-story--reading {
+    padding:
+      max(4px, env(safe-area-inset-top, 0px))
+      max(4px, env(safe-area-inset-right, 0px))
+      max(4px, env(safe-area-inset-bottom, 0px))
+      max(4px, env(safe-area-inset-left, 0px));
+  }
+
+  #playerRoot .player-story--reading .player-story-inner {
+    width: min(
+      100%,
+      calc((100svh - 40px) * var(--preview-aspect-w, 16) / var(--preview-aspect-h, 9)),
+      calc((100dvw - 8px))
+    );
+    height: auto;
+    max-height: none;
   }
 }
 

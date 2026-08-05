@@ -47,6 +47,22 @@
     return tabs;
   };
 
+  ScenaReaderMenu.prototype.getPlayfieldHost = function () {
+    if (!this.frameEl) return null;
+    return this.frameEl.querySelector(".player-story-inner") ||
+      this.frameEl.querySelector("#previewContent") ||
+      this.frameEl;
+  };
+
+  ScenaReaderMenu.prototype.attachToPlayfield = function () {
+    var host = this.getPlayfieldHost();
+    if (!host || !this.menuBtn) return;
+    if (this.menuBtn.parentNode !== host) host.appendChild(this.menuBtn);
+    if (this.menuBackdrop && this.menuBackdrop.parentNode !== host) host.appendChild(this.menuBackdrop);
+    var hud = this.frameEl && this.frameEl.querySelector("#playerKeyItems");
+    if (hud && hud.parentNode !== host) host.appendChild(hud);
+  };
+
   ScenaReaderMenu.prototype.mount = function () {
     if (!this.frameEl || this.mounted) return;
     this.mounted = true;
@@ -68,7 +84,8 @@
           '<div class="player-menu-body" id="playerMenuBody"></div>' +
         '</div>' +
       '</div>';
-    this.frameEl.insertAdjacentHTML("beforeend", markup);
+    var host = this.getPlayfieldHost();
+    host.insertAdjacentHTML("beforeend", markup);
     this.menuBtn = this.frameEl.querySelector("#playerMenuBtn");
     this.menuBackdrop = this.frameEl.querySelector("#playerMenuBackdrop");
     this.menuBody = this.frameEl.querySelector("#playerMenuBody");
@@ -122,6 +139,7 @@
   };
 
   ScenaReaderMenu.prototype.sync = function () {
+    this.attachToPlayfield();
     var menu = this.getMenuConfig();
     var tabs = this.availableTabs();
     if (!this.menuBtn) return;

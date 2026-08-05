@@ -72,6 +72,12 @@
     if (lesson.id === "metrics-affection-supplies" && this.graph.selectNode) {
       this.graph.selectNode("invite");
     }
+    // Node-focused lessons: show Details so the selected beat is editable immediately.
+    // Asset-focused lessons keep the Assets binder tab from learnPreferredBinderTab.
+    if (this.graph.selectedId && this.graph.openBinderTab && !lesson.learnResourcesTab &&
+        !lesson.learnSoundSettings && !lesson.learnKeyItemsPanel) {
+      this.graph.openBinderTab("details", { persist: false });
+    }
   }
 
   window.ScenaLearnSandbox = ScenaLearnSandbox;

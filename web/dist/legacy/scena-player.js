@@ -38,6 +38,8 @@
     this.frozenBeatHtml = "";
     this.discussHintVisible = false;
     this.discussHintTimer = null;
+    this.typingTimer = null;
+    this.typingAudioCtx = null;
     this.dialogueLog = [];
     this.readerMenu = null;
 
@@ -63,6 +65,10 @@
     }
     window.removeEventListener("keydown", this.boundKey);
     if (window.ScenaAudio) ScenaAudio.stopBgm();
+    if (this.typingTimer) {
+      clearInterval(this.typingTimer);
+      this.typingTimer = null;
+    }
   };
 
   ScenaPlayer.prototype.syncChoicesMade = function () {
@@ -519,75 +525,37 @@
   };
 
   ScenaPlayer.prototype.applyReaderUi = function () {
-    if (!this.frameEl) return;
-    var ui = ScenaStore.resolveReaderUi(this.series);
-    var parts = String("16:9").split(":");
-    var aw = parseInt(parts[0], 10) || 16;
-    var ah = parseInt(parts[1], 10) || 9;
-    var el = this.frameEl;
-    el.style.setProperty("--preview-aspect-w", String(aw));
-    el.style.setProperty("--preview-aspect-h", String(ah));
-    if (this.series && this.series.readerUi) this.series.readerUi.aspectRatio = "16:9";
-    el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
-    el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
-    el.style.setProperty("--ui-accent", ui.colors.accent);
-    el.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
-    el.style.setProperty("--ui-choice-text", ui.colors.choiceText);
-    el.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
-    el.style.setProperty("--ui-speaker", ui.colors.speaker);
-    el.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
-    el.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
-    el.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
-    el.className = "preview-frame player-frame preview-ui--" + ui.preset +
-      " preview-shape-dialogue--" + ui.shapes.dialogue +
-      " preview-shape-choice--" + ui.shapes.choice;
-    if (ui.customSprites.dialogueBox) {
-      el.style.setProperty("--ui-dialogue-sprite", "url(" + ui.customSprites.dialogueBox + ")");
-      el.dataset.customDialogue = "1";
-    } else {
-      el.style.removeProperty("--ui-dialogue-sprite");
-      delete el.dataset.customDialogue;
+    if (!this.frameEl || !window.ScenaStore || !ScenaStore.applyReaderUiToFrame) return;
+    var self = this;
+    ScenaStore.applyReaderUiToFrame(this.frameEl, this.series, {
+      onApplied: function () {
+        self.initReaderMenu();
+        if (self.readerMenu) {
+          self.readerMenu.mount();
+          self.readerMenu.sync();
+        }
+        self.bindReaderPlayfieldFit();
+      },
+    });
+  };
+
+  ScenaPlayer.prototype.bindReaderPlayfieldFit = function () {
+    if (!window.ScenaStore || !ScenaStore.bindPlayfieldFit) return;
+    var story = this.storyEl;
+    if (!story) return;
+    var inner = story.querySelector(".player-story-inner");
+    if (!inner) return;
+    if (this._playfieldFitObserver) {
+      try { this._playfieldFitObserver.disconnect(); } catch (e) { /* ignore */ }
+      this._playfieldFitObserver = null;
     }
-    if (ui.customSprites.choiceButton) {
-      el.style.setProperty("--ui-choice-sprite", "url(" + ui.customSprites.choiceButton + ")");
-      el.dataset.customChoice = "1";
-    } else {
-      el.style.removeProperty("--ui-choice-sprite");
-      delete el.dataset.customChoice;
-    }
-    var layout = ui.layout || {};
-    var dlg = layout.dialogue || { x: 4, y: 68, w: 92 };
-    var ch = layout.choices || { x: 52, y: 28, w: 42 };
-    var name = layout.nameplate || { x: 6, y: 62 };
-    el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
-    el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
-    el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
-    el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
-    el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
-    el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
-    el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
-    el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
-    var menuPos = layout.menu || { x: 92, y: 4 };
-    el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
-    el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
-    el.style.setProperty("--ui-layout-menu-right", "auto");
-    var menuCfg = ui.menu || {};
-    var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
-    el.style.setProperty("--ui-menu-panel-w", panelW + "%");
-    if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
-    if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
-    var accent = String(ui.colors.accent || "#2a9d8f");
-    var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-    if (rgb) {
-      el.style.setProperty("--ui-accent-rgb",
-        parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
-    }
-    el.classList.add("preview-frame--laid-out");
-    this.initReaderMenu();
-    if (this.readerMenu) {
-      this.readerMenu.mount();
-      this.readerMenu.sync();
-    }
+    var aw = parseInt(this.frameEl && this.frameEl.dataset.playfieldAw, 10) || 16;
+    var ah = parseInt(this.frameEl && this.frameEl.dataset.playfieldAh, 10) || 9;
+    inner.dataset.playfieldAw = String(aw);
+    inner.dataset.playfieldAh = String(ah);
+    var scale = parseFloat(this.frameEl && this.frameEl.style.getPropertyValue("--ui-dialogue-scale")) || 1;
+    inner.style.setProperty("--ui-dialogue-scale", String(scale));
+    this._playfieldFitObserver = ScenaStore.bindPlayfieldFit(inner, story, { pad: 8, aspectW: aw, aspectH: ah });
   };
 
   ScenaPlayer.prototype.ensureShell = function () {
@@ -1149,12 +1117,15 @@
       this.appendDialogueLog(speaker, dialogueText);
     }
 
+    var nameplateHtml = speaker !== "Narration"
+      ? '<strong class="preview-nameplate preview-speaker">' + escapeHtml(speaker) + '</strong>'
+      : "";
     var dialogueHtml = "";
     if (ScenaStore.hasChoices(node)) {
       var visibleChoices = ScenaStore.filterVisibleChoices(node, this.playMetrics || {}, this.choicesMade || [], this.playKeyItems || {});
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue player-dialogue">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           (dialogueText ? '<p class="player-dialogue-text">' + escapeHtml(dialogueText) + '</p>' : "") +
         '</div>' +
         '<div class="preview-dialogue preview-dialogue--choices player-choices">' +
@@ -1170,8 +1141,8 @@
         ? '<p class="preview-continue-hint player-tap-hint">Tap to continue</p>'
         : '<p class="preview-continue-hint player-tap-hint">Tap to finish</p>';
       dialogueHtml =
+        nameplateHtml +
         '<div class="preview-dialogue player-dialogue is-clickable">' +
-          (speaker !== "Narration" ? '<strong class="preview-speaker">' + escapeHtml(speaker) + '</strong>' : "") +
           '<p class="player-dialogue-text">' + escapeHtml(dialogueText || "…") + '</p>' +
           continueHint +
         '</div>';
@@ -1180,9 +1151,71 @@
     this.frozenBeatHtml = stageHtml + dialogueHtml;
     this.storyEl.className = this.readingStoryClassName();
     this.storyEl.innerHTML = '<div class="player-story-inner">' + this.frozenBeatHtml + "</div>";
+    if (this.readerMenu && this.readerMenu.attachToPlayfield) this.readerMenu.attachToPlayfield();
+    this.bindReaderPlayfieldFit();
+    this.applyTypingEffect();
     this.refreshCommentsUI();
     if (canParallax && this.parallaxEnabled) this.bindParallax();
     this.bindInput(node);
+  };
+
+  ScenaPlayer.prototype.applyTypingEffect = function () {
+    if (!this.storyEl) return;
+    if (this.typingTimer) {
+      clearInterval(this.typingTimer);
+      this.typingTimer = null;
+    }
+    var ui = ScenaStore.resolveReaderUi(this.series);
+    var typing = (ui && ui.typing) || { enabled: true, speed: 28, sound: true };
+    if (!typing.enabled) return;
+    var speed = Math.max(8, Math.min(80, parseInt(typing.speed, 10) || 28));
+    var textEls = this.storyEl.querySelectorAll(".player-dialogue-text");
+    if (!textEls.length) return;
+    var jobs = [];
+    textEls.forEach(function (el) {
+      var full = el.textContent || "";
+      el.textContent = "";
+      jobs.push({ el: el, full: full, i: 0 });
+    });
+    var self = this;
+    var tickMs = Math.max(12, Math.round(1000 / speed));
+    this.typingTimer = setInterval(function () {
+      var done = true;
+      jobs.forEach(function (job) {
+        if (job.i < job.full.length) {
+          done = false;
+          job.i += 1;
+          job.el.textContent = job.full.slice(0, job.i);
+        }
+      });
+      if (typing.sound && !done) self.playTypingTick();
+      if (done) {
+        clearInterval(self.typingTimer);
+        self.typingTimer = null;
+      }
+    }, tickMs);
+  };
+
+  ScenaPlayer.prototype.playTypingTick = function () {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      if (!this.typingAudioCtx) this.typingAudioCtx = new Ctx();
+      var ac = this.typingAudioCtx;
+      var osc = ac.createOscillator();
+      var gain = ac.createGain();
+      osc.type = "square";
+      osc.frequency.value = 1500 + Math.random() * 1300;
+      gain.gain.setValueAtTime(0.0001, ac.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.018, ac.currentTime + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.02);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + 0.022);
+    } catch (e) {
+      /* ignore */
+    }
   };
 
   ScenaPlayer.prototype.bindInput = function (node) {

@@ -827,13 +827,37 @@
       colors: {},
       sizes: { dialogueScale: 1, choiceScale: 1, cornerRadius: 6 },
       shapes: { dialogue: "bar", choice: "rounded" },
-      customSprites: { dialogueBox: null, choiceButton: null },
+      customSprites: {
+        dialogueBox: null,
+        choiceButton: null,
+        nameplate: null,
+        menuButton: null,
+        menuPanel: null,
+        inventoryItem: null,
+        audioSlide: null,
+      },
+      appearance: {
+        dialogue: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        choices: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        nameplate: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        menu: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        menuPanel: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        transcript: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        inventory: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "" },
+        inventoryItem: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "#2a2a2a" },
+        audio: { opacity: 100, smooth: false, borderWidth: 0, borderColor: "#ffffff", glowSize: 0, glowColor: "#2a9d8f", fontSize: 100, bestFit: true, fontFamily: "", fontColor: "", bgColor: "#333333", fillColor: "#2a9d8f" },
+      },
+      typing: { enabled: true, speed: 28, sound: true },
       sounds: { clickAssetId: null },
       layout: {
-        dialogue: { x: 4, y: 68, w: 92 },
-        nameplate: { x: 6, y: 62 },
-        choices: { x: 52, y: 28, w: 42 },
+        dialogue: { x: 4, y: 68, w: 92, h: 24 },
+        nameplate: { x: 6, y: 62, w: 28 },
+        choices: { x: 52, y: 28, w: 42, h: 40 },
         menu: { x: 92, y: 4 },
+        menuPanel: { x: 58, y: 0, w: 42, h: 100 },
+        transcript: { x: 4, y: 18, w: 92, h: 78 },
+        inventory: { x: 4, y: 18, w: 92, h: 78 },
+        audio: { x: 4, y: 18, w: 92, h: 78 },
       },
       menu: {
         enabled: true,
@@ -841,11 +865,20 @@
         showInventory: true,
         showAudioSettings: true,
         inventoryDisplay: "grid",
+        inventoryIconPosition: "left",
+        inventoryListWidth: 100,
+        inventoryListHeight: 100,
         showInventoryHud: false,
         panelSide: "right",
         panelWidth: 42,
         panelBg: "#12100e",
         panelText: "#f5f0e6",
+        transcriptBg: "#1a1816",
+        transcriptText: "#f5f0e6",
+        inventoryBg: "#1a1816",
+        inventoryText: "#f5f0e6",
+        audioBg: "#1a1816",
+        audioText: "#f5f0e6",
       },
     };
   }
@@ -2299,15 +2332,237 @@
         sizes: Object.assign({}, base.sizes, saved.sizes || {}),
         shapes: Object.assign({}, preset.shapes, saved.shapes || {}),
         customSprites: Object.assign({}, base.customSprites, saved.customSprites || {}),
+        appearance: {
+          dialogue: Object.assign({}, base.appearance.dialogue, (saved.appearance && saved.appearance.dialogue) || {}),
+          choices: Object.assign({}, base.appearance.choices, (saved.appearance && saved.appearance.choices) || {}),
+          nameplate: Object.assign({}, base.appearance.nameplate, (saved.appearance && saved.appearance.nameplate) || {}),
+          menu: Object.assign({}, base.appearance.menu, (saved.appearance && saved.appearance.menu) || {}),
+          menuPanel: Object.assign({}, base.appearance.menuPanel, (saved.appearance && saved.appearance.menuPanel) || {}),
+          transcript: Object.assign({}, base.appearance.transcript, (saved.appearance && saved.appearance.transcript) || {}),
+          inventory: Object.assign({}, base.appearance.inventory, (saved.appearance && saved.appearance.inventory) || {}),
+          inventoryItem: Object.assign({}, base.appearance.inventoryItem, (saved.appearance && saved.appearance.inventoryItem) || {}),
+          audio: Object.assign({}, base.appearance.audio, (saved.appearance && saved.appearance.audio) || {}),
+        },
+        typing: Object.assign({}, base.typing, saved.typing || {}),
         sounds: Object.assign({}, base.sounds, saved.sounds || {}),
         layout: {
           dialogue: Object.assign({}, base.layout.dialogue, (saved.layout && saved.layout.dialogue) || {}),
           nameplate: Object.assign({}, base.layout.nameplate, (saved.layout && saved.layout.nameplate) || {}),
           choices: Object.assign({}, base.layout.choices, (saved.layout && saved.layout.choices) || {}),
           menu: Object.assign({}, base.layout.menu, (saved.layout && saved.layout.menu) || {}),
+          menuPanel: Object.assign({}, base.layout.menuPanel || { x: 58, y: 0, w: 42, h: 100 }, (saved.layout && saved.layout.menuPanel) || {}),
+          transcript: Object.assign({}, base.layout.transcript, (saved.layout && saved.layout.transcript) || {}),
+          inventory: Object.assign({}, base.layout.inventory, (saved.layout && saved.layout.inventory) || {}),
+          audio: Object.assign({}, base.layout.audio, (saved.layout && saved.layout.audio) || {}),
         },
         menu: Object.assign({}, base.menu, saved.menu || {}),
       };
+    },
+
+    applyReaderUiToFrame: function (frameEl, series, opts) {
+      opts = opts || {};
+      if (!frameEl || !series) return null;
+      this.ensureReaderUi(series);
+      var ui = this.resolveReaderUi(series);
+      var el = frameEl;
+      var parts = String(ui.aspectRatio || "16:9").split(":");
+      var aw = parseInt(parts[0], 10) || 16;
+      var ah = parseInt(parts[1], 10) || 9;
+      el.style.setProperty("--preview-aspect-w", String(aw));
+      el.style.setProperty("--preview-aspect-h", String(ah));
+      if (series.readerUi) series.readerUi.aspectRatio = "16:9";
+      el.dataset.playfieldAw = String(aw);
+      el.dataset.playfieldAh = String(ah);
+      el.style.setProperty("--ui-dialogue-bg", ui.colors.dialogueBg);
+      el.style.setProperty("--ui-dialogue-text", ui.colors.dialogueText);
+      el.style.setProperty("--ui-accent", ui.colors.accent);
+      el.style.setProperty("--ui-choice-bg", ui.colors.choiceBg);
+      el.style.setProperty("--ui-choice-text", ui.colors.choiceText);
+      el.style.setProperty("--ui-choice-border", ui.colors.choiceBorder);
+      el.style.setProperty("--ui-speaker", ui.colors.speaker);
+      el.style.setProperty("--ui-dialogue-scale", String(ui.sizes.dialogueScale || 1));
+      el.style.setProperty("--ui-choice-scale", String(ui.sizes.choiceScale || 1));
+      el.style.setProperty("--ui-corner-radius", String(ui.sizes.cornerRadius || 6) + "px");
+      var extraClass = opts.extraClass || "";
+      el.className = "preview-frame player-frame preview-ui--" + ui.preset +
+        " preview-shape-dialogue--" + ui.shapes.dialogue +
+        " preview-shape-choice--" + ui.shapes.choice +
+        (extraClass ? " " + extraClass : "");
+      var appearance = ui.appearance || {};
+      [
+        ["dialogue", "dialogue"],
+        ["choices", "choices"],
+        ["nameplate", "nameplate"],
+        ["menu", "menu"],
+        ["menuPanel", "menupanel"],
+        ["transcript", "transcript"],
+        ["inventory", "inventory"],
+        ["inventoryItem", "inventoryitem"],
+        ["audio", "audio"],
+      ].forEach(function (pair) {
+        var key = pair[0];
+        var css = pair[1];
+        var ap = appearance[key] || {};
+        el.style.setProperty("--ui-" + css + "-opacity", ((ap.opacity == null ? 100 : ap.opacity) / 100).toFixed(3));
+        el.style.setProperty("--ui-" + css + "-border-width", (ap.borderWidth || 0) + "px");
+        el.style.setProperty("--ui-" + css + "-border-color", ap.borderColor || "#ffffff");
+        el.style.setProperty("--ui-" + css + "-glow-size", (ap.glowSize || 0) + "px");
+        el.style.setProperty("--ui-" + css + "-glow-color", ap.glowColor || "#2a9d8f");
+        el.style.setProperty("--ui-" + css + "-font-size", (ap.fontSize || 100) + "%");
+        if (ap.bgColor) el.style.setProperty("--ui-" + css + "-bg", ap.bgColor);
+        else el.style.removeProperty("--ui-" + css + "-bg");
+        if (ap.fillColor) el.style.setProperty("--ui-" + css + "-fill", ap.fillColor);
+        else el.style.removeProperty("--ui-" + css + "-fill");
+        if (ap.fontFamily) el.style.setProperty("--ui-" + css + "-font-family", ap.fontFamily);
+        else el.style.removeProperty("--ui-" + css + "-font-family");
+        if (ap.fontColor) el.style.setProperty("--ui-" + css + "-font-color", ap.fontColor);
+        else el.style.removeProperty("--ui-" + css + "-font-color");
+        el.dataset["smooth" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.smooth ? "1" : "0";
+        el.dataset["bestfit" + key.charAt(0).toUpperCase() + key.slice(1)] = ap.bestFit === false ? "0" : "1";
+      });
+      var sprites = ui.customSprites || {};
+      if (sprites.dialogueBox) {
+        el.style.setProperty("--ui-dialogue-sprite", "url(" + sprites.dialogueBox + ")");
+        el.dataset.customDialogue = "1";
+      } else {
+        el.style.removeProperty("--ui-dialogue-sprite");
+        delete el.dataset.customDialogue;
+      }
+      if (sprites.choiceButton) {
+        el.style.setProperty("--ui-choice-sprite", "url(" + sprites.choiceButton + ")");
+        el.dataset.customChoice = "1";
+      } else {
+        el.style.removeProperty("--ui-choice-sprite");
+        delete el.dataset.customChoice;
+      }
+      if (sprites.nameplate) el.style.setProperty("--ui-nameplate-sprite", "url(" + sprites.nameplate + ")");
+      else el.style.removeProperty("--ui-nameplate-sprite");
+      if (sprites.menuButton) el.style.setProperty("--ui-menu-button-sprite", "url(" + sprites.menuButton + ")");
+      else el.style.removeProperty("--ui-menu-button-sprite");
+      if (sprites.menuPanel) el.style.setProperty("--ui-menu-panel-sprite", "url(" + sprites.menuPanel + ")");
+      else el.style.removeProperty("--ui-menu-panel-sprite");
+      if (sprites.inventoryItem) el.style.setProperty("--ui-inventory-item-sprite", "url(" + sprites.inventoryItem + ")");
+      else el.style.removeProperty("--ui-inventory-item-sprite");
+      if (sprites.audioSlide) el.style.setProperty("--ui-audio-slide-sprite", "url(" + sprites.audioSlide + ")");
+      else el.style.removeProperty("--ui-audio-slide-sprite");
+      var layout = ui.layout || {};
+      var dlg = layout.dialogue || { x: 4, y: 68, w: 92, h: 24 };
+      var ch = layout.choices || { x: 52, y: 28, w: 42, h: 40 };
+      var name = layout.nameplate || { x: 6, y: 62, w: 28 };
+      el.style.setProperty("--ui-layout-dialogue-x", dlg.x + "%");
+      el.style.setProperty("--ui-layout-dialogue-y", dlg.y + "%");
+      el.style.setProperty("--ui-layout-dialogue-w", dlg.w + "%");
+      el.style.setProperty("--ui-layout-dialogue-h", (dlg.h != null ? dlg.h : 24) + "%");
+      el.style.setProperty("--ui-layout-choices-x", ch.x + "%");
+      el.style.setProperty("--ui-layout-choices-y", ch.y + "%");
+      el.style.setProperty("--ui-layout-choices-w", ch.w + "%");
+      el.style.setProperty("--ui-layout-choices-h", (ch.h != null ? ch.h : 40) + "%");
+      el.style.setProperty("--ui-layout-nameplate-x", name.x + "%");
+      el.style.setProperty("--ui-layout-nameplate-y", name.y + "%");
+      el.style.setProperty("--ui-layout-nameplate-w", (name.w != null ? name.w : 28) + "%");
+      var menuPos = layout.menu || { x: 92, y: 4 };
+      el.style.setProperty("--ui-layout-menu-x", (menuPos.x != null ? menuPos.x : 92) + "%");
+      el.style.setProperty("--ui-layout-menu-y", (menuPos.y != null ? menuPos.y : 4) + "%");
+      el.style.setProperty("--ui-layout-menu-right", "auto");
+      var menuCfg = ui.menu || {};
+      var mp = layout.menuPanel || null;
+      if (mp) {
+        el.style.setProperty("--ui-layout-menupanel-x", (mp.x != null ? mp.x : 58) + "%");
+        el.style.setProperty("--ui-layout-menupanel-y", (mp.y != null ? mp.y : 0) + "%");
+        el.style.setProperty("--ui-layout-menupanel-w", (mp.w != null ? mp.w : 42) + "%");
+        el.style.setProperty("--ui-layout-menupanel-h", (mp.h != null ? mp.h : 100) + "%");
+        el.classList.add("player-frame--menu-laid-out");
+        el.style.setProperty("--ui-menu-panel-w", (mp.w != null ? mp.w : 42) + "%");
+      } else {
+        var panelW = Math.max(28, Math.min(70, parseInt(menuCfg.panelWidth, 10) || 42));
+        el.style.setProperty("--ui-menu-panel-w", panelW + "%");
+        el.classList.remove("player-frame--menu-laid-out");
+      }
+      if (menuCfg.panelBg) el.style.setProperty("--ui-menu-panel-bg", menuCfg.panelBg);
+      if (menuCfg.panelText) el.style.setProperty("--ui-menu-panel-text", menuCfg.panelText);
+      if (menuCfg.transcriptBg) el.style.setProperty("--ui-transcript-bg", menuCfg.transcriptBg);
+      if (menuCfg.transcriptText) el.style.setProperty("--ui-transcript-text", menuCfg.transcriptText);
+      if (menuCfg.inventoryBg) el.style.setProperty("--ui-inventory-bg", menuCfg.inventoryBg);
+      if (menuCfg.inventoryText) el.style.setProperty("--ui-inventory-text", menuCfg.inventoryText);
+      if (menuCfg.audioBg) el.style.setProperty("--ui-audio-pane-bg", menuCfg.audioBg);
+      if (menuCfg.audioText) el.style.setProperty("--ui-audio-text", menuCfg.audioText);
+      el.style.setProperty("--ui-inventory-list-w", ((menuCfg.inventoryListWidth != null ? menuCfg.inventoryListWidth : 100)) + "%");
+      el.style.setProperty("--ui-inventory-list-h", ((menuCfg.inventoryListHeight != null ? menuCfg.inventoryListHeight : 100)) + "%");
+      el.dataset.inventoryDisplay = menuCfg.inventoryDisplay || "grid";
+      el.dataset.inventoryIconPosition = menuCfg.inventoryIconPosition || "left";
+      var accent = String(ui.colors.accent || "#2a9d8f");
+      var rgb = accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+      if (rgb) {
+        el.style.setProperty("--ui-accent-rgb",
+          parseInt(rgb[1], 16) + ", " + parseInt(rgb[2], 16) + ", " + parseInt(rgb[3], 16));
+      }
+      el.classList.add("preview-frame--laid-out");
+      if (typeof opts.onApplied === "function") opts.onApplied(ui);
+      return ui;
+    },
+
+    /**
+     * Letterbox el into viewport at a fixed aspect (default 16:9 / 1920×1080).
+     * Sets exact pixel size so UI % and stage art never warp when the pane resizes.
+     * Root font tracks playfield width so dialogue/nameplate scale with the stage.
+     */
+    fitPlayfield: function (el, viewportEl, opts) {
+      opts = opts || {};
+      if (!el || !viewportEl) return null;
+      var aw = opts.aspectW || parseInt(el.dataset.playfieldAw, 10) || 16;
+      var ah = opts.aspectH || parseInt(el.dataset.playfieldAh, 10) || 9;
+      var pad = opts.pad != null ? opts.pad : 0;
+      var pw = Math.max(0, viewportEl.clientWidth - pad * 2);
+      var ph = Math.max(0, viewportEl.clientHeight - pad * 2);
+      if (pw < 2 || ph < 2) return null;
+      var scale = Math.min(pw / aw, ph / ah);
+      var w = Math.max(1, Math.floor(aw * scale));
+      var h = Math.max(1, Math.floor(ah * scale));
+      var dialogueScale = parseFloat(getComputedStyle(el).getPropertyValue("--ui-dialogue-scale")) || 1;
+      if (!isFinite(dialogueScale) || dialogueScale <= 0) dialogueScale = 1;
+      /* Design root: 18px at 1920-wide playfield — scales linearly with width. */
+      var designW = 1920;
+      var rootPx = 18 * (w / designW) * dialogueScale;
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+      el.style.maxWidth = "none";
+      el.style.maxHeight = "none";
+      el.style.aspectRatio = "unset";
+      el.style.flex = "0 0 auto";
+      el.style.setProperty("--playfield-font", rootPx.toFixed(3) + "px");
+      el.style.setProperty("--playfield-scale", (w / designW).toFixed(5));
+      el.style.fontSize = rootPx.toFixed(3) + "px";
+      el.classList.add("preview-frame--fitted");
+      el.dataset.playfieldW = String(w);
+      el.dataset.playfieldH = String(h);
+      return { width: w, height: h, scale: scale, fontSize: rootPx };
+    },
+
+    bindPlayfieldFit: function (el, viewportEl, opts) {
+      opts = opts || {};
+      if (!el || !viewportEl || typeof ResizeObserver === "undefined") {
+        if (el && viewportEl) this.fitPlayfield(el, viewportEl, opts);
+        return null;
+      }
+      var self = this;
+      if (el._scenaFitObserver) {
+        try { el._scenaFitObserver.disconnect(); } catch (e) { /* ignore */ }
+        el._scenaFitObserver = null;
+      }
+      var pending = null;
+      var run = function () {
+        pending = null;
+        self.fitPlayfield(el, viewportEl, opts);
+      };
+      var schedule = function () {
+        if (pending) return;
+        pending = requestAnimationFrame(run);
+      };
+      var ro = new ResizeObserver(schedule);
+      ro.observe(viewportEl);
+      el._scenaFitObserver = ro;
+      run();
+      return ro;
     },
 
     resolveReaderMenu: function (series) {
@@ -2324,6 +2579,18 @@
         series.readerUi.sizes = Object.assign(defaultReaderUi().sizes, series.readerUi.sizes || {});
         series.readerUi.shapes = Object.assign(defaultReaderUi().shapes, series.readerUi.shapes || {});
         series.readerUi.customSprites = Object.assign(defaultReaderUi().customSprites, series.readerUi.customSprites || {});
+        series.readerUi.appearance = {
+          dialogue: Object.assign({}, defaultReaderUi().appearance.dialogue, (series.readerUi.appearance && series.readerUi.appearance.dialogue) || {}),
+          choices: Object.assign({}, defaultReaderUi().appearance.choices, (series.readerUi.appearance && series.readerUi.appearance.choices) || {}),
+          nameplate: Object.assign({}, defaultReaderUi().appearance.nameplate, (series.readerUi.appearance && series.readerUi.appearance.nameplate) || {}),
+          menu: Object.assign({}, defaultReaderUi().appearance.menu, (series.readerUi.appearance && series.readerUi.appearance.menu) || {}),
+          menuPanel: Object.assign({}, defaultReaderUi().appearance.menuPanel, (series.readerUi.appearance && series.readerUi.appearance.menuPanel) || {}),
+          transcript: Object.assign({}, defaultReaderUi().appearance.transcript, (series.readerUi.appearance && series.readerUi.appearance.transcript) || {}),
+          inventory: Object.assign({}, defaultReaderUi().appearance.inventory, (series.readerUi.appearance && series.readerUi.appearance.inventory) || {}),
+          inventoryItem: Object.assign({}, defaultReaderUi().appearance.inventoryItem, (series.readerUi.appearance && series.readerUi.appearance.inventoryItem) || {}),
+          audio: Object.assign({}, defaultReaderUi().appearance.audio, (series.readerUi.appearance && series.readerUi.appearance.audio) || {}),
+        };
+        series.readerUi.typing = Object.assign(defaultReaderUi().typing, series.readerUi.typing || {});
         series.readerUi.sounds = Object.assign(defaultReaderUi().sounds, series.readerUi.sounds || {});
         series.readerUi.menu = Object.assign(defaultReaderUi().menu, series.readerUi.menu || {});
         series.readerUi.layout = {
@@ -2331,6 +2598,17 @@
           nameplate: Object.assign({}, defaultReaderUi().layout.nameplate, (series.readerUi.layout && series.readerUi.layout.nameplate) || {}),
           choices: Object.assign({}, defaultReaderUi().layout.choices, (series.readerUi.layout && series.readerUi.layout.choices) || {}),
           menu: Object.assign({}, defaultReaderUi().layout.menu, (series.readerUi.layout && series.readerUi.layout.menu) || {}),
+          menuPanel: (function () {
+            var savedMp = series.readerUi.layout && series.readerUi.layout.menuPanel;
+            if (savedMp) return Object.assign({}, defaultReaderUi().layout.menuPanel, savedMp);
+            var menu = series.readerUi.menu || {};
+            var pw = Math.max(28, Math.min(70, parseInt(menu.panelWidth, 10) || 42));
+            if (menu.panelSide === "left") return { x: 0, y: 0, w: pw, h: 100 };
+            return { x: Math.max(0, 100 - pw), y: 0, w: pw, h: 100 };
+          })(),
+          transcript: Object.assign({}, defaultReaderUi().layout.transcript, (series.readerUi.layout && series.readerUi.layout.transcript) || {}),
+          inventory: Object.assign({}, defaultReaderUi().layout.inventory, (series.readerUi.layout && series.readerUi.layout.inventory) || {}),
+          audio: Object.assign({}, defaultReaderUi().layout.audio, (series.readerUi.layout && series.readerUi.layout.audio) || {}),
         };
       }
       series.readerUi.aspectRatio = "16:9";

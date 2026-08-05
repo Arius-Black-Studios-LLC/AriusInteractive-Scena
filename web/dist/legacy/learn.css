@@ -293,7 +293,7 @@
   bottom: 0;
   width: min(var(--learn-sidebar-w), 92vw);
   max-width: 340px;
-  padding: 24px 20px;
+  padding: 20px 20px 24px;
   border-right: 1px solid var(--scena-border);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -301,6 +301,81 @@
   background: var(--scena-surface);
   box-shadow: 8px 0 32px rgba(0, 0, 0, 0.12);
   pointer-events: auto;
+  transform: translateX(0);
+  opacity: 1;
+  transition: transform 0.22s ease, opacity 0.18s ease, visibility 0.22s;
+  visibility: visible;
+}
+
+.learn-lesson-layout.is-guide-hidden .learn-instructions {
+  transform: translateX(calc(-100% - 12px));
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.learn-guide-chrome {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.learn-guide-chrome h1 {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.learn-guide-hide {
+  flex-shrink: 0;
+  margin: 2px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--scena-border);
+  border-radius: var(--radius);
+  background: var(--scena-bg);
+  color: var(--scena-text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.learn-guide-hide:hover {
+  color: var(--scena-text);
+  border-color: var(--scena-accent);
+}
+
+.learn-guide-show {
+  position: absolute;
+  z-index: calc(var(--learn-guide-z) + 1);
+  top: 72px;
+  left: 0;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--scena-border);
+  border-left: none;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--scena-surface);
+  box-shadow: 4px 4px 20px rgba(0, 0, 0, 0.12);
+  color: var(--scena-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.learn-lesson-layout.is-guide-hidden .learn-guide-show {
+  display: inline-flex;
+}
+
+.learn-guide-show:hover {
+  color: var(--scena-accent);
 }
 
 .learn-instructions h1 {
@@ -376,27 +451,33 @@
   height: 100%;
 }
 
-/* Match real studio graph layout: wide center + inspector on the right */
-.learn-sandbox-wrap .workspace-editor--learn .workspace-panels--learn {
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+/* Tutorials use the real Studio binder shell: preview / graph / Assets·Details·Blocks */
+.learn-sandbox-wrap .workspace-panels--binder {
+  grid-template-columns: minmax(0, 1fr);
+  position: relative;
   min-width: 0;
   min-height: 0;
 }
 
-.learn-sandbox-wrap .workspace-editor--learn .panel-left {
-  grid-column: 2;
-  grid-row: 1;
-  min-width: 0;
-  max-width: 100%;
-  border-right: none;
-  border-left: 1px solid var(--scena-border);
-}
-
-.learn-sandbox-wrap .workspace-editor--learn .panel-center {
-  grid-column: 1;
-  grid-row: 1;
+.learn-sandbox-wrap .panel-center {
+  display: grid;
+  grid-template-rows: calc(var(--preview-ratio, 0.42) * 100%) 6px 1fr;
   min-height: 0;
   min-width: 0;
+}
+
+.learn-sandbox-wrap .center-preview {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.learn-sandbox-wrap .center-graph {
+  min-height: 0;
+  min-width: 0;
+}
+
+.learn-sandbox-wrap .workspace-binder {
+  z-index: 40;
 }
 
 .learn-sandbox-wrap .graph-inspector {
@@ -406,7 +487,7 @@
   max-width: 100%;
 }
 
-/* Choice "Show only when" — stack cleanly in the inspector column */
+/* Choice "Show only when" — stack cleanly in the Details binder */
 .learn-sandbox-wrap .graph-inspector .choice-row,
 .learn-sandbox-wrap .graph-inspector .choice-req-section,
 .learn-sandbox-wrap .graph-inspector .choice-req-stack,
@@ -502,61 +583,6 @@
   align-self: flex-end;
 }
 
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .workspace-panels--learn,
-.learn-sandbox-wrap .workspace-editor--learn-sound .workspace-panels--learn {
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px) minmax(280px, 340px);
-  grid-template-rows: minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-center,
-.learn-sandbox-wrap .workspace-editor--learn-sound .panel-center {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-right,
-.learn-sandbox-wrap .workspace-editor--learn-sound .panel-right {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-left,
-.learn-sandbox-wrap .workspace-editor--learn-sound .panel-left {
-  grid-column: 3;
-  grid-row: 1;
-  border-right: none;
-  border-left: 1px solid var(--scena-border);
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .workspace-resources--learn,
-.learn-sandbox-wrap .workspace-editor--learn-sound .workspace-resources--learn {
-  flex: unset;
-  width: auto;
-  border-left: none;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-sidepanel .resources-split,
-.learn-sandbox-wrap .workspace-editor--learn-sound .resources-split {
-  grid-template-columns: 120px 1fr;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn .panel-center--learn {
-  min-height: 0;
-  min-width: 0;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-play .panel-center--learn {
-  display: grid;
-  grid-template-rows: calc(var(--preview-ratio, 0.48) * 100%) 6px 1fr;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-play .center-preview--learn {
-  min-height: 0;
-  overflow: hidden;
-}
-
 .learn-graph-toolbar--play {
   display: flex;
   align-items: center;
@@ -564,20 +590,17 @@
   justify-content: flex-start;
 }
 
-.learn-graph-toolbar--play .graph-toolbar-center {
-  flex-shrink: 0;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn .center-graph--learn {
-  flex: 1;
-  min-height: 0;
+.learn-graph-toolbar--play .graph-toolbar-center,
+.learn-graph-toolbar--play .graph-toolbar-desktop {
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .learn-sandbox-wrap .learn-graph-toolbar {
-  justify-content: center;
+  justify-content: flex-start;
   padding: 8px 16px;
   background: var(--scena-surface);
   border-bottom: 1px solid var(--scena-border);
@@ -598,24 +621,7 @@
   50% { box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.9), 0 0 16px rgba(255, 140, 0, 0.55); }
 }
 
-.learn-sandbox-wrap .workspace-editor--learn-resources .workspace-panels--learn-resources {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.learn-sandbox-wrap .workspace-editor--learn-resources {
-  height: 100%;
-}
-
-.learn-sandbox-wrap .workspace-resources--learn {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  border-left: none;
-}
-
-.learn-sandbox-wrap .workspace-resources--learn .resources-split {
+.learn-sandbox-wrap .workspace-resources .resources-split {
   grid-template-columns: 140px 1fr;
 }
 
@@ -801,33 +807,17 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   }
 
-  .learn-sandbox-wrap .workspace-editor--learn-sidepanel .workspace-panels--learn,
-  .learn-sandbox-wrap .workspace-editor--learn-sound .workspace-panels--learn {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto auto;
+  .learn-lesson-layout.is-guide-hidden .learn-instructions {
+    transform: translateY(calc(-100% - 12px));
   }
 
-  .learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-center,
-  .learn-sandbox-wrap .workspace-editor--learn-sound .panel-center {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-right,
-  .learn-sandbox-wrap .workspace-editor--learn-sound .panel-right {
-    grid-column: 1;
-    grid-row: 2;
-    max-height: 240px;
-    border-left: none;
-    border-top: 1px solid var(--scena-border);
-  }
-
-  .learn-sandbox-wrap .workspace-editor--learn-sidepanel .panel-left,
-  .learn-sandbox-wrap .workspace-editor--learn-sound .panel-left {
-    grid-column: 1;
-    grid-row: 3;
-    max-height: min(44vh, 320px);
-    border-left: none;
-    border-top: 1px solid var(--scena-border);
+  .learn-guide-show {
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 1px solid var(--scena-border);
+    border-radius: 999px;
+    padding: 8px 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   }
 }

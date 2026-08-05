@@ -1,13 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DucatBalance } from "../components/DucatBalance";
 import { useLegacyBundle } from "../hooks/useLegacyBundle";
 import "./AccountPage.css";
 
 export function AccountPage() {
-  const { session, userId, loading: authLoading, signOut, isAdmin, profileLoading, refreshProfile } = useAuth();
+  const {
+    session,
+    userId,
+    loading: authLoading,
+    signOut,
+    updatePassword,
+    isAdmin,
+    profileLoading,
+    refreshProfile,
+  } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPasswordReset = searchParams.get("reset") === "1";
   const mainRef = useRef<HTMLElement>(null);
   const { ready, error } = useLegacyBundle("account", [
     "studio.css",
@@ -15,6 +26,9 @@ export function AccountPage() {
     "arleco-theme.css",
   ]);
   const [bootError, setBootError] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
   const [modNotices, setModNotices] = useState<
     Array<{ noticeId: string; title: string; reason: string; createdAt?: string; readAt?: string | null }>
   >([]);
@@ -91,6 +105,22 @@ export function AccountPage() {
       .catch(() => setBootError("Could not load profile."));
   }, [authLoading, userId, session, ready, navigate]);
 
+  async function handlePasswordUpdate(event: FormEvent) {
+    event.preventDefault();
+    setPasswordMessage("");
+    setPasswordBusy(true);
+    try {
+      await updatePassword(newPassword);
+      setPasswordMessage("Password updated. You can use it the next time you log in.");
+      setNewPassword("");
+      window.history.replaceState({}, document.title, "/account");
+    } catch (err) {
+      setPasswordMessage(err instanceof Error ? err.message : "Could not update password.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
   if (error || bootError) {
     return (
       <div className="account-loading">
@@ -141,6 +171,28 @@ export function AccountPage() {
         </div>
       </header>
       <div className="account-body">
+        {isPasswordReset ? (
+          <section className="account-mod-notices container">
+            <h2>Choose a new password</h2>
+            <form onSubmit={handlePasswordUpdate}>
+              <label className="field">
+                <span>New password</span>
+                <input
+                  type="password"
+                  minLength={8}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+              {passwordMessage ? <p className="field-hint">{passwordMessage}</p> : null}
+              <button className="btn btn-primary" type="submit" disabled={passwordBusy}>
+                {passwordBusy ? "Updating…" : "Update password"}
+              </button>
+            </form>
+          </section>
+        ) : null}
         {modNotices.length ? (
           <section className="account-mod-notices container">
             <h2>Moderation notices</h2>

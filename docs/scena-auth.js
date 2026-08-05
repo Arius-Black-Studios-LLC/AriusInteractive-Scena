@@ -1,5 +1,5 @@
 /**
- * Arleco — Supabase magic-link auth (browser)
+ * Arleco — Supabase password auth (browser)
  */
 (function () {
   var client = null;
@@ -34,8 +34,21 @@
 
   function redirectUrl() {
     var cfg = getConfig();
-    if (cfg.authRedirectUrl) return cfg.authRedirectUrl;
-    return window.location.origin + window.location.pathname;
+    var currentOrigin = window.location.origin;
+    var configured = String(cfg.authRedirectUrl || "").trim();
+    if (configured) {
+      try {
+        var parsed = new URL(configured, currentOrigin);
+        // Never send production users to a localhost or retired deployment URL.
+        if (
+          parsed.origin === currentOrigin &&
+          !/^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)
+        ) {
+          return parsed.origin + "/";
+        }
+      } catch (e) { /* use current origin */ }
+    }
+    return currentOrigin + "/";
   }
 
   function postLoginKey() {
@@ -61,7 +74,12 @@
 
   function cleanAuthUrl() {
     if (!window.history.replaceState) return;
-    window.history.replaceState({}, document.title, redirectUrl());
+    var isRecovery = new URLSearchParams(window.location.search).get("reset") === "1";
+    window.history.replaceState(
+      {},
+      document.title,
+      isRecovery ? "/account?reset=1" : window.location.pathname
+    );
   }
 
   function pageName() {
@@ -215,6 +233,76 @@
       }).then(function (result) {
         if (result.error) throw result.error;
         return result;
+      });
+    },
+
+    signInWithPassword: function (email, password) {
+      var sb = getClient();
+      if (!sb) {
+        return Promise.reject(new Error("Supabase is not configured."));
+      }
+      return sb.auth.signInWithPassword({
+        email: String(email || "").trim().toLowerCase(),
+        password: password,
+      }).then(function (result) {
+        if (result.error) throw result.error;
+        return result.data && result.data.session;
+      });
+    },
+
+    signUpWithPassword: function (email, password, username, role) {
+      var sb = getClient();
+      if (!sb) {
+        return Promise.reject(new Error("Supabase is not configured."));
+      }
+      var cleanUsername = String(username || "").trim();
+      return sb.auth.signUp({
+        email: String(email || "").trim().toLowerCase(),
+        password: password,
+        options: {
+          emailRedirectTo: redirectUrl(),
+          data: {
+            username: cleanUsername,
+            display_name: cleanUsername,
+            intended_role: role || "creator",
+          },
+        },
+      }).then(function (result) {
+        if (result.error) throw result.error;
+        var session = result.data && result.data.session;
+        var user = result.data && result.data.user;
+        if (!session || !user || !cleanUsername) return session;
+        return sb.from("profiles").update({
+          username: cleanUsername,
+          display_name: cleanUsername,
+          intended_role: role || "creator",
+        }).eq("id", user.id).then(function (profileResult) {
+          if (profileResult.error) throw profileResult.error;
+          return session;
+        });
+      });
+    },
+
+    resetPassword: function (email) {
+      var sb = getClient();
+      if (!sb) {
+        return Promise.reject(new Error("Supabase is not configured."));
+      }
+      return sb.auth.resetPasswordForEmail(
+        String(email || "").trim().toLowerCase(),
+        { redirectTo: window.location.origin + "/account?reset=1" }
+      ).then(function (result) {
+        if (result.error) throw result.error;
+      });
+    },
+
+    updatePassword: function (password) {
+      var sb = getClient();
+      if (!sb) {
+        return Promise.reject(new Error("Supabase is not configured."));
+      }
+      return sb.auth.updateUser({ password: password }).then(function (result) {
+        if (result.error) throw result.error;
       });
     },
 

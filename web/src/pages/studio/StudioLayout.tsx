@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { LoginModal } from "../../components/LoginModal";
+import { useAuth } from "../../context/AuthContext";
 import { StudioProvider, useStudioContext } from "../../context/StudioContext";
 import { StudioEpisodeModal, StudioToast } from "../../components/studio/StudioChrome";
 import { StudioTopbar } from "../../components/studio/StudioTopbar";
@@ -51,6 +53,54 @@ function StudioDesktopGate() {
   );
 }
 
+function StudioAuthGate() {
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
+
+  function open(mode: "login" | "signup") {
+    setAuthMode(mode);
+    setLoginOpen(true);
+  }
+
+  return (
+    <main className="studio-auth-gate">
+      <div className="studio-auth-network" aria-hidden="true">
+        <span className="studio-auth-line line-a" />
+        <span className="studio-auth-line line-b" />
+        <span className="studio-auth-line line-c" />
+        <span className="studio-auth-node node-a">Scene</span>
+        <span className="studio-auth-node node-b">Choice</span>
+        <span className="studio-auth-node node-c">Ending</span>
+        <span className="studio-auth-node node-d">Character</span>
+      </div>
+      <section className="studio-auth-card">
+        <p className="studio-desktop-gate-eyebrow">Arleco Creator Studio</p>
+        <h1>Connect every scene into a story worth exploring.</h1>
+        <p>
+          Build branching visual novels with a visual story graph, scene tools, previews,
+          publishing, and cloud saves.
+        </p>
+        <div className="studio-auth-actions">
+          <button className="btn btn-primary" type="button" onClick={() => open("signup")}>
+            Create a free account
+          </button>
+          <button className="btn btn-ghost" type="button" onClick={() => open("login")}>
+            Log in
+          </button>
+        </div>
+        <Link className="studio-auth-home-link" to="/">Explore Arleco first →</Link>
+      </section>
+      <LoginModal
+        key={authMode}
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        postLogin="/studio"
+        initialMode={authMode}
+      />
+    </main>
+  );
+}
+
 function StudioShell() {
   const { ready, error, bootError } = useStudioContext();
 
@@ -87,9 +137,18 @@ function StudioShell() {
 
 export function StudioLayout() {
   const desktopOk = useDesktopStudioOk();
+  const { userId, loading } = useAuth();
 
   if (!desktopOk) {
     return <StudioDesktopGate />;
+  }
+
+  if (loading) {
+    return <div className="studio-loading">Connecting to Creator Studio…</div>;
+  }
+
+  if (!userId) {
+    return <StudioAuthGate />;
   }
 
   return (

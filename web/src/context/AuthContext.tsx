@@ -18,6 +18,15 @@ type AuthContextValue = {
   isAdmin: boolean;
   configured: boolean;
   signIn: (email: string, role?: string, postLogin?: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  signUpWithPassword: (input: {
+    email: string;
+    password: string;
+    username: string;
+    role?: string;
+  }) => Promise<boolean>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -118,6 +127,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    await loadLegacyScripts(["scena-auth.js"]);
+    if (!window.ScenaAuth) throw new Error("Auth failed to load.");
+    const next = await window.ScenaAuth.signInWithPassword(email, password);
+    setSession(next);
+  }, []);
+
+  const signUpWithPassword = useCallback(
+    async (input: { email: string; password: string; username: string; role?: string }) => {
+      await loadLegacyScripts(["scena-auth.js"]);
+      if (!window.ScenaAuth) throw new Error("Auth failed to load.");
+      const next = await window.ScenaAuth.signUpWithPassword(
+        input.email,
+        input.password,
+        input.username,
+        input.role,
+      );
+      if (next) setSession(next);
+      return Boolean(next);
+    },
+    [],
+  );
+
+  const resetPassword = useCallback(async (email: string) => {
+    await loadLegacyScripts(["scena-auth.js"]);
+    if (!window.ScenaAuth) throw new Error("Auth failed to load.");
+    await window.ScenaAuth.resetPassword(email);
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    await loadLegacyScripts(["scena-auth.js"]);
+    if (!window.ScenaAuth) throw new Error("Auth failed to load.");
+    await window.ScenaAuth.updatePassword(password);
+  }, []);
+
   const signOut = useCallback(async () => {
     await loadLegacyScripts(["scena-auth.js"]);
     await window.ScenaAuth?.signOut();
@@ -134,11 +178,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       configured,
       signIn,
+      signInWithPassword,
+      signUpWithPassword,
+      resetPassword,
+      updatePassword,
       signOut,
       refresh,
       refreshProfile,
     }),
-    [session, loading, profileLoading, isAdmin, configured, signIn, signOut, refresh, refreshProfile],
+    [
+      session,
+      loading,
+      profileLoading,
+      isAdmin,
+      configured,
+      signIn,
+      signInWithPassword,
+      signUpWithPassword,
+      resetPassword,
+      updatePassword,
+      signOut,
+      refresh,
+      refreshProfile,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

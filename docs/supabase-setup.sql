@@ -36,11 +36,12 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, display_name, intended_role)
+  insert into public.profiles (id, email, display_name, username, intended_role)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+    nullif(trim(new.raw_user_meta_data->>'username'), ''),
     coalesce(new.raw_user_meta_data->>'intended_role', 'reader')
   )
   on conflict (id) do nothing;

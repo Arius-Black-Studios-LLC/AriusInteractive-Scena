@@ -763,7 +763,7 @@
 
         "<p>Before the curtain rises, every player is cast and costumed.</p>" +
 
-        "<ol><li>Click a <strong>Arleco mascot</strong> below — each one is a theater role with a transparent neutral sprite.</li>" +
+        "<ol><li>Open <strong>Assets → Characters</strong> on the right, then click an <strong>Arleco mascot</strong> — each one is a theater role with a transparent neutral sprite.</li>" +
 
         "<li>Select your character in the list — set <strong>Name</strong> and <strong>Color</strong> if you like.</li>" +
 
@@ -837,7 +837,7 @@
 
         "<p>From the Globe's heavens to modern scenic design, stories need a world behind the words.</p>" +
 
-        "<ol><li>Click <strong>Empty theater</strong> below to add three simple flats, <em>or</em> use <strong>+ Create</strong> and upload your own.</li>" +
+        "<ol><li>Open <strong>Assets → Stages</strong>, then click <strong>Empty theater</strong> to add three simple flats, <em>or</em> use <strong>+ Create</strong> and upload your own.</li>" +
 
         "<li>Select your stage and confirm <strong>Background</strong>, <strong>Middle</strong>, and <strong>Foreground</strong> layers.</li></ol>" +
 

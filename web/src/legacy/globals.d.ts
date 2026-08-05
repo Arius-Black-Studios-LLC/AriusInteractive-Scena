@@ -50,6 +50,15 @@ declare global {
       isConfigured: () => boolean;
       init: () => Promise<LegacySession>;
       signInWithEmail: (email: string, role?: string, path?: string) => Promise<void>;
+      signInWithPassword: (email: string, password: string) => Promise<LegacySession>;
+      signUpWithPassword: (
+        email: string,
+        password: string,
+        username: string,
+        role?: string,
+      ) => Promise<LegacySession>;
+      resetPassword: (email: string) => Promise<void>;
+      updatePassword: (password: string) => Promise<void>;
       signOut: () => Promise<void>;
       getClient: () => unknown;
       getSession?: () => Promise<LegacySession>;
