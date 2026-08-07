@@ -1,5 +1,34 @@
+import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import "./StaticPage.css";
+import "./ContactForm.css";
+
+const SUPPORT_EMAIL = "hello@ariusinteractive.com";
+const FORM_NAME = "contact-arleco";
+
+async function submitArlecoContact(fields: {
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
+}) {
+  const body = new URLSearchParams({
+    "form-name": FORM_NAME,
+    "bot-field": "",
+    brand: "[Arleco]",
+    subject: "[Arleco] Website contact",
+    name: fields.name.trim(),
+    email: fields.email.trim(),
+    topic: fields.topic.trim(),
+    message: fields.message.trim(),
+  });
+  const res = await fetch("/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) throw new Error("Could not send your message. Email us directly instead.");
+}
 
 type Block =
   | { type: "p"; text: string }
@@ -16,7 +45,7 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
         type: "ul",
         items: [
           "Browse Discover for live series — no account required to start reading.",
-          "Log in with a magic link to sync progress across devices.",
+          "Log in with username/password or a magic link to sync progress across devices.",
           "Use save files on a series page for separate playthroughs.",
         ],
       },
@@ -29,7 +58,10 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
           "Visit Tutorials for interactive lessons on branching stories.",
         ],
       },
-      { type: "p", text: "Need more help? Email hello@arleco.app or join our Discord community." },
+      {
+        type: "p",
+        text: `Need more help? Use the Contact page or email ${SUPPORT_EMAIL}.`,
+      },
     ],
   },
   about: {
@@ -41,15 +73,8 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
       },
       {
         type: "p",
-        text: "We are in early beta. The studio, reader, and creator tools are still evolving, but the stories are real and the creators are independent.",
+        text: "We are in early beta. The studio, reader, and creator tools are still evolving, but the stories are real and the creators are independent. Arleco is a product of Arius Interactive.",
       },
-    ],
-  },
-  contact: {
-    title: "Contact",
-    blocks: [
-      { type: "p", text: "Questions, partnerships, or press — reach us at hello@arleco.app." },
-      { type: "p", text: "For login issues, request a fresh magic link from the Discover page." },
     ],
   },
   privacy: {
@@ -59,7 +84,7 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
         type: "p",
         text: "We collect account email, optional profile fields, reading progress, and creator project data needed to run the service.",
       },
-      { type: "p", text: "We do not sell personal data. Contact hello@arleco.app for data requests." },
+      { type: "p", text: `We do not sell personal data. Contact ${SUPPORT_EMAIL} for data requests.` },
     ],
   },
   terms: {
@@ -76,12 +101,95 @@ const PAGES: Record<string, { title: string; blocks: Block[] }> = {
     title: "Content guidelines",
     blocks: [
       { type: "p", text: "All published stories must be primarily human-written and labeled appropriately for mature themes." },
-      { type: "p", text: "Questions before you publish? See Help or email hello@arleco.app." },
+      { type: "p", text: `Questions before you publish? See Help or email ${SUPPORT_EMAIL}.` },
     ],
   },
 };
 
-export function StaticPage({ page }: { page: keyof typeof PAGES }) {
+function ContactView() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [topic, setTopic] = useState("General");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      await submitArlecoContact({ name, email, topic, message });
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="static-main container">
+      <h1>Contact</h1>
+      <p>
+        Questions, partnerships, press, login help, or content reports — send a message or email{" "}
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+      </p>
+
+      {done ? (
+        <div className="contact-success">
+          <h2>Message sent</h2>
+          <p>Thanks — we&apos;ll reply to {email}.</p>
+        </div>
+      ) : (
+        <form className="contact-form" onSubmit={(e) => void onSubmit(e)}>
+          <label>
+            Your name
+            <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+          </label>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+          <label>
+            Topic
+            <select value={topic} onChange={(e) => setTopic(e.target.value)}>
+              <option>General</option>
+              <option>Reader help</option>
+              <option>Creator / studio</option>
+              <option>Account / login</option>
+              <option>Content report</option>
+              <option>Press / partnership</option>
+            </select>
+          </label>
+          <label>
+            Message
+            <textarea rows={6} value={message} onChange={(e) => setMessage(e.target.value)} required />
+          </label>
+          {error && <p className="contact-error">{error}</p>}
+          <button className="contact-submit" type="submit" disabled={busy}>
+            {busy ? "Sending…" : "Send message"}
+          </button>
+        </form>
+      )}
+
+      <p className="static-foot">
+        <Link to="/discover">Discover</Link> · <Link to="/help">Help</Link>
+      </p>
+    </main>
+  );
+}
+
+export function StaticPage({ page }: { page: string }) {
+  if (page === "contact") return <ContactView />;
+
   const content = PAGES[page];
   if (!content) {
     return (
@@ -94,22 +202,22 @@ export function StaticPage({ page }: { page: keyof typeof PAGES }) {
 
   return (
     <main className="static-main container">
-        <h1>{content.title}</h1>
-        {content.blocks.map((block, i) => {
-          if (block.type === "h2") return <h2 key={i}>{block.text}</h2>;
-          if (block.type === "ul") {
-            return (
-              <ul key={i}>
-                {block.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            );
-          }
-          return <p key={i}>{block.text}</p>;
-        })}
-        <p className="static-foot">
-          <Link to="/discover">Discover</Link> · <Link to="/help">Help</Link>
+      <h1>{content.title}</h1>
+      {content.blocks.map((block, i) => {
+        if (block.type === "h2") return <h2 key={i}>{block.text}</h2>;
+        if (block.type === "ul") {
+          return (
+            <ul key={i}>
+              {block.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          );
+        }
+        return <p key={i}>{block.text}</p>;
+      })}
+      <p className="static-foot">
+        <Link to="/discover">Discover</Link> · <Link to="/help">Help</Link> · <Link to="/contact">Contact</Link>
       </p>
     </main>
   );

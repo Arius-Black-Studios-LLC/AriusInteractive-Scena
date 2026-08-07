@@ -35,4 +35,4 @@ Git workflow, tagging, and branches: **`VERSIONING.md`**. Release notes: **`CHAN
 
 - In-app: `/help.html`
 - Discord: https://discord.gg/83V5SQAeez
-- Email: help@ariusinteractive.com
+- Email: hello@ariusinteractive.com

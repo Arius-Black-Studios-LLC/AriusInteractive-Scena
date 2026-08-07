@@ -1,0 +1,70 @@
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface, #fff) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted, #888) 25%, transparent);
+}
+
+.contact-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text, #222);
+}
+
+.contact-form input,
+.contact-form select,
+.contact-form textarea {
+  font: inherit;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--muted, #888) 35%, transparent);
+  background: #fff;
+  color: var(--text, #222);
+}
+
+.contact-submit {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent, #3d6b4f);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.contact-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.contact-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ffebee;
+  color: #b71c1c;
+  font-weight: 600;
+}
+
+.contact-success {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent, #3d6b4f) 12%, #fff);
+  border: 1px solid color-mix(in srgb, var(--accent, #3d6b4f) 35%, transparent);
+}
+
+.contact-success h2 {
+  margin-top: 0;
+}

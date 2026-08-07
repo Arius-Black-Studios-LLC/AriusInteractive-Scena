@@ -55,6 +55,7 @@ function ShellLayout() {
         <div className="container site-footer-inner">
           <span>Arleco · indie visual novels</span>
           <Link to="/help">Help</Link>
+          <Link to="/contact">Contact</Link>
           <Link to="/privacy">Privacy</Link>
           <Link to="/terms">Terms</Link>
         </div>

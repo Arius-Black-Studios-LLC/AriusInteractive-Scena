@@ -1,6 +1,6 @@
 # Arius Interactive — Brand Reference (Arleco operator)
 
-> **Arius Black Studios is dissolved.** Arleco is operated by **Arius Interactive** (not yet incorporated). Support: help@ariusinteractive.com
+> **Arius Black Studios is dissolved.** Arleco is operated by **Arius Interactive** (not yet incorporated). Support: hello@ariusinteractive.com
 
 The ABS logo below is **legacy only** — do not use on new Arleco surfaces.
 
